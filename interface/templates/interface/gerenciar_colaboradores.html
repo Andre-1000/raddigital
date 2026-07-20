@@ -23,6 +23,23 @@
     <button type="button" class="botao botao--primaria" id="botao-adicionar">Adicionar</button>
   </div>
 
+  <div class="cartao" style="margin-top:1rem;">
+    <h2 style="font-size:1rem;">Importar lista (CSV)</h2>
+    <p class="texto-suave" style="font-size:0.85rem;">
+      Um colaborador por linha: <strong>registro da empresa, nome</strong>.
+      Cabeçalho é opcional (detectado automaticamente). Aceita separador
+      vírgula ou ponto e vírgula (Excel em português costuma exportar com
+      ponto e vírgula). Quem já está cadastrado tem o nome atualizado e é
+      reativado — pode rodar de novo sempre que a lista for atualizada,
+      sem duplicar ninguém.
+    </p>
+    <div id="aviso-importar"></div>
+    <input type="file" id="campo-arquivo-importar" accept=".csv,text/csv">
+    <button type="button" class="botao botao--secundaria" id="botao-importar" style="margin-top:0.75rem;">
+      Importar
+    </button>
+  </div>
+
   <div id="aviso-lista" style="margin-top:1rem;"></div>
   <div id="lista-colaboradores" class="pilha" style="margin-top:1rem;"></div>
 </div>

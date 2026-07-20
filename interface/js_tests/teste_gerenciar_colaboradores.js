@@ -66,6 +66,23 @@ async function principal() {
         colaboradores = colaboradores.filter((c) => c.id !== id);
         return { ok: true, json: async () => ({ removido: true }) };
       }
+      if (url === '/colaboradores/importar/' && metodo === 'POST') {
+        const arquivo = opcoes.body.get('arquivo');
+        const texto = await arquivo.text();
+        const linhas = texto.split('\n').filter((l) => l.trim());
+        let criados = 0;
+        const erros = [];
+        linhas.forEach((linha, indice) => {
+          const [registro, nome] = linha.split(',').map((c) => (c || '').trim());
+          if (!/^\d+$/.test(registro || '')) {
+            erros.push({ linha: indice + 1, mensagem: 'Registro invalido.' });
+            return;
+          }
+          colaboradores.push({ id: proximoId++, registro_empresa: registro, nome, ativo: true });
+          criados++;
+        });
+        return { ok: true, json: async () => ({ criados, atualizados: 0, erros }) };
+      }
       return { ok: false, json: async () => ({ erro: 'rota nao mockada: ' + url }) };
     },
   };
@@ -176,6 +193,29 @@ async function principal() {
   assert(
     !document.getElementById('lista-colaboradores').textContent.includes('Fulano Editado'),
     'colaborador excluido desaparece da tela'
+  );
+
+  // ---- Importar CSV ----
+
+  const File = window.File;
+  const conteudoCsv = '55555,Importado Um\n66666,Importado Dois\nABC,Registro Invalido\n';
+  const arquivoCsv = new File([conteudoCsv], 'lista.csv', { type: 'text/csv' });
+
+  const campoArquivo = document.getElementById('campo-arquivo-importar');
+  Object.defineProperty(campoArquivo, 'files', { value: [arquivoCsv], configurable: true });
+
+  document.getElementById('botao-importar').dispatchEvent(new window.Event('click', { bubbles: true }));
+  await new Promise((resolve) => setTimeout(resolve, 80));
+
+  const listaTextoAposImportar = document.getElementById('lista-colaboradores').textContent;
+  assert(listaTextoAposImportar.includes('Importado Um'), 'colaborador importado (linha 1) aparece na lista');
+  assert(listaTextoAposImportar.includes('Importado Dois'), 'colaborador importado (linha 2) aparece na lista');
+
+  const avisoImportar = document.getElementById('aviso-importar').textContent;
+  assert(avisoImportar.includes('2'), 'resumo mostra a quantidade de criados');
+  assert(
+    avisoImportar.includes('1') && avisoImportar.toLowerCase().includes('não importada'),
+    'resumo avisa sobre a linha com erro sem travar as outras'
   );
 
   console.log(`\n${falhas === 0 ? 'TODOS OS TESTES PASSARAM' : falhas + ' TESTE(S) FALHARAM'}`);

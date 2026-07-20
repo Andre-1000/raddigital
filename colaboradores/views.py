@@ -7,11 +7,14 @@ Views do app colaboradores.
   o cliente offline-first guardar em IndexedDB e poder adicionar
   colaboradores ao RAD mesmo sem conexao (o mesmo padrao usado em
   catalogos/views.py::listar_todos).
-- criar/editar/excluir: exclusivas do Administrador (RG-RESP-012).
+- criar/editar/excluir/importar: exclusivas do Administrador (RG-RESP-012).
 """
+import csv
+import io
 import json
 import re
 
+from django.db import transaction
 from django.db.models import Q
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -23,6 +26,7 @@ from usuarios.models import UsuarioPerfil
 from .models import ColaboradorCadastro
 
 REGEX_SOMENTE_NUMEROS = re.compile(r'^\d+$')
+TAMANHO_MAXIMO_IMPORTACAO_BYTES = 5 * 1024 * 1024  # 5MB
 
 
 def _serializar(colaborador):
@@ -193,3 +197,113 @@ def _validar_registro_e_nome(registro_empresa, nome):
     if not nome:
         erros.append({'campo': 'nome', 'mensagem': 'Informe o nome do colaborador.'})
     return erros
+
+
+def _decodificar_csv(conteudo_bruto):
+    """
+    Tenta algumas codificacoes comuns, nessa ordem: UTF-8 com BOM
+    (o que o Excel do Windows costuma gravar), UTF-8 puro, e Latin-1
+    (fallback comum para planilhas antigas/exportadas com acentuacao
+    em codificacao antiga). Retorna None se nenhuma funcionar.
+    """
+    for codificacao in ('utf-8-sig', 'utf-8', 'latin-1'):
+        try:
+            return conteudo_bruto.decode(codificacao)
+        except (UnicodeDecodeError, LookupError):
+            continue
+    return None
+
+
+def _detectar_delimitador_csv(texto):
+    """
+    Excel em portugues do Brasil normalmente exporta CSV com ";" (o
+    "," e reservado para separador decimal nas configuracoes
+    regionais brasileiras) -- mas um CSV gerado em inglês/outros
+    sistemas costuma vir com ",". Decide pelo que aparece mais na
+    primeira linha, em vez de assumir um dos dois.
+    """
+    primeira_linha = texto.splitlines()[0] if texto.splitlines() else ''
+    return ';' if primeira_linha.count(';') > primeira_linha.count(',') else ','
+
+
+@csrf_exempt
+@require_http_methods(['POST'])
+@requer_token
+@requer_perfil(UsuarioPerfil.ADMINISTRADOR)
+def importar(request):
+    """
+    POST /colaboradores/importar/
+    Multipart, campo "arquivo": um CSV com duas colunas por linha --
+    registro_empresa, nome. Cabecalho e opcional (detectado
+    automaticamente: se a primeira coluna da primeira linha nao for
+    só numero, é tratada como cabecalho e ignorada).
+
+    Comportamento "upsert", pensado para poder rodar de novo sempre
+    que a CPTM mandar uma lista atualizada, sem duplicar nem falhar:
+    - registro_empresa que já existe → nome atualizado, reativado
+      caso estivesse desativado.
+    - registro_empresa novo → criado.
+
+    RG-RESP-012: exclusivo do Administrador, mesma regra dos outros
+    endpoints deste app.
+    """
+    arquivo = request.FILES.get('arquivo')
+    if not arquivo:
+        return JsonResponse({'erro': 'Envie um arquivo CSV no campo "arquivo".'}, status=400)
+
+    if arquivo.size > TAMANHO_MAXIMO_IMPORTACAO_BYTES:
+        return JsonResponse({'erro': 'Arquivo muito grande (limite de 5MB).'}, status=400)
+
+    texto = _decodificar_csv(arquivo.read())
+    if texto is None:
+        return JsonResponse(
+            {'erro': 'Nao foi possivel ler o arquivo. Salve como CSV (UTF-8) e tente novamente.'},
+            status=400,
+        )
+
+    delimitador = _detectar_delimitador_csv(texto)
+    todas_as_linhas = list(csv.reader(io.StringIO(texto), delimiter=delimitador))
+    # Descarta linhas totalmente vazias (comuns no fim de exports do Excel).
+    todas_as_linhas = [linha for linha in todas_as_linhas if any((c or '').strip() for c in linha)]
+
+    if not todas_as_linhas:
+        return JsonResponse({'erro': 'Arquivo vazio.'}, status=400)
+
+    indice_inicio = 0
+    primeira_coluna = (todas_as_linhas[0][0] if todas_as_linhas[0] else '').strip()
+    if not REGEX_SOMENTE_NUMEROS.match(primeira_coluna):
+        indice_inicio = 1  # primeira linha parece cabecalho, nao dado -- pula
+
+    criados = 0
+    atualizados = 0
+    erros_linhas = []
+
+    with transaction.atomic():
+        for numero_linha, linha in enumerate(todas_as_linhas[indice_inicio:], start=indice_inicio + 1):
+            registro_empresa = (linha[0] if len(linha) > 0 else '').strip()
+            nome = (linha[1] if len(linha) > 1 else '').strip()
+
+            erros_campo = _validar_registro_e_nome(registro_empresa, nome)
+            if erros_campo:
+                erros_linhas.append(
+                    {'linha': numero_linha, 'mensagem': '; '.join(e['mensagem'] for e in erros_campo)}
+                )
+                continue
+
+            _, criado = ColaboradorCadastro.objects.update_or_create(
+                registro_empresa=registro_empresa,
+                defaults={'nome': nome, 'ativo': True},
+            )
+            if criado:
+                criados += 1
+            else:
+                atualizados += 1
+
+    return JsonResponse(
+        {
+            'criados': criados,
+            'atualizados': atualizados,
+            'total_processado': criados + atualizados,
+            'erros': erros_linhas,
+        }
+    )

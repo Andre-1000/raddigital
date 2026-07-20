@@ -234,6 +234,66 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
   });
 
+  // ---- Importar CSV -------------------------------------------------------
+
+  const avisoImportar = document.getElementById('aviso-importar');
+
+  function montarResumoImportacao(corpo) {
+    const partes = [`<strong>${corpo.criados}</strong> adicionado(s)`, `<strong>${corpo.atualizados}</strong> atualizado(s)`];
+    let html = `<div class="aviso aviso--sucesso">${partes.join(', ')}.</div>`;
+
+    if (corpo.erros && corpo.erros.length > 0) {
+      const itensErro = corpo.erros
+        .map((e) => `<li>Linha ${e.linha}: ${e.mensagem}</li>`)
+        .join('');
+      html += `
+        <div class="aviso aviso--atencao">
+          <strong>${corpo.erros.length} linha(s) não importada(s):</strong>
+          <ul style="margin: 0.5rem 0 0; padding-left: 1.2rem;">${itensErro}</ul>
+        </div>
+      `;
+    }
+    return html;
+  }
+
+  document.getElementById('botao-importar').addEventListener('click', async function () {
+    avisoImportar.innerHTML = '';
+    const campoArquivo = document.getElementById('campo-arquivo-importar');
+    const arquivo = campoArquivo.files[0];
+    if (!arquivo) {
+      avisoImportar.innerHTML = '<div class="aviso aviso--erro">Escolha um arquivo CSV.</div>';
+      return;
+    }
+
+    const botao = document.getElementById('botao-importar');
+    botao.disabled = true;
+    botao.textContent = 'Importando…';
+    try {
+      const formData = new FormData();
+      formData.append('arquivo', arquivo);
+
+      const resposta = await RadAuth.requisicaoAutenticada('/colaboradores/importar/', {
+        method: 'POST',
+        body: formData,
+      });
+      const corpo = await resposta.json().catch(() => ({}));
+
+      if (!resposta.ok) {
+        avisoImportar.innerHTML = `<div class="aviso aviso--erro">${corpo.erro || 'Não foi possível importar o arquivo.'}</div>`;
+        return;
+      }
+
+      avisoImportar.innerHTML = montarResumoImportacao(corpo);
+      campoArquivo.value = '';
+      await carregarLista();
+    } catch (erro) {
+      avisoImportar.innerHTML = '<div class="aviso aviso--erro">Erro de conexão ao importar.</div>';
+    } finally {
+      botao.disabled = false;
+      botao.textContent = 'Importar';
+    }
+  });
+
   // ---- Exclusao ----------------------------------------------------------
 
   const modalExcluir = document.getElementById('modal-excluir-colaborador');
