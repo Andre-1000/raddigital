@@ -1,103 +1,116 @@
 {% extends "interface/base.html" %}
 {% block titulo %}Consultar RADs — Sistema RAD{% endblock %}
 
+{% block cabecalho_extra %}
+<style>
+  /* Tela administrativa (uso predominante no computador): aproveita
+     mais largura de tela do que o container-app padrão, que é
+     dimensionado para preenchimento em campo no celular. */
+  .container-app { max-width: var(--largura-app-administrativa); }
+</style>
+{% endblock %}
+
 {% block conteudo %}
 <div id="conteudo-protegido" style="display:none;">
   <h1 style="font-size:1.3rem;">Consultar RADs</h1>
 
   <div class="cartao">
-    <div class="campo" style="margin-bottom:0.6rem;">
-      <label for="filtro-numero-rad">N° RAD</label>
-      <input type="text" id="filtro-numero-rad" placeholder="Ex.: R00001">
-    </div>
-    <div class="campo" style="margin-bottom:0.6rem;">
-      <label for="filtro-numero-os">N° OS</label>
-      <input type="text" id="filtro-numero-os">
-    </div>
-    <div class="campo" style="margin-bottom:0.6rem;">
-      <label for="filtro-numero-sa">N° SA</label>
-      <input type="text" id="filtro-numero-sa" inputmode="numeric">
-    </div>
-    <div class="campo" style="margin-bottom:0.6rem;">
-      <label for="filtro-status">Status</label>
-      <select id="filtro-status">
-        <option value="">Todos</option>
-        <option value="sincronizado">Sincronizado</option>
-        <option value="cancelado">Cancelado</option>
-      </select>
+    <div class="grade-campos">
+      <div class="campo">
+        <label for="filtro-numero-rad">N° RAD</label>
+        <input type="text" id="filtro-numero-rad" placeholder="Ex.: R00001">
+      </div>
+      <div class="campo">
+        <label for="filtro-numero-os">N° OS</label>
+        <input type="text" id="filtro-numero-os">
+      </div>
+      <div class="campo">
+        <label for="filtro-numero-sa">N° SA</label>
+        <input type="text" id="filtro-numero-sa" inputmode="numeric">
+      </div>
+      <div class="campo">
+        <label for="filtro-status">Status</label>
+        <select id="filtro-status">
+          <option value="">Todos</option>
+          <option value="sincronizado">Sincronizado</option>
+          <option value="cancelado">Cancelado</option>
+        </select>
+      </div>
+
+      <div class="campo">
+        <label for="filtro-data-de">Data de preenchimento — de</label>
+        <input type="date" id="filtro-data-de">
+      </div>
+      <div class="campo">
+        <label for="filtro-data-ate">Data de preenchimento — até</label>
+        <input type="date" id="filtro-data-ate">
+      </div>
+
+      <div class="campo">
+        <label for="filtro-local-inicial">Local inicial</label>
+        <select id="filtro-local-inicial">
+          <option value="">Todos</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label for="filtro-local-final">Local final</label>
+        <select id="filtro-local-final">
+          <option value="">Todos</option>
+        </select>
+      </div>
+
+      <div class="campo">
+        <label for="filtro-tipo-manutencao">Tipo de manutenção</label>
+        <select id="filtro-tipo-manutencao">
+          <option value="">Todos</option>
+        </select>
+      </div>
+
+      <div class="campo">
+        <label for="filtro-numero-falha">N° falha</label>
+        <input type="text" id="filtro-numero-falha">
+      </div>
+
+      <div class="campo">
+        <label for="filtro-mch">MCH</label>
+        <select id="filtro-mch">
+          <option value="">Todos</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label for="filtro-linha-mch">Linha da MCH</label>
+        <select id="filtro-linha-mch">
+          <option value="">Todas</option>
+        </select>
+      </div>
+
+      <div class="campo">
+        <label for="filtro-login-usuario">Técnico (login)</label>
+        <input type="text" id="filtro-login-usuario">
+      </div>
+
+      <div class="campo">
+        <label for="filtro-hp-inicio-de">Hora prog. início — de</label>
+        <input type="datetime-local" id="filtro-hp-inicio-de">
+      </div>
+      <div class="campo">
+        <label for="filtro-hp-inicio-ate">Hora prog. início — até</label>
+        <input type="datetime-local" id="filtro-hp-inicio-ate">
+      </div>
+      <div class="campo">
+        <label for="filtro-hr-inicio-de">Hora real início — de</label>
+        <input type="datetime-local" id="filtro-hr-inicio-de">
+      </div>
+      <div class="campo">
+        <label for="filtro-hr-inicio-ate">Hora real início — até</label>
+        <input type="datetime-local" id="filtro-hr-inicio-ate">
+      </div>
     </div>
 
-    <div class="campo" style="margin-bottom:0.6rem;">
-      <label for="filtro-data-de">Data de preenchimento — de</label>
-      <input type="date" id="filtro-data-de">
+    <div class="linha-acoes">
+      <button type="button" class="botao botao--primaria" id="botao-filtrar">Filtrar</button>
+      <button type="button" class="botao botao--secundaria" id="botao-limpar-filtros">Limpar filtros</button>
     </div>
-    <div class="campo" style="margin-bottom:0.6rem;">
-      <label for="filtro-data-ate">Data de preenchimento — até</label>
-      <input type="date" id="filtro-data-ate">
-    </div>
-
-    <div class="campo" style="margin-bottom:0.6rem;">
-      <label for="filtro-local-inicial">Local inicial</label>
-      <select id="filtro-local-inicial">
-        <option value="">Todos</option>
-      </select>
-    </div>
-    <div class="campo" style="margin-bottom:0.6rem;">
-      <label for="filtro-local-final">Local final</label>
-      <select id="filtro-local-final">
-        <option value="">Todos</option>
-      </select>
-    </div>
-
-    <div class="campo" style="margin-bottom:0.6rem;">
-      <label for="filtro-tipo-manutencao">Tipo de manutenção</label>
-      <select id="filtro-tipo-manutencao">
-        <option value="">Todos</option>
-      </select>
-    </div>
-
-    <div class="campo" style="margin-bottom:0.6rem;">
-      <label for="filtro-numero-falha">N° falha</label>
-      <input type="text" id="filtro-numero-falha">
-    </div>
-
-    <div class="campo" style="margin-bottom:0.6rem;">
-      <label for="filtro-mch">MCH</label>
-      <select id="filtro-mch">
-        <option value="">Todos</option>
-      </select>
-    </div>
-    <div class="campo" style="margin-bottom:0.6rem;">
-      <label for="filtro-linha-mch">Linha da MCH</label>
-      <select id="filtro-linha-mch">
-        <option value="">Todas</option>
-      </select>
-    </div>
-
-    <div class="campo" style="margin-bottom:0.6rem;">
-      <label for="filtro-login-usuario">Técnico (login)</label>
-      <input type="text" id="filtro-login-usuario">
-    </div>
-
-    <div class="campo" style="margin-bottom:0.6rem;">
-      <label for="filtro-hp-inicio-de">Hora prog. início — de</label>
-      <input type="datetime-local" id="filtro-hp-inicio-de">
-    </div>
-    <div class="campo" style="margin-bottom:0.6rem;">
-      <label for="filtro-hp-inicio-ate">Hora prog. início — até</label>
-      <input type="datetime-local" id="filtro-hp-inicio-ate">
-    </div>
-    <div class="campo" style="margin-bottom:0.6rem;">
-      <label for="filtro-hr-inicio-de">Hora real início — de</label>
-      <input type="datetime-local" id="filtro-hr-inicio-de">
-    </div>
-    <div class="campo" style="margin-bottom:0.6rem;">
-      <label for="filtro-hr-inicio-ate">Hora real início — até</label>
-      <input type="datetime-local" id="filtro-hr-inicio-ate">
-    </div>
-
-    <button type="button" class="botao botao--primaria" id="botao-filtrar">Filtrar</button>
-    <button type="button" class="botao" id="botao-limpar-filtros">Limpar filtros</button>
   </div>
 
   <div id="aviso-consulta" style="margin-top:1rem;"></div>
@@ -231,7 +244,7 @@
 
         dados.resultados.forEach(function (rad) {
           const item = document.createElement('a');
-          item.className = 'cartao';
+          item.className = 'cartao cartao--interativo';
           item.style.display = 'block';
           item.style.textDecoration = 'none';
           item.style.color = 'inherit';

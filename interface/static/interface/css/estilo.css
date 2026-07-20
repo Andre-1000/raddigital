@@ -16,22 +16,28 @@
   Decisões de design que continuam valendo:
   - Fontes do sistema (system-ui), não webfonts externas: a ferramenta
     roda offline e em conexão ruim em campo.
-  - Alvo de toque mínimo de 44px: uso em celular, muitas vezes com luvas.
+  - Alvo de toque mínimo de 44px.
+
+  Atualização (20/07/2026): modernização visual (sombras, transições,
+  cantos) + classes de grade responsiva para telas administrativas
+  (Consulta, Gestão de Colaboradores, Gestão de Usuários) usadas em
+  computador. A tela "Novo RAD" mantém prioridade de uso em celular e
+  só adota grade onde isso não prejudica a leitura em uma coluna.
 */
 
 :root {
   /* Cor */
-  --cor-fundo: #f1f0f7;          /* tom muito claro derivado do azul-marinho, para distinguir do cartão */
+  --cor-fundo: #f1f0f7;
   --cor-superficie: #fffcff;
   --cor-tinta: #242472;
   --cor-tinta-suave: #5a5a8f;
   --cor-linha: #dcdaee;
 
-  --cor-primaria: #11aa60;       /* verde — ações principais, confirmar, sincronizar */
+  --cor-primaria: #11aa60;
   --cor-primaria-escura: #0c8048;
-  --cor-atencao: #fa5e13;        /* laranja — atrasos, avisos, offline */
+  --cor-atencao: #fa5e13;
   --cor-atencao-fundo: #fef0e4;
-  --cor-perigo: #b8300f;         /* variação avermelhada do laranja — cancelar, erro, remover */
+  --cor-perigo: #b8300f;
   --cor-perigo-fundo: #fbe5df;
   --cor-sucesso-fundo: #e1f5eb;
 
@@ -40,10 +46,18 @@
   --fonte-mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
 
   /* Espaçamento e forma */
-  --raio: 10px;
-  --raio-pequeno: 6px;
+  --raio: 12px;
+  --raio-grande: 18px;
+  --raio-pequeno: 8px;
   --alvo-toque: 44px;
-  --sombra: 0 1px 2px rgba(36, 36, 114, 0.07), 0 1px 12px rgba(36, 36, 114, 0.06);
+  --sombra: 0 1px 2px rgba(36, 36, 114, 0.06), 0 8px 24px rgba(36, 36, 114, 0.07);
+  --sombra-elevada: 0 4px 10px rgba(36, 36, 114, 0.08), 0 16px 36px rgba(36, 36, 114, 0.10);
+  --transicao: 0.16s ease;
+  --transicao-lenta: 0.22s ease;
+
+  /* Larguras de contêiner */
+  --largura-app-formulario: 640px;   /* telas de preenchimento em campo (mobile-first) */
+  --largura-app-administrativa: 1180px; /* telas de consulta/gestão (uso predominante em desktop) */
 }
 
 * {
@@ -82,7 +96,7 @@ h1, h2, h3 {
   margin: 0 0 0.5rem;
 }
 
-/* Barra superior — motivo assinatura: trilho como divisor, não decoração */
+/* Barra superior */
 .barra-topo {
   background: var(--cor-superficie);
   border-bottom: 3px solid var(--cor-primaria);
@@ -120,9 +134,19 @@ h1, h2, h3 {
 }
 
 .container-app {
-  max-width: 640px;
+  max-width: var(--largura-app-formulario);
   margin: 0 auto;
   padding: 1.25rem 1rem 2rem;
+}
+
+/*
+  Contêiner mais largo para telas administrativas (Consulta, Gestão de
+  Colaboradores, Gestão de Usuários). Aplicar em conjunto com
+  .container-app trocando a classe no elemento <main>, ou adicionar
+  esta classe extra a um contêiner interno.
+*/
+.container-app--administrativo {
+  max-width: var(--largura-app-administrativa);
 }
 
 /* Cartões */
@@ -132,9 +156,22 @@ h1, h2, h3 {
   border-radius: var(--raio);
   padding: 1.25rem;
   box-shadow: var(--sombra);
+  transition: box-shadow var(--transicao), transform var(--transicao), border-color var(--transicao);
 }
 
-/* Botões — alvo de toque grande */
+/* Cartão clicável (ex.: item de lista em Consulta de RADs) ganha
+   destaque sutil ao passar o mouse -- só faz sentido em telas com
+   ponteiro, então fica atrás de um hover media query. */
+@media (hover: hover) {
+  a.cartao.cartao--interativo:hover,
+  .cartao--interativo:hover {
+    box-shadow: var(--sombra-elevada);
+    border-color: var(--cor-linha);
+    transform: translateY(-1px);
+  }
+}
+
+/* Botões */
 .botao {
   display: inline-flex;
   align-items: center;
@@ -149,7 +186,7 @@ h1, h2, h3 {
   font-family: inherit;
   cursor: pointer;
   text-decoration: none;
-  transition: filter 0.15s ease, transform 0.05s ease;
+  transition: filter var(--transicao), transform 0.05s ease, box-shadow var(--transicao);
   width: 100%;
 }
 
@@ -166,8 +203,8 @@ h1, h2, h3 {
   background: var(--cor-primaria);
   color: #fff;
 }
-.botao--primaria:hover { filter: brightness(1.06); }
-.botao--primaria:disabled { background: var(--cor-linha); color: var(--cor-tinta-suave); cursor: not-allowed; }
+.botao--primaria:hover { filter: brightness(1.06); box-shadow: 0 4px 12px rgba(17, 170, 96, 0.28); }
+.botao--primaria:disabled { background: var(--cor-linha); color: var(--cor-tinta-suave); cursor: not-allowed; box-shadow: none; }
 
 .botao--secundaria {
   background: var(--cor-superficie);
@@ -180,7 +217,23 @@ h1, h2, h3 {
   background: var(--cor-perigo);
   color: #fff;
 }
-.botao--perigo:hover { filter: brightness(1.08); }
+.botao--perigo:hover { filter: brightness(1.08); box-shadow: 0 4px 12px rgba(184, 48, 15, 0.25); }
+
+/*
+  Linha de ações: agrupa botões lado a lado (ex.: "Filtrar" +
+  "Limpar filtros"). Em telas estreitas, quebra para empilhar,
+  mantendo cada botão com alvo de toque confortável.
+*/
+.linha-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+.linha-acoes .botao {
+  width: auto;
+  flex: 1 1 200px;
+}
 
 /* Formulário */
 .campo {
@@ -216,18 +269,49 @@ h1, h2, h3 {
   border-radius: var(--raio-pequeno);
   background: var(--cor-superficie);
   color: var(--cor-tinta);
+  transition: border-color var(--transicao), box-shadow var(--transicao);
+}
+
+.campo input:hover,
+.campo select:hover,
+.campo textarea:hover {
+  border-color: #c3c0e6;
 }
 
 .campo input:focus-visible,
 .campo select:focus-visible,
 .campo textarea:focus-visible {
-  outline: 3px solid var(--cor-primaria-escura);
-  outline-offset: 1px;
+  outline: none;
+  border-color: var(--cor-primaria-escura);
+  box-shadow: 0 0 0 3px rgba(12, 128, 72, 0.18);
 }
 
 .campo textarea {
   min-height: 90px;
   resize: vertical;
+}
+
+/*
+  Grade de campos: usada em formulários de telas administrativas
+  (Consulta, Gestão de Colaboradores, Gestão de Usuários) para
+  organizar múltiplos filtros/campos em colunas no computador.
+  `auto-fit` + `minmax` colapsa sozinho para 1 coluna em telas
+  estreitas, sem precisar de media query separada para mobile.
+*/
+.grade-campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.9rem 1.25rem;
+}
+
+.grade-campos .campo {
+  margin-bottom: 0;
+}
+
+/* Variante com colunas um pouco mais largas, para campos com rótulos
+   longos ou selects com texto extenso. */
+.grade-campos--largo {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
 /* Mensagens de estado */
@@ -279,4 +363,53 @@ h1, h2, h3 {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+/*
+  Tabela administrativa (Gestão de Colaboradores, Gestão de Usuários):
+  visual mais moderno que uma tabela HTML padrão, mas continua sendo
+  uma <table> semântica.
+*/
+.tabela-wrap {
+  overflow-x: auto;
+  border-radius: var(--raio);
+  border: 1px solid var(--cor-linha);
+  box-shadow: var(--sombra);
+}
+
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--cor-superficie);
+  font-size: 0.92rem;
+}
+
+.tabela th,
+.tabela td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tabela thead th {
+  background: var(--cor-fundo);
+  color: var(--cor-tinta-suave);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  border-bottom: 1px solid var(--cor-linha);
+}
+
+.tabela tbody tr {
+  border-bottom: 1px solid var(--cor-linha);
+  transition: background var(--transicao);
+}
+.tabela tbody tr:last-child {
+  border-bottom: none;
+}
+@media (hover: hover) {
+  .tabela tbody tr:hover {
+    background: var(--cor-fundo);
+  }
 }
