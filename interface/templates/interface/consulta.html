@@ -11,6 +11,10 @@
       <input type="text" id="filtro-numero-rad" placeholder="Ex.: R00001">
     </div>
     <div class="campo" style="margin-bottom:0.6rem;">
+      <label for="filtro-numero-os">N° OS</label>
+      <input type="text" id="filtro-numero-os">
+    </div>
+    <div class="campo" style="margin-bottom:0.6rem;">
       <label for="filtro-numero-sa">N° SA</label>
       <input type="text" id="filtro-numero-sa" inputmode="numeric">
     </div>
@@ -22,7 +26,78 @@
         <option value="cancelado">Cancelado</option>
       </select>
     </div>
+
+    <div class="campo" style="margin-bottom:0.6rem;">
+      <label for="filtro-data-de">Data de preenchimento — de</label>
+      <input type="date" id="filtro-data-de">
+    </div>
+    <div class="campo" style="margin-bottom:0.6rem;">
+      <label for="filtro-data-ate">Data de preenchimento — até</label>
+      <input type="date" id="filtro-data-ate">
+    </div>
+
+    <div class="campo" style="margin-bottom:0.6rem;">
+      <label for="filtro-local-inicial">Local inicial</label>
+      <select id="filtro-local-inicial">
+        <option value="">Todos</option>
+      </select>
+    </div>
+    <div class="campo" style="margin-bottom:0.6rem;">
+      <label for="filtro-local-final">Local final</label>
+      <select id="filtro-local-final">
+        <option value="">Todos</option>
+      </select>
+    </div>
+
+    <div class="campo" style="margin-bottom:0.6rem;">
+      <label for="filtro-tipo-manutencao">Tipo de manutenção</label>
+      <select id="filtro-tipo-manutencao">
+        <option value="">Todos</option>
+      </select>
+    </div>
+
+    <div class="campo" style="margin-bottom:0.6rem;">
+      <label for="filtro-numero-falha">N° falha</label>
+      <input type="text" id="filtro-numero-falha">
+    </div>
+
+    <div class="campo" style="margin-bottom:0.6rem;">
+      <label for="filtro-mch">MCH</label>
+      <select id="filtro-mch">
+        <option value="">Todos</option>
+      </select>
+    </div>
+    <div class="campo" style="margin-bottom:0.6rem;">
+      <label for="filtro-linha-mch">Linha da MCH</label>
+      <select id="filtro-linha-mch">
+        <option value="">Todas</option>
+      </select>
+    </div>
+
+    <div class="campo" style="margin-bottom:0.6rem;">
+      <label for="filtro-login-usuario">Técnico (login)</label>
+      <input type="text" id="filtro-login-usuario">
+    </div>
+
+    <div class="campo" style="margin-bottom:0.6rem;">
+      <label for="filtro-hp-inicio-de">Hora prog. início — de</label>
+      <input type="datetime-local" id="filtro-hp-inicio-de">
+    </div>
+    <div class="campo" style="margin-bottom:0.6rem;">
+      <label for="filtro-hp-inicio-ate">Hora prog. início — até</label>
+      <input type="datetime-local" id="filtro-hp-inicio-ate">
+    </div>
+    <div class="campo" style="margin-bottom:0.6rem;">
+      <label for="filtro-hr-inicio-de">Hora real início — de</label>
+      <input type="datetime-local" id="filtro-hr-inicio-de">
+    </div>
+    <div class="campo" style="margin-bottom:0.6rem;">
+      <label for="filtro-hr-inicio-ate">Hora real início — até</label>
+      <input type="datetime-local" id="filtro-hr-inicio-ate">
+    </div>
+
     <button type="button" class="botao botao--primaria" id="botao-filtrar">Filtrar</button>
+    <button type="button" class="botao" id="botao-limpar-filtros">Limpar filtros</button>
   </div>
 
   <div id="aviso-consulta" style="margin-top:1rem;"></div>
@@ -53,18 +128,93 @@
       return `<span class="selo ${classe}">${status}</span>`;
     }
 
+    function popularSelect(id, itens, valorChave, rotuloFn) {
+      const select = document.getElementById(id);
+      itens.forEach(function (item) {
+        const opcao = document.createElement('option');
+        opcao.value = item[valorChave];
+        opcao.textContent = rotuloFn(item);
+        select.appendChild(opcao);
+      });
+    }
+
+    async function carregarCatalogos() {
+      try {
+        const resposta = await RadAuth.requisicaoAutenticada('/catalogos/todos/');
+        if (!resposta.ok) return;
+        const catalogos = await resposta.json();
+
+        // Locais: identificador e' a sigla (CatLocal nao expoe 'id').
+        popularSelect(
+          'filtro-local-inicial',
+          catalogos.locais,
+          'sigla',
+          (l) => `${l.sigla} — ${l.nome}`
+        );
+        popularSelect(
+          'filtro-local-final',
+          catalogos.locais,
+          'sigla',
+          (l) => `${l.sigla} — ${l.nome}`
+        );
+
+        popularSelect(
+          'filtro-tipo-manutencao',
+          catalogos.tipos_manutencao,
+          'id',
+          (t) => t.nome
+        );
+
+        popularSelect(
+          'filtro-mch',
+          catalogos.mch,
+          'id',
+          (m) => m.identificacao
+        );
+
+        // Linha da MCH e' campo texto no cadastro do AMV; usamos o
+        // catalogo de linhas so para preencher as opcoes do select.
+        popularSelect(
+          'filtro-linha-mch',
+          catalogos.linhas,
+          'nome',
+          (l) => l.nome
+        );
+      } catch (erro) {
+        // Falha ao carregar catalogos nao deve travar a tela de consulta;
+        // os filtros por texto continuam funcionando normalmente.
+      }
+    }
+
     async function carregarLista() {
       aviso.innerHTML = '';
       mensagemVazia.style.display = 'none';
       lista.innerHTML = '';
 
       const parametros = new URLSearchParams();
-      const numeroRad = document.getElementById('filtro-numero-rad').value.trim();
-      const numeroSa = document.getElementById('filtro-numero-sa').value.trim();
-      const status = document.getElementById('filtro-status').value;
-      if (numeroRad) parametros.set('numero_rad', numeroRad);
-      if (numeroSa) parametros.set('numero_sa', numeroSa);
-      if (status) parametros.set('status', status);
+
+      function definirSeExistir(idCampo, nomeParametro) {
+        const valor = document.getElementById(idCampo).value.trim();
+        if (valor) parametros.set(nomeParametro, valor);
+      }
+
+      definirSeExistir('filtro-numero-rad', 'numero_rad');
+      definirSeExistir('filtro-numero-os', 'numero_os');
+      definirSeExistir('filtro-numero-sa', 'numero_sa');
+      definirSeExistir('filtro-status', 'status');
+      definirSeExistir('filtro-data-de', 'data_de');
+      definirSeExistir('filtro-data-ate', 'data_ate');
+      definirSeExistir('filtro-local-inicial', 'id_local_inicial');
+      definirSeExistir('filtro-local-final', 'id_local_final');
+      definirSeExistir('filtro-tipo-manutencao', 'id_tipo_manutencao');
+      definirSeExistir('filtro-numero-falha', 'numero_falha');
+      definirSeExistir('filtro-mch', 'id_mch');
+      definirSeExistir('filtro-linha-mch', 'linha_mch');
+      definirSeExistir('filtro-login-usuario', 'login_usuario');
+      definirSeExistir('filtro-hp-inicio-de', 'hp_inicio_de');
+      definirSeExistir('filtro-hp-inicio-ate', 'hp_inicio_ate');
+      definirSeExistir('filtro-hr-inicio-de', 'hr_inicio_de');
+      definirSeExistir('filtro-hr-inicio-ate', 'hr_inicio_ate');
 
       try {
         const resposta = await RadAuth.requisicaoAutenticada(`/consulta/rads/?${parametros.toString()}`);
@@ -110,7 +260,24 @@
       }
     }
 
+    function limparFiltros() {
+      [
+        'filtro-numero-rad', 'filtro-numero-os', 'filtro-numero-sa',
+        'filtro-status', 'filtro-data-de', 'filtro-data-ate',
+        'filtro-local-inicial', 'filtro-local-final', 'filtro-tipo-manutencao',
+        'filtro-numero-falha', 'filtro-mch', 'filtro-linha-mch',
+        'filtro-login-usuario', 'filtro-hp-inicio-de', 'filtro-hp-inicio-ate',
+        'filtro-hr-inicio-de', 'filtro-hr-inicio-ate',
+      ].forEach(function (id) {
+        document.getElementById(id).value = '';
+      });
+      carregarLista();
+    }
+
     document.getElementById('botao-filtrar').addEventListener('click', carregarLista);
+    document.getElementById('botao-limpar-filtros').addEventListener('click', limparFiltros);
+
+    await carregarCatalogos();
     await carregarLista();
   });
 </script>
