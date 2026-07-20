@@ -1,0 +1,16 @@
+{
+  "name": "rad-frontend-tests",
+  "version": "1.0.0",
+  "description": "Testes de JS puro (regras de horario, DOM real com jsdom) do Sistema RAD. Rodados via pytest (interface/tests.py), nao publicados.",
+  "private": true,
+  "main": "teste_regras_horario.js",
+  "scripts": {
+    "test": "node teste_regras_horario.js && node teste_bloco_amv.js && node teste_colaboradores.js && node teste_anexos.js && node teste_campos_finais.js && node teste_sincronizar.js && node teste_detalhe_rad.js && node teste_conflito_rascunho.js && node teste_gerenciar_colaboradores.js && node teste_exportar_cliente.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "jsdom": "^29.1.1"
+  }
+}

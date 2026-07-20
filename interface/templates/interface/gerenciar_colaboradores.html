@@ -1,0 +1,45 @@
+{% extends "interface/base.html" %}
+{% load static %}
+{% block titulo %}Gerenciar Colaboradores — Sistema RAD{% endblock %}
+
+{% block conteudo %}
+<div id="conteudo-protegido" style="display:none;">
+  <h1 style="font-size:1.3rem;">Gerenciar Colaboradores</h1>
+  <p class="texto-suave" style="font-size:0.85rem; margin-top:-0.5rem;">
+    Cadastro oficial usado na busca de colaboradores ao preencher um RAD.
+  </p>
+
+  <div class="cartao">
+    <h2 style="font-size:1rem;">Adicionar Colaborador</h2>
+    <div id="aviso-criar"></div>
+    <div class="campo">
+      <label for="campo-novo-registro">Registro da Empresa</label>
+      <input type="text" id="campo-novo-registro" inputmode="numeric" maxlength="20">
+    </div>
+    <div class="campo">
+      <label for="campo-novo-nome">Nome</label>
+      <input type="text" id="campo-novo-nome" maxlength="200">
+    </div>
+    <button type="button" class="botao botao--primaria" id="botao-adicionar">Adicionar</button>
+  </div>
+
+  <div id="aviso-lista" style="margin-top:1rem;"></div>
+  <div id="lista-colaboradores" class="pilha" style="margin-top:1rem;"></div>
+</div>
+
+<!-- Modal de confirmacao de exclusao definitiva -->
+<div id="modal-excluir-colaborador" style="display:none; position:fixed; inset:0; background:rgba(28,31,30,0.5); z-index:30; align-items:center; justify-content:center; padding:1rem;">
+  <div class="cartao" style="max-width:420px;">
+    <h2 style="font-size:1.05rem;">Excluir colaborador?</h2>
+    <p>Remove <strong id="nome-colaborador-excluir"></strong> do cadastro oficial permanentemente. RADs já sincronizados que citam esta pessoa <strong>não são afetados</strong> — eles guardam uma cópia própria do nome. Considere <strong>desativar</strong> em vez de excluir, se a intenção é só impedir novas seleções.</p>
+    <div class="pilha">
+      <button type="button" class="botao botao--perigo" id="botao-confirmar-exclusao-colaborador">Excluir definitivamente</button>
+      <button type="button" class="botao botao--secundaria" id="botao-cancelar-exclusao-colaborador">Cancelar</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block script_extra %}
+<script src="{% static 'interface/js/gerenciar_colaboradores.js' %}"></script>
+{% endblock %}

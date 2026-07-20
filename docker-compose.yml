@@ -1,0 +1,49 @@
+# Sobe o Sistema RAD containerizado + Postgres, para testar a imagem
+# de producao localmente antes de mandar para qualquer provedor de
+# nuvem. Nao e o que roda em producao de verdade (isso depende do
+# provedor escolhido) -- e uma forma de validar que o Dockerfile
+# funciona antes de chegar lá.
+#
+# Uso: docker compose up --build
+#      docker compose exec web python manage.py migrate
+#      docker compose exec web python manage.py carregar_catalogos
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: sistema_rad
+      POSTGRES_USER: rad_dev
+      POSTGRES_PASSWORD: rad_dev_local_2026
+    volumes:
+      - dados_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rad_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DEBUG: "False"
+      SECRET_KEY: "troque-esta-chave-antes-de-usar-de-verdade-1234567890"
+      ALLOWED_HOSTS: "localhost,127.0.0.1"
+      DB_ENGINE: "django.db.backends.postgresql"
+      DB_NAME: "sistema_rad"
+      DB_USER: "rad_dev"
+      DB_PASSWORD: "rad_dev_local_2026"
+      DB_HOST: "db"
+      DB_PORT: "5432"
+      VALIDADE_TOKEN_DIAS: "7"
+    volumes:
+      - dados_media:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  dados_postgres:
+  dados_media:

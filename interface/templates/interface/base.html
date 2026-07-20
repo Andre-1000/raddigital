@@ -1,0 +1,76 @@
+{% load static %}<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#242472">
+  <title>{% block titulo %}Sistema RAD{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'interface/css/estilo.css' %}">
+  {% block cabecalho_extra %}{% endblock %}
+</head>
+<body>
+
+{% block barra_topo %}
+<header class="barra-topo">
+  <a class="barra-topo__marca" href="{% url 'interface:inicio' %}">
+    <svg class="trilho" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M4 4 L4 20 M20 4 L20 20" stroke="#242472" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M4 8 L20 8 M4 13 L20 13 M4 18 L20 18" stroke="#fa5e13" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    RAD
+  </a>
+  <div class="barra-topo__usuario">
+    <span id="indicador-conexao" class="selo selo--online">Online</span>
+    <span id="usuario-logado"></span>
+  </div>
+</header>
+{% endblock %}
+
+<main class="container-app">
+  {% block conteudo %}{% endblock %}
+</main>
+
+<script src="{% static 'interface/js/auth.js' %}"></script>
+<script src="{% static 'interface/js/db.js' %}"></script>
+<script>
+  // Indicador de conexão — atualizado em tempo real, sem esperar
+  // requisição falhar (RG conforme EFD: dispositivo pode estar offline
+  // desde a abertura da ferramenta).
+  function atualizarIndicadorConexao() {
+    const selo = document.getElementById('indicador-conexao');
+    if (!selo) return;
+    if (navigator.onLine) {
+      selo.textContent = 'Online';
+      selo.className = 'selo selo--online';
+    } else {
+      selo.textContent = 'Offline';
+      selo.className = 'selo selo--offline';
+    }
+  }
+  window.addEventListener('online', atualizarIndicadorConexao);
+  window.addEventListener('offline', atualizarIndicadorConexao);
+  atualizarIndicadorConexao();
+
+  document.addEventListener('DOMContentLoaded', function () {
+    const info = RadAuth.obterSessao();
+    const rotuloUsuario = document.getElementById('usuario-logado');
+    if (info && rotuloUsuario) {
+      rotuloUsuario.textContent = info.login;
+    }
+  });
+
+  // Registra o Service Worker (app shell offline, RG-SYNC-001/010/011).
+  // Sem suporte a Service Worker (navegador muito antigo), a ferramenta
+  // continua funcionando normalmente -- so nao fica disponivel offline
+  // na primeira abertura apos fechar o navegador.
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('/sw.js').catch(function (erro) {
+        console.warn('Nao foi possivel registrar o Service Worker:', erro);
+      });
+    });
+  }
+</script>
+{% block script_extra %}{% endblock %}
+</body>
+</html>

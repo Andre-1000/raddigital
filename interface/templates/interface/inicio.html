@@ -1,0 +1,96 @@
+{% extends "interface/base.html" %}
+{% block titulo %}Início — Sistema RAD{% endblock %}
+
+{% block conteudo %}
+<div id="conteudo-protegido" style="display:none;">
+  <h1 style="font-size:1.3rem;">Olá, <span id="nome-usuario"></span></h1>
+  <p class="texto-suave">O que você quer fazer agora?</p>
+
+  <div class="pilha" style="margin-top:1.25rem;">
+    <a href="{% url 'interface:novo_rad' %}" class="botao botao--primaria" id="link-novo-rad">+ Novo RAD</a>
+
+    <div id="bloco-gestao" style="display:none;">
+      <a href="{% url 'interface:consulta' %}" class="botao botao--secundaria">Consultar RADs</a>
+    </div>
+
+    <div id="bloco-admin" style="display:none;">
+      <a href="{% url 'interface:gerenciar_colaboradores' %}" class="botao botao--secundaria">Gerenciar Colaboradores</a>
+    </div>
+  </div>
+
+  <div class="cartao" style="margin-top:1.5rem;">
+    <p class="texto-suave" style="margin:0 0 0.6rem; font-size:0.85rem;" id="status-catalogos">
+      Catálogos: verificando…
+    </p>
+    <button type="button" class="botao botao--secundaria" id="botao-atualizar-catalogos">
+      Atualizar catálogos
+    </button>
+  </div>
+
+  <div class="cartao" style="margin-top:1rem;">
+    <button type="button" class="botao botao--secundaria" id="botao-sair">Sair</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block script_extra %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!RadAuth.exigirSessao()) return;
+
+    const sessao = RadAuth.obterSessao();
+    document.getElementById('nome-usuario').textContent = sessao.login;
+    document.getElementById('conteudo-protegido').style.display = '';
+
+    if (RadAuth.temPerfil('supervisor', 'administrador')) {
+      document.getElementById('bloco-gestao').style.display = '';
+    }
+    if (RadAuth.temPerfil('administrador')) {
+      document.getElementById('bloco-admin').style.display = '';
+    }
+
+    document.getElementById('botao-sair').addEventListener('click', function () {
+      RadAuth.sair();
+    });
+
+    const statusCatalogos = document.getElementById('status-catalogos');
+    const botaoAtualizar = document.getElementById('botao-atualizar-catalogos');
+
+    function formatarDataHora(isoString) {
+      if (!isoString) return null;
+      const data = new Date(isoString);
+      return data.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+    }
+
+    async function mostrarStatusCatalogos() {
+      const dataAtualizacao = await RadDB.dataUltimaAtualizacaoCatalogos();
+      if (dataAtualizacao) {
+        statusCatalogos.textContent = `Catálogos: atualizados em ${formatarDataHora(dataAtualizacao)}`;
+      } else {
+        statusCatalogos.textContent = 'Catálogos: ainda não baixados neste dispositivo.';
+      }
+    }
+
+    async function atualizarCatalogosAgora() {
+      if (!navigator.onLine) {
+        statusCatalogos.textContent = 'Sem conexão — não é possível atualizar os catálogos agora.';
+        return;
+      }
+      botaoAtualizar.disabled = true;
+      botaoAtualizar.textContent = 'Atualizando…';
+      try {
+        await RadDB.atualizarCatalogos();
+        await mostrarStatusCatalogos();
+      } catch (erro) {
+        statusCatalogos.textContent = 'Não foi possível atualizar os catálogos agora.';
+      } finally {
+        botaoAtualizar.disabled = false;
+        botaoAtualizar.textContent = 'Atualizar catálogos';
+      }
+    }
+
+    mostrarStatusCatalogos();
+    botaoAtualizar.addEventListener('click', atualizarCatalogosAgora);
+  });
+</script>
+{% endblock %}

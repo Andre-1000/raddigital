@@ -1,0 +1,301 @@
+{% extends "interface/base.html" %}
+{% block titulo %}{{ numero_rad }} — Sistema RAD{% endblock %}
+
+{% block conteudo %}
+<div id="conteudo-protegido" style="display:none;">
+  <a href="{% url 'interface:consulta' %}" class="texto-suave" style="font-size:0.85rem;">&larr; Voltar para a lista</a>
+  <h1 style="font-size:1.3rem; margin-top:0.5rem;">
+    {{ numero_rad }} <span id="selo-status"></span>
+  </h1>
+
+  <div id="aviso-detalhe"></div>
+
+  <div class="cartao" id="cartao-dados" style="display:none;">
+    <h2 style="font-size:1rem;">Dados do RAD</h2>
+    <div id="lista-campos" class="pilha"></div>
+  </div>
+
+  <div class="cartao" id="cartao-colaboradores" style="margin-top:1rem; display:none;">
+    <h2 style="font-size:1rem;">Colaboradores e Participantes</h2>
+    <div id="lista-colaboradores-detalhe" class="pilha"></div>
+  </div>
+
+  <div class="cartao" id="cartao-anexos" style="margin-top:1rem; display:none;">
+    <h2 style="font-size:1rem;">Anexos</h2>
+    <div id="lista-anexos-detalhe" class="pilha"></div>
+  </div>
+
+  <div class="cartao" id="cartao-exportar" style="margin-top:1rem; display:none;">
+    <h2 style="font-size:1rem;">Exportar</h2>
+    <div id="aviso-exportar"></div>
+    <div class="pilha">
+      <button type="button" class="botao botao--secundaria" id="botao-copiar-mensagem">Copiar mensagem</button>
+      <button type="button" class="botao botao--secundaria" id="botao-baixar-pdf">Baixar PDF</button>
+      <button type="button" class="botao botao--secundaria" id="botao-baixar-docx">Baixar Word</button>
+    </div>
+  </div>
+
+  <div class="cartao" id="cartao-cancelar" style="margin-top:1rem; display:none;">
+    <h2 style="font-size:1rem;">Cancelamento</h2>
+    <p class="texto-suave" style="font-size:0.85rem;">
+      Exclusivo do Administrador. O cancelamento é <strong>irreversível</strong>.
+    </p>
+    <button type="button" class="botao botao--perigo" id="botao-abrir-cancelamento">Cancelar este RAD</button>
+  </div>
+</div>
+
+<!-- Modal de confirmacao de cancelamento (RG-CAN-005/009) -->
+<div id="modal-cancelamento" style="display:none; position:fixed; inset:0; background:rgba(28,31,30,0.5); z-index:30; align-items:center; justify-content:center; padding:1rem;">
+  <div class="cartao" style="max-width:420px;">
+    <h2 style="font-size:1.05rem;">Cancelar {{ numero_rad }}?</h2>
+    <p>Esta ação é <strong>irreversível</strong>. Informe o motivo do cancelamento.</p>
+    <div class="campo">
+      <label for="campo-justificativa-cancelamento">Justificativa</label>
+      <textarea id="campo-justificativa-cancelamento" maxlength="1000"></textarea>
+    </div>
+    <div id="aviso-modal-cancelamento"></div>
+    <div class="pilha">
+      <button type="button" class="botao botao--perigo" id="botao-confirmar-cancelamento">Confirmar cancelamento</button>
+      <button type="button" class="botao botao--secundaria" id="botao-fechar-modal-cancelamento">Voltar</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block script_extra %}
+{{ numero_rad|json_script:"numero-rad-raw" }}
+<script>
+  document.addEventListener('DOMContentLoaded', async function () {
+    if (!RadAuth.exigirSessao()) return;
+    if (!RadAuth.temPerfil('supervisor', 'administrador')) {
+      window.location.href = '/inicio/';
+      return;
+    }
+    document.getElementById('conteudo-protegido').style.display = '';
+
+    const NUMERO_RAD = JSON.parse(document.getElementById('numero-rad-raw').textContent);
+
+    const avisoDetalhe = document.getElementById('aviso-detalhe');
+
+    const ROTULOS = {
+      numero_os: 'OS',
+      numero_sa: 'N° SA',
+      numero_execucao: 'N° Execução',
+      data_preenchimento: 'Data',
+      local_inicial: 'Local Inicial',
+      local_final: 'Local Final',
+      km_poste: 'Km/Poste',
+      linhas: 'Linhas',
+      vias: 'Vias',
+      equipes: 'Equipes Envolvidas',
+      tipo_manutencao: 'Tipo de Manutenção',
+      numero_falha: 'N° Falha',
+      hora_prog_inicio: 'Horário Programado de Início',
+      hora_prog_termino: 'Horário Programado de Término',
+      hora_real_inicio: 'Horário Real de Início',
+      hora_real_termino: 'Horário Real de Término',
+      duracao_programada_min: 'Duração Programada (min)',
+      duracao_real_min: 'Duração Real (min)',
+      motivo_atraso_inicio: 'Motivo do Atraso no Início',
+      desc_motivo_atraso_inicio: 'Descrição do Atraso no Início',
+      motivo_atraso_termino: 'Motivo do Atraso no Término',
+      desc_motivo_atraso_termino: 'Descrição do Atraso no Término',
+      servicos: 'Serviços Executados',
+      outros_servico_desc: 'Descrição de Outros Serviços',
+      responsavel_atividade: 'Responsável Atividade',
+      operador_ccm: 'Operador CCM',
+      descricao_tecnica_atividade: 'Descrição Técnica da Atividade',
+      materiais_utilizados: 'Materiais Utilizados',
+      observacoes_gerais: 'Observações Gerais',
+      login_usuario: 'Preenchido por',
+      data_sincronizacao: 'Sincronizado em',
+    };
+
+    function formatarValor(valor) {
+      if (valor === null || valor === undefined || valor === '') return 'N/A';
+      if (Array.isArray(valor)) return valor.length ? valor.join(', ') : 'N/A';
+      if (typeof valor === 'boolean') return valor ? 'Sim' : 'Não';
+      return String(valor);
+    }
+
+    function renderizarCampos(dados) {
+      const container = document.getElementById('lista-campos');
+      container.innerHTML = '';
+      Object.keys(ROTULOS).forEach(function (chave) {
+        if (!(chave in dados)) return; // campo pode ter sido desabilitado (app configuracoes)
+        const linha = document.createElement('div');
+        linha.innerHTML = `<span class="texto-suave" style="font-size:0.8rem;">${ROTULOS[chave]}</span><br><strong>${formatarValor(dados[chave])}</strong>`;
+        container.appendChild(linha);
+      });
+    }
+
+    function renderizarColaboradores(colaboradores) {
+      const cartao = document.getElementById('cartao-colaboradores');
+      const container = document.getElementById('lista-colaboradores-detalhe');
+      if (!colaboradores || colaboradores.length === 0) return;
+      cartao.style.display = '';
+      colaboradores.forEach(function (pessoa) {
+        const linha = document.createElement('div');
+        const rotuloTipo = pessoa.tipo === 'colaborador' ? 'Colaborador' : 'Participante';
+        const registro = pessoa.registro_empresa ? ` · Registro ${pessoa.registro_empresa}` : '';
+        linha.innerHTML = `<strong>${pessoa.nome}</strong><div class="texto-suave" style="font-size:0.8rem;">${rotuloTipo}${registro}</div>`;
+        container.appendChild(linha);
+      });
+    }
+
+    function renderizarAnexos(anexos) {
+      const cartao = document.getElementById('cartao-anexos');
+      const container = document.getElementById('lista-anexos-detalhe');
+      if (!anexos || anexos.length === 0) return;
+      cartao.style.display = '';
+      anexos.forEach(function (anexo) {
+        const linha = document.createElement('div');
+        const categoria = anexo.categoria_foto ? ` — ${anexo.categoria_foto}` : '';
+        const tamanhoKb = Math.round(anexo.tamanho_bytes / 1024);
+        linha.innerHTML = `<strong>${anexo.nome_original}</strong><div class="texto-suave" style="font-size:0.8rem;">${anexo.tipo_arquivo}${categoria} · ${tamanhoKb}KB</div>`;
+        container.appendChild(linha);
+      });
+    }
+
+    let dadosCarregados = null;
+
+    async function carregarDetalhe() {
+      try {
+        const resposta = await RadAuth.requisicaoAutenticada(`/consulta/rads/${encodeURIComponent(NUMERO_RAD)}/`);
+        if (resposta.status === 404) {
+          avisoDetalhe.innerHTML = '<div class="aviso aviso--erro">RAD não encontrado.</div>';
+          return;
+        }
+        if (!resposta.ok) {
+          avisoDetalhe.innerHTML = '<div class="aviso aviso--erro">Não foi possível carregar este RAD.</div>';
+          return;
+        }
+        const dados = await resposta.json();
+        dadosCarregados = dados;
+
+        document.getElementById('selo-status').innerHTML =
+          `<span class="selo ${dados.status === 'cancelado' ? 'selo--offline' : 'selo--online'}">${dados.status}</span>`;
+
+        renderizarCampos(dados);
+        document.getElementById('cartao-dados').style.display = '';
+        renderizarColaboradores(dados.colaboradores);
+        renderizarAnexos(dados.anexos);
+
+        if (dados.status !== 'cancelado') {
+          document.getElementById('cartao-exportar').style.display = '';
+        }
+        if (dados.pode_cancelar) {
+          document.getElementById('cartao-cancelar').style.display = '';
+        }
+        if (dados.justificativa_cancelamento) {
+          const avisoCancelado = document.createElement('div');
+          avisoCancelado.className = 'aviso aviso--atencao';
+          avisoCancelado.innerHTML = `<strong>RAD cancelado</strong> por ${dados.login_cancelamento} em ${dados.data_cancelamento}.<br>Justificativa: ${dados.justificativa_cancelamento}`;
+          avisoDetalhe.appendChild(avisoCancelado);
+        }
+      } catch (erro) {
+        avisoDetalhe.innerHTML = '<div class="aviso aviso--erro">Erro de conexão ao carregar este RAD.</div>';
+      }
+    }
+    await carregarDetalhe();
+
+    // ---- Exportacao ----------------------------------------------------
+
+    const avisoExportar = document.getElementById('aviso-exportar');
+
+    document.getElementById('botao-copiar-mensagem').addEventListener('click', async function () {
+      avisoExportar.innerHTML = '';
+      try {
+        const resposta = await RadAuth.requisicaoAutenticada(`/consulta/rads/${encodeURIComponent(NUMERO_RAD)}/mensagem/`);
+        if (!resposta.ok) {
+          avisoExportar.innerHTML = '<div class="aviso aviso--erro">Não foi possível gerar a mensagem.</div>';
+          return;
+        }
+        const corpo = await resposta.json();
+        await navigator.clipboard.writeText(corpo.mensagem);
+        avisoExportar.innerHTML = '<div class="aviso aviso--sucesso">Mensagem copiada para a área de transferência.</div>';
+      } catch (erro) {
+        avisoExportar.innerHTML = '<div class="aviso aviso--erro">Não foi possível copiar a mensagem.</div>';
+      }
+    });
+
+    async function baixarArquivoAutenticado(url, nomeArquivo) {
+      avisoExportar.innerHTML = '';
+      try {
+        const resposta = await RadAuth.requisicaoAutenticada(url);
+        if (!resposta.ok) {
+          avisoExportar.innerHTML = '<div class="aviso aviso--erro">Não foi possível gerar o arquivo.</div>';
+          return;
+        }
+        const blob = await resposta.blob();
+        const urlObjeto = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = urlObjeto;
+        link.download = nomeArquivo;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(urlObjeto);
+      } catch (erro) {
+        avisoExportar.innerHTML = '<div class="aviso aviso--erro">Não foi possível baixar o arquivo.</div>';
+      }
+    }
+
+    document.getElementById('botao-baixar-pdf').addEventListener('click', function () {
+      baixarArquivoAutenticado(`/consulta/rads/${encodeURIComponent(NUMERO_RAD)}/pdf/`, `${NUMERO_RAD}.pdf`);
+    });
+    document.getElementById('botao-baixar-docx').addEventListener('click', function () {
+      baixarArquivoAutenticado(`/consulta/rads/${encodeURIComponent(NUMERO_RAD)}/docx/`, `${NUMERO_RAD}.docx`);
+    });
+
+    // ---- Cancelamento (RG-CAN-001 a 012) --------------------------------
+
+    const modalCancelamento = document.getElementById('modal-cancelamento');
+    const avisoModalCancelamento = document.getElementById('aviso-modal-cancelamento');
+    const campoJustificativa = document.getElementById('campo-justificativa-cancelamento');
+
+    document.getElementById('botao-abrir-cancelamento').addEventListener('click', function () {
+      campoJustificativa.value = '';
+      avisoModalCancelamento.innerHTML = '';
+      modalCancelamento.style.display = 'flex';
+    });
+    document.getElementById('botao-fechar-modal-cancelamento').addEventListener('click', function () {
+      modalCancelamento.style.display = 'none';
+    });
+
+    document.getElementById('botao-confirmar-cancelamento').addEventListener('click', async function () {
+      const justificativa = campoJustificativa.value.trim();
+      if (!justificativa) {
+        avisoModalCancelamento.innerHTML = '<div class="aviso aviso--erro">Informe a justificativa.</div>';
+        return;
+      }
+
+      const botao = document.getElementById('botao-confirmar-cancelamento');
+      botao.disabled = true;
+      botao.textContent = 'Cancelando…';
+
+      try {
+        const resposta = await RadAuth.requisicaoAutenticada(`/rad/${encodeURIComponent(NUMERO_RAD)}/cancelar/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ justificativa: justificativa }),
+        });
+
+        if (!resposta.ok) {
+          const corpo = await resposta.json().catch(function () { return {}; });
+          avisoModalCancelamento.innerHTML = `<div class="aviso aviso--erro">${corpo.erro || 'Não foi possível cancelar.'}</div>`;
+          return;
+        }
+
+        modalCancelamento.style.display = 'none';
+        window.location.reload();
+      } catch (erro) {
+        avisoModalCancelamento.innerHTML = '<div class="aviso aviso--erro">Erro de conexão ao cancelar.</div>';
+      } finally {
+        botao.disabled = false;
+        botao.textContent = 'Confirmar cancelamento';
+      }
+    });
+  });
+</script>
+{% endblock %}

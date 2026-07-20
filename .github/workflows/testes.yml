@@ -1,0 +1,88 @@
+# CI do Sistema RAD — roda a suite inteira (Python + testes JS com
+# jsdom + navegador real com Playwright) a cada push/PR.
+#
+# Nota: a decisao de hospedagem do repositorio (GitHub x GitLab, ver
+# README) ainda esta pendente. Este workflow e especifico do GitHub
+# Actions como referencia; se a escolha final for GitLab, a mesma
+# sequencia de passos (instalar dependencias, subir Postgres, migrar,
+# carregar catalogos, rodar pytest) se traduz diretamente para um
+# .gitlab-ci.yml equivalente.
+
+name: Testes
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: sistema_rad
+          POSTGRES_USER: rad_dev
+          POSTGRES_PASSWORD: rad_dev_local_2026
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Instalar dependencias Python
+        run: pip install -r requirements.txt
+
+      - name: Instalar Chromium (Playwright)
+        run: playwright install --with-deps chromium
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependencias JS (jsdom)
+        working-directory: interface/js_tests
+        run: npm install
+
+      - name: Rodar migrations
+        env:
+          DB_HOST: localhost
+          DB_PASSWORD: rad_dev_local_2026
+          SECRET_KEY: chave-de-ci-nao-usada-em-producao
+        run: python manage.py migrate --noinput
+
+      - name: Carregar catalogos de seed
+        env:
+          DB_HOST: localhost
+          DB_PASSWORD: rad_dev_local_2026
+          SECRET_KEY: chave-de-ci-nao-usada-em-producao
+        run: python manage.py carregar_catalogos
+
+      - name: Rodar a suite completa (pytest)
+        env:
+          DB_HOST: localhost
+          DB_PASSWORD: rad_dev_local_2026
+          SECRET_KEY: chave-de-ci-nao-usada-em-producao
+        run: pytest -v --cov=. --cov-report=term-missing
+
+      - name: Conferir migrations sem drift
+        env:
+          DB_HOST: localhost
+          DB_PASSWORD: rad_dev_local_2026
+          SECRET_KEY: chave-de-ci-nao-usada-em-producao
+        run: python manage.py makemigrations --check --dry-run

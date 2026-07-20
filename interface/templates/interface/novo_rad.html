@@ -1,0 +1,406 @@
+{% extends "interface/base.html" %}
+{% load static %}
+{% block titulo %}Novo RAD — Sistema RAD{% endblock %}
+
+{% block conteudo %}
+<!-- RG-SYNC-018/019: so um RAD em preenchimento por vez. Este modal
+     aparece ANTES de qualquer outra coisa na tela quando ja existe um
+     rascunho com conteudo relevante no dispositivo. -->
+<div id="modal-conflito-rascunho" style="display:none; position:fixed; inset:0; background:rgba(28,31,30,0.5); z-index:40; align-items:center; justify-content:center; padding:1rem;">
+  <div class="cartao" style="max-width:420px;">
+    <h2 style="font-size:1.05rem;">RAD em andamento</h2>
+    <p id="texto-conflito-rascunho">Você já tem um RAD em preenchimento neste dispositivo.</p>
+    <div class="pilha">
+      <button type="button" class="botao botao--primaria" id="botao-continuar-rascunho">Continuar este RAD</button>
+      <button type="button" class="botao botao--perigo" id="botao-apagar-e-comecar-novo">Apagar e começar um novo</button>
+    </div>
+  </div>
+</div>
+
+<div id="conteudo-protegido" style="display:none;">
+  <h1 style="font-size:1.3rem;">Novo RAD</h1>
+  <p class="texto-suave" id="status-rascunho" style="margin-top:-0.5rem; font-size:0.85rem;"></p>
+  <button type="button" class="botao botao--secundaria" id="botao-apagar-rascunho" style="width:auto; min-height:36px; padding:0 0.9rem; margin-bottom:1rem;">
+    Apagar rascunho
+  </button>
+
+  <div id="aviso-formulario"></div>
+
+  <form id="form-rad" novalidate>
+
+    <div class="cartao">
+      <h2 style="font-size:1rem;">Identificação</h2>
+
+      <div class="campo">
+        <label for="campo-numero-os">OS</label>
+        <input type="number" id="campo-numero-os" inputmode="numeric" min="1" max="9999999" required>
+      </div>
+
+      <div class="campo">
+        <label for="campo-numero-sa">N° SA</label>
+        <input type="text" id="campo-numero-sa" inputmode="numeric" maxlength="10" required>
+      </div>
+
+      <div class="campo">
+        <label for="campo-data">Data</label>
+        <input type="date" id="campo-data" required>
+      </div>
+    </div>
+
+    <div class="cartao" style="margin-top:1rem;">
+      <h2 style="font-size:1rem;">Localização</h2>
+
+      <div class="campo">
+        <label for="campo-local-inicial">Local Inicial</label>
+        <input type="text" id="campo-local-inicial" list="lista-locais" autocomplete="off" placeholder="Buscar por código ou nome…" required>
+      </div>
+
+      <div class="campo">
+        <label for="campo-local-final">Local Final</label>
+        <input type="text" id="campo-local-final" list="lista-locais" autocomplete="off" placeholder="Buscar por código ou nome…" required>
+      </div>
+
+      <datalist id="lista-locais"></datalist>
+
+      <div class="campo">
+        <label>Linha</label>
+        <div class="grupo-chips" id="chips-linhas"></div>
+        <p class="campo__ajuda" id="ajuda-linhas"></p>
+      </div>
+
+      <div class="campo">
+        <label>Via</label>
+        <div class="grupo-chips" id="chips-vias"></div>
+        <p class="campo__ajuda" id="ajuda-vias"></p>
+      </div>
+
+      <div class="campo">
+        <label>Equipes Envolvidas</label>
+        <div class="grupo-chips" id="chips-equipes"></div>
+        <p class="campo__ajuda">VP entra automaticamente em todo RAD.</p>
+      </div>
+
+      <div class="campo">
+        <label for="campo-km-poste">Km / Poste <span class="texto-suave">(opcional)</span></label>
+        <input type="text" id="campo-km-poste" inputmode="numeric" placeholder="XX/XX - XX/XX" maxlength="13">
+      </div>
+    </div>
+
+    <div class="cartao" style="margin-top:1rem;">
+      <h2 style="font-size:1rem; display:flex; align-items:center; gap:0.4rem;">
+        Controle Operacional
+        <button type="button" id="botao-ajuda-tipo-manutencao" class="selo selo--online" style="border:none; cursor:pointer;" aria-label="O que significa cada tipo de manutenção?">?</button>
+      </h2>
+
+      <div class="campo">
+        <label for="campo-tipo-manutencao">Tipo de Manutenção</label>
+        <select id="campo-tipo-manutencao" required>
+          <option value="">Selecione…</option>
+        </select>
+      </div>
+
+      <div class="campo" id="campo-grupo-numero-falha" style="display:none;">
+        <label for="campo-numero-falha">N° Falha</label>
+        <input type="number" id="campo-numero-falha" inputmode="numeric" min="1" max="9999999">
+      </div>
+    </div>
+
+    <div class="cartao" style="margin-top:1rem;">
+      <h2 style="font-size:1rem;">Horários</h2>
+
+      <div class="campo">
+        <label for="campo-hp-inicio">Horário Programado de Início</label>
+        <input type="time" id="campo-hp-inicio" required>
+        <p class="campo__ajuda">
+          Data: <input type="date" id="campo-data-hp-inicio" style="width:auto; display:inline-block; min-height:auto; padding:0.3rem 0.5rem;">
+        </p>
+      </div>
+
+      <div class="campo">
+        <label for="campo-hp-termino">Horário Programado de Término</label>
+        <input type="time" id="campo-hp-termino" required>
+        <p class="campo__ajuda">
+          Data: <input type="date" id="campo-data-hp-termino" style="width:auto; display:inline-block; min-height:auto; padding:0.3rem 0.5rem;">
+          <span id="aviso-virada-hp"></span>
+        </p>
+      </div>
+
+      <div class="campo">
+        <label for="campo-hr-inicio">Horário Real de Início</label>
+        <input type="time" id="campo-hr-inicio" required>
+        <p class="campo__ajuda">
+          Data: <input type="date" id="campo-data-hr-inicio" style="width:auto; display:inline-block; min-height:auto; padding:0.3rem 0.5rem;">
+        </p>
+      </div>
+
+      <div class="campo">
+        <label for="campo-hr-termino">Horário Real de Término</label>
+        <input type="time" id="campo-hr-termino" required>
+        <p class="campo__ajuda">
+          Data: <input type="date" id="campo-data-hr-termino" style="width:auto; display:inline-block; min-height:auto; padding:0.3rem 0.5rem;">
+          <span id="aviso-virada-hr"></span>
+        </p>
+      </div>
+
+      <div class="campo" style="display:flex; gap:1.5rem;">
+        <div>
+          <label style="margin-bottom:0.15rem;">Duração programada</label>
+          <div id="valor-duracao-programada" style="font-weight:700; font-size:1.1rem;">--</div>
+        </div>
+        <div>
+          <label style="margin-bottom:0.15rem;">Duração real</label>
+          <div id="valor-duracao-real" style="font-weight:700; font-size:1.1rem;">--</div>
+        </div>
+      </div>
+
+      <div id="bloco-atrasos">
+        <div class="campo" id="campo-grupo-atraso-inicio" style="display:none;">
+          <span class="selo selo--offline">Atraso identificado no início</span>
+          <div style="margin-top:0.6rem;">
+            <label for="campo-motivo-atraso-inicio">Motivo do atraso no início</label>
+            <select id="campo-motivo-atraso-inicio" required></select>
+          </div>
+          <div id="campo-grupo-desc-atraso-inicio" style="display:none; margin-top:0.6rem;">
+            <label for="campo-desc-atraso-inicio">Descreva o motivo</label>
+            <textarea id="campo-desc-atraso-inicio" maxlength="500"></textarea>
+          </div>
+        </div>
+
+        <div class="campo" id="campo-grupo-atraso-termino" style="display:none;">
+          <span class="selo selo--offline">Atraso identificado no término</span>
+          <div style="margin-top:0.6rem;">
+            <label for="campo-motivo-atraso-termino">Motivo do atraso no término</label>
+            <select id="campo-motivo-atraso-termino" required></select>
+          </div>
+          <div id="campo-grupo-desc-atraso-termino" style="display:none; margin-top:0.6rem;">
+            <label for="campo-desc-atraso-termino">Descreva o motivo</label>
+            <textarea id="campo-desc-atraso-termino" maxlength="500"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cartao" style="margin-top:1rem;">
+      <h2 style="font-size:1rem;">Serviços Executados</h2>
+      <div class="pilha" id="lista-servicos"></div>
+
+      <div class="campo" id="campo-grupo-outros-servico" style="display:none; margin-top:0.8rem;">
+        <label for="campo-outros-servico-desc">Descreva o serviço</label>
+        <textarea id="campo-outros-servico-desc" maxlength="500"></textarea>
+      </div>
+    </div>
+
+    <div class="cartao" id="bloco-amv" style="margin-top:1rem; display:none;">
+      <h2 style="font-size:1rem;">Bloco AMV</h2>
+
+      <div class="campo">
+        <label for="campo-mch">Identificação MCH</label>
+        <input type="text" id="campo-mch" list="lista-mch" autocomplete="off" placeholder="Buscar MCH…">
+      </div>
+      <datalist id="lista-mch"></datalist>
+
+      <div class="campo" id="detalhes-mch" style="display:flex; gap:1rem; flex-wrap:wrap; display:none;">
+        <div><span class="texto-suave" style="font-size:0.8rem;">Modelo</span><br><strong id="valor-mch-modelo">—</strong></div>
+        <div><span class="texto-suave" style="font-size:0.8rem;">Via</span><br><strong id="valor-mch-via">—</strong></div>
+        <div><span class="texto-suave" style="font-size:0.8rem;">UR</span><br><strong id="valor-mch-ur">—</strong></div>
+        <div><span class="texto-suave" style="font-size:0.8rem;">Local</span><br><strong id="valor-mch-local">—</strong></div>
+        <div><span class="texto-suave" style="font-size:0.8rem;">Linha</span><br><strong id="valor-mch-linha">—</strong></div>
+      </div>
+      <p class="campo__ajuda">Modelo, Via, UR, Local e Linha vêm automaticamente do cadastro da MCH.</p>
+
+      <div class="campo">
+        <label>Tipo de Defeito</label>
+        <div class="pilha" id="lista-tipos-defeito"></div>
+      </div>
+
+      <div class="campo">
+        <label>Ações</label>
+        <div class="pilha" id="lista-acoes-amv"></div>
+      </div>
+    </div>
+
+    <div class="cartao" style="margin-top:1rem;">
+      <h2 style="font-size:1rem;">Colaboradores e Participantes</h2>
+
+      <div class="pilha" id="lista-colaboradores-adicionados"></div>
+      <p class="texto-suave" id="mensagem-sem-colaboradores" style="font-size:0.85rem;">
+        Nenhum colaborador adicionado ainda.
+      </p>
+
+      <div id="aviso-colaboradores"></div>
+
+      <div class="pilha" style="margin-top:0.75rem;">
+        <button type="button" class="botao botao--secundaria" id="botao-adicionar-colaborador">
+          + Adicionar Colaborador
+        </button>
+        <button type="button" class="botao botao--secundaria" id="botao-adicionar-participante">
+          + Adicionar Participante
+        </button>
+      </div>
+
+      <!-- Busca de colaborador do cadastro oficial (RG-RESP-003/008), offline via IndexedDB -->
+      <div class="campo" id="bloco-busca-colaborador" style="display:none; margin-top:0.75rem;">
+        <label for="campo-busca-colaborador">Buscar por registro ou nome</label>
+        <input type="text" id="campo-busca-colaborador" autocomplete="off">
+        <div class="pilha" id="resultados-busca-colaborador" style="margin-top:0.5rem;"></div>
+      </div>
+
+      <!-- Participante externo (RG-RESP-013/014/015) -->
+      <div class="campo" id="bloco-novo-participante" style="display:none; margin-top:0.75rem;">
+        <label for="campo-nome-participante">Nome do participante</label>
+        <input type="text" id="campo-nome-participante" maxlength="200">
+        <button type="button" class="botao botao--primaria" id="botao-confirmar-participante" style="margin-top:0.5rem;">
+          Adicionar
+        </button>
+      </div>
+    </div>
+
+    <div class="cartao" style="margin-top:1rem;">
+      <h2 style="font-size:1rem;">Anexos</h2>
+
+      <div class="campo">
+        <label>Fotos — Intervenção Verificada <span class="texto-suave">(até 2)</span></label>
+        <div class="pilha" id="miniaturas-fotos-intervencao"></div>
+        <div id="aviso-fotos-intervencao"></div>
+        <input type="file" id="campo-foto-intervencao" accept="image/*" capture="environment" style="margin-top:0.5rem;">
+      </div>
+
+      <div class="campo">
+        <label>Fotos — Ação Realizada <span class="texto-suave">(até 2)</span></label>
+        <div class="pilha" id="miniaturas-fotos-acao"></div>
+        <div id="aviso-fotos-acao"></div>
+        <input type="file" id="campo-foto-acao" accept="image/*" capture="environment" style="margin-top:0.5rem;">
+      </div>
+
+      <div class="campo">
+        <label>PDF <span class="texto-suave">(opcional, até 1)</span></label>
+        <div class="pilha" id="miniatura-pdf"></div>
+        <div id="aviso-pdf"></div>
+        <input type="file" id="campo-pdf" accept="application/pdf" style="margin-top:0.5rem;">
+      </div>
+    </div>
+
+    <div class="cartao" style="margin-top:1rem;">
+      <h2 style="font-size:1rem;">Responsáveis e Detalhes</h2>
+
+      <div class="campo">
+        <label for="campo-responsavel-atividade">Responsável Atividade</label>
+        <input type="text" id="campo-responsavel-atividade" maxlength="50" required>
+      </div>
+
+      <div class="campo">
+        <label for="campo-operador-ccm">Operador CCM <span class="texto-suave">(opcional)</span></label>
+        <input type="text" id="campo-operador-ccm" maxlength="25">
+      </div>
+
+      <div class="campo">
+        <label for="campo-descricao-tecnica">Descrição Técnica da Atividade <span class="texto-suave">(opcional)</span></label>
+        <textarea id="campo-descricao-tecnica"></textarea>
+      </div>
+
+      <div class="campo">
+        <label for="campo-materiais-utilizados">Materiais Utilizados <span class="texto-suave">(opcional)</span></label>
+        <textarea id="campo-materiais-utilizados" maxlength="2000"></textarea>
+      </div>
+    </div>
+
+    <!-- Observações Gerais fica abaixo dos anexos de proposito
+         (decisao registrada em docs/NOTAS_LAYOUT_FRONTEND.md) -->
+    <div class="cartao" style="margin-top:1rem;">
+      <h2 style="font-size:1rem;">Observações Gerais</h2>
+      <div class="campo">
+        <label for="campo-observacoes-gerais" style="display:none;">Observações Gerais</label>
+        <textarea id="campo-observacoes-gerais" maxlength="3000" placeholder="Observações complementares sobre a atividade (opcional)"></textarea>
+      </div>
+    </div>
+
+  </form>
+
+  <div id="lista-erros-sincronizacao"></div>
+</div>
+
+<div class="acao-fixa">
+  <div id="aviso-sincronizacao"></div>
+  <div id="aviso-exportar-rascunho"></div>
+  <div style="display:flex; gap:0.5rem;">
+    <button type="button" class="botao botao--secundaria" id="botao-exportar" disabled style="flex:1;">
+      Exportar
+    </button>
+    <button type="button" class="botao botao--primaria" id="botao-sincronizar" disabled style="flex:1;">
+      Sincronizar
+    </button>
+  </div>
+  <p class="texto-suave centro" id="texto-status-botao" style="margin: 0.4rem 0 0; font-size: 0.8rem;"></p>
+</div>
+
+<!-- RG-EXP-003: escolha de formato (PDF ou Word) ou copiar mensagem -->
+<div id="modal-exportar" style="display:none; position:fixed; inset:0; background:rgba(28,31,30,0.5); z-index:30; align-items:center; justify-content:center; padding:1rem;">
+  <div class="cartao" style="max-width:380px;">
+    <h2 style="font-size:1.05rem;">Exportar RAD</h2>
+    <p class="texto-suave" style="font-size:0.85rem;">
+      Gerado neste dispositivo, sem precisar de conexão. O arquivo é salvo na pasta de downloads.
+    </p>
+    <div class="pilha">
+      <button type="button" class="botao botao--secundaria" id="botao-exportar-mensagem">Copiar mensagem</button>
+      <button type="button" class="botao botao--secundaria" id="botao-exportar-pdf">Baixar PDF</button>
+      <button type="button" class="botao botao--secundaria" id="botao-exportar-docx">Baixar Word</button>
+      <button type="button" class="botao botao--secundaria" id="botao-fechar-exportar">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirmacao de exclusao do rascunho (RG-SYNC-020) -->
+<div id="modal-confirmar-exclusao" style="display:none; position:fixed; inset:0; background:rgba(28,31,30,0.5); z-index:30; align-items:center; justify-content:center; padding:1rem;">
+  <div class="cartao" style="max-width:420px;">
+    <h2 style="font-size:1.05rem;">Apagar este RAD?</h2>
+    <p>Esta ação é <strong>irreversível</strong>. Todos os dados preenchidos neste RAD serão perdidos permanentemente.</p>
+    <div class="pilha">
+      <button type="button" class="botao botao--perigo" id="botao-confirmar-exclusao">Apagar RAD</button>
+      <button type="button" class="botao botao--secundaria" id="botao-cancelar-exclusao">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de ajuda: Tipo de Manutenção (EFD-010-A). Conteudo estatico, nao vem de API. -->
+<div id="modal-ajuda-tipo-manutencao" style="display:none; position:fixed; inset:0; background:rgba(28,31,30,0.5); z-index:30; align-items:center; justify-content:center; padding:1rem;">
+  <div class="cartao" style="max-width:480px; max-height:80vh; overflow-y:auto;">
+    <h2 style="font-size:1.05rem;">Tipos de manutenção</h2>
+    <p><strong>Preventiva</strong> — atividades em intervalos planejados para evitar falhas antes que ocorram. Ex.: troca programada de componentes, lubrificação programada.</p>
+    <p><strong>Corretiva</strong> — realizada após uma falha ou degradação identificada, para restaurar o funcionamento normal. Ex.: substituição de componente danificado.</p>
+    <p><strong>Preditiva</strong> — baseada no monitoramento da condição real dos ativos, para prever falhas. Ex.: inspeção por ultrassom, análise de vibração.</p>
+    <p><strong>Falha</strong> — evento em que o ativo perde total ou parcialmente sua função. Ex.: quebra de trilho, defeito em AMV.</p>
+    <button type="button" class="botao botao--secundaria" id="botao-fechar-ajuda">Fechar</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block cabecalho_extra %}
+<style>
+  .grupo-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .chip {
+    border: 1px solid var(--cor-linha);
+    background: var(--cor-superficie);
+    color: var(--cor-tinta);
+    border-radius: 999px;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    min-height: var(--alvo-toque);
+  }
+  .chip[aria-pressed="true"] {
+    background: var(--cor-primaria);
+    border-color: var(--cor-primaria);
+    color: #fff;
+  }
+  .chip:disabled { opacity: 0.7; cursor: not-allowed; }
+</style>
+{% endblock %}
+
+{% block script_extra %}
+<script src="{% static 'interface/js/vendor/jspdf.umd.min.js' %}"></script>
+<script src="{% static 'interface/js/regras_horario.js' %}"></script>
+<script src="{% static 'interface/js/validadores_arquivos.js' %}"></script>
+<script src="{% static 'interface/js/exportar_cliente.js' %}"></script>
+<script src="{% static 'interface/js/rad_form.js' %}"></script>
+{% endblock %}

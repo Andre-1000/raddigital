@@ -1,0 +1,117 @@
+{% extends "interface/base.html" %}
+{% block titulo %}Consultar RADs — Sistema RAD{% endblock %}
+
+{% block conteudo %}
+<div id="conteudo-protegido" style="display:none;">
+  <h1 style="font-size:1.3rem;">Consultar RADs</h1>
+
+  <div class="cartao">
+    <div class="campo" style="margin-bottom:0.6rem;">
+      <label for="filtro-numero-rad">N° RAD</label>
+      <input type="text" id="filtro-numero-rad" placeholder="Ex.: R00001">
+    </div>
+    <div class="campo" style="margin-bottom:0.6rem;">
+      <label for="filtro-numero-sa">N° SA</label>
+      <input type="text" id="filtro-numero-sa" inputmode="numeric">
+    </div>
+    <div class="campo" style="margin-bottom:0.6rem;">
+      <label for="filtro-status">Status</label>
+      <select id="filtro-status">
+        <option value="">Todos</option>
+        <option value="sincronizado">Sincronizado</option>
+        <option value="cancelado">Cancelado</option>
+      </select>
+    </div>
+    <button type="button" class="botao botao--primaria" id="botao-filtrar">Filtrar</button>
+  </div>
+
+  <div id="aviso-consulta" style="margin-top:1rem;"></div>
+
+  <div id="lista-rads" class="pilha" style="margin-top:1rem;"></div>
+  <p id="mensagem-vazia" class="texto-suave centro" style="display:none; margin-top:2rem;">
+    Nenhum RAD encontrado.
+  </p>
+</div>
+{% endblock %}
+
+{% block script_extra %}
+<script>
+  document.addEventListener('DOMContentLoaded', async function () {
+    if (!RadAuth.exigirSessao()) return;
+    if (!RadAuth.temPerfil('supervisor', 'administrador')) {
+      window.location.href = '{% url "interface:inicio" %}';
+      return;
+    }
+    document.getElementById('conteudo-protegido').style.display = '';
+
+    const lista = document.getElementById('lista-rads');
+    const aviso = document.getElementById('aviso-consulta');
+    const mensagemVazia = document.getElementById('mensagem-vazia');
+
+    function seloStatus(status) {
+      const classe = status === 'cancelado' ? 'selo--offline' : 'selo--online';
+      return `<span class="selo ${classe}">${status}</span>`;
+    }
+
+    async function carregarLista() {
+      aviso.innerHTML = '';
+      mensagemVazia.style.display = 'none';
+      lista.innerHTML = '';
+
+      const parametros = new URLSearchParams();
+      const numeroRad = document.getElementById('filtro-numero-rad').value.trim();
+      const numeroSa = document.getElementById('filtro-numero-sa').value.trim();
+      const status = document.getElementById('filtro-status').value;
+      if (numeroRad) parametros.set('numero_rad', numeroRad);
+      if (numeroSa) parametros.set('numero_sa', numeroSa);
+      if (status) parametros.set('status', status);
+
+      try {
+        const resposta = await RadAuth.requisicaoAutenticada(`/consulta/rads/?${parametros.toString()}`);
+        if (!resposta.ok) {
+          aviso.innerHTML = '<div class="aviso aviso--erro">Não foi possível carregar os RADs.</div>';
+          return;
+        }
+        const dados = await resposta.json();
+
+        if (dados.resultados.length === 0) {
+          mensagemVazia.style.display = '';
+          return;
+        }
+
+        dados.resultados.forEach(function (rad) {
+          const item = document.createElement('a');
+          item.className = 'cartao';
+          item.style.display = 'block';
+          item.style.textDecoration = 'none';
+          item.style.color = 'inherit';
+          item.href = `/consultar/${rad.numero_rad}/`;
+          item.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <strong>${rad.numero_rad}</strong>
+              ${seloStatus(rad.status)}
+            </div>
+            <div class="texto-suave" style="margin-top:0.35rem; font-size:0.9rem;">
+              OS ${rad.numero_os} · ${rad.data_preenchimento} · ${rad.tipo_manutencao}
+            </div>
+          `;
+          lista.appendChild(item);
+        });
+
+        if (dados.total_paginas > 1) {
+          const infoPaginas = document.createElement('p');
+          infoPaginas.className = 'texto-suave centro';
+          infoPaginas.style.fontSize = '0.85rem';
+          infoPaginas.textContent = `${dados.total_encontrado} RAD(s) encontrado(s) — mostrando página ${dados.pagina_atual} de ${dados.total_paginas}`;
+          lista.appendChild(infoPaginas);
+        }
+      } catch (erro) {
+        aviso.innerHTML = '<div class="aviso aviso--erro">Erro de conexão ao carregar os RADs.</div>';
+      }
+    }
+
+    document.getElementById('botao-filtrar').addEventListener('click', carregarLista);
+    await carregarLista();
+  });
+</script>
+{% endblock %}
