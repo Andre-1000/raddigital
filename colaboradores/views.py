@@ -8,6 +8,11 @@ Views do app colaboradores.
   colaboradores ao RAD mesmo sem conexao (o mesmo padrao usado em
   catalogos/views.py::listar_todos).
 - criar/editar/excluir/importar: exclusivas do Administrador (RG-RESP-012).
+
+Cada colaborador tem um login vinculado automaticamente, usando a
+propria matricula como login (decisao do projeto: matricula = login).
+Perfil padrao ao criar/importar: Usuario -- pode ser promovido depois
+na tela de gestao de usuarios.
 """
 import csv
 import io
@@ -21,7 +26,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from usuarios.decorators import requer_perfil, requer_token
-from usuarios.models import UsuarioPerfil
+from usuarios.models import Usuario, UsuarioPerfil
 
 from .models import ColaboradorCadastro
 
@@ -29,12 +34,38 @@ REGEX_SOMENTE_NUMEROS = re.compile(r'^\d+$')
 TAMANHO_MAXIMO_IMPORTACAO_BYTES = 5 * 1024 * 1024  # 5MB
 
 
+def _garantir_usuario(colaborador):
+    """
+    Garante que o colaborador tem um login vinculado com login =
+    matricula. Se o login ja existir (import antigo, por exemplo) so
+    vincula; se nao existir, cria com perfil Usuario padrao.
+    Idempotente -- pode ser chamado toda vez que o colaborador e
+    criado/editado sem duplicar nada.
+    """
+    if colaborador.usuario_id:
+        return colaborador.usuario
+
+    usuario, criado = Usuario.objects.get_or_create(
+        login=colaborador.registro_empresa
+    )
+    if criado:
+        UsuarioPerfil.objects.create(usuario=usuario, perfil=UsuarioPerfil.USUARIO)
+
+    colaborador.usuario = usuario
+    colaborador.save(update_fields=['usuario'])
+    return usuario
+
+
 def _serializar(colaborador):
+    usuario = colaborador.usuario
     return {
         'id': colaborador.id,
         'registro_empresa': colaborador.registro_empresa,
         'nome': colaborador.nome,
         'ativo': colaborador.ativo,
+        'login': usuario.login if usuario else None,
+        'perfis': usuario.lista_perfis if usuario else [],
+        'usuario_ativo': usuario.ativo if usuario else None,
     }
 
 
@@ -56,12 +87,16 @@ def listar_todos(request):
 def listar_para_administrar(request):
     """
     GET /colaboradores/administrar/
-    Exclusivo do Administrador (RG-RESP-012). Ao contrario de
-    listar_todos/buscar, inclui colaboradores INATIVOS tambem -- e a
-    unica forma de ve-los para poder reativa-los ou editar antes de
-    excluir de vez.
+    Exclusivo do Administrador (RG-RESP-012). Tela "Gestao de Pessoas":
+    inclui colaboradores INATIVOS tambem, e ja traz login/perfis
+    (select_related evita 1 query por linha).
     """
-    colaboradores = ColaboradorCadastro.objects.all().order_by('nome')
+    colaboradores = (
+        ColaboradorCadastro.objects.select_related('usuario')
+        .prefetch_related('usuario__perfis')
+        .all()
+        .order_by('nome')
+    )
     return JsonResponse({'colaboradores': [_serializar(c) for c in colaboradores]})
 
 
@@ -96,6 +131,7 @@ def criar(request):
     Body: {"registro_empresa": "12345", "nome": "Fulano de Tal"}
     RG-RESP-002: registro_empresa deve conter apenas numeros.
     RG-RESP-012: exclusivo do Administrador.
+    Cria automaticamente o login (matricula = login, perfil Usuario).
     """
     try:
         dados = json.loads(request.body or '{}')
@@ -115,9 +151,12 @@ def criar(request):
             status=422,
         )
 
-    colaborador = ColaboradorCadastro.objects.create(
-        registro_empresa=registro_empresa, nome=nome
-    )
+    with transaction.atomic():
+        colaborador = ColaboradorCadastro.objects.create(
+            registro_empresa=registro_empresa, nome=nome
+        )
+        _garantir_usuario(colaborador)
+
     return JsonResponse(_serializar(colaborador), status=201)
 
 
@@ -131,9 +170,16 @@ def editar(request, id_colaborador):
     Body: {"registro_empresa": "...", "nome": "...", "ativo": true}
     RG-RESP-011: RADs ja sincronizados preservam a copia historica --
     editar aqui NUNCA altera rad_colaboradores.
+
+    Atencao: mudar a matricula NAO renomeia o login existente (login
+    e o identificador de autenticacao, ver usuarios/views.py::editar).
+    Se a matricula mudar e nao houver login com o novo valor, um novo
+    login e criado; o antigo continua existindo, desvinculado.
     """
     try:
-        colaborador = ColaboradorCadastro.objects.get(id=id_colaborador)
+        colaborador = ColaboradorCadastro.objects.select_related('usuario').get(
+            id=id_colaborador
+        )
     except ColaboradorCadastro.DoesNotExist:
         return JsonResponse({'erro': 'Colaborador nao encontrado.'}, status=404)
 
@@ -158,11 +204,18 @@ def editar(request, id_colaborador):
             status=422,
         )
 
+    matricula_mudou = registro_empresa != colaborador.registro_empresa
+
     colaborador.registro_empresa = registro_empresa
     colaborador.nome = nome
     if 'ativo' in dados:
         colaborador.ativo = bool(dados['ativo'])
     colaborador.save(update_fields=['registro_empresa', 'nome', 'ativo'])
+
+    if matricula_mudou:
+        colaborador.usuario = None
+        colaborador.save(update_fields=['usuario'])
+    _garantir_usuario(colaborador)
 
     return JsonResponse(_serializar(colaborador))
 
@@ -176,6 +229,8 @@ def excluir(request, id_colaborador):
     POST /colaboradores/<id>/excluir/
     RG-RESP-011: exclusao do cadastro oficial nao afeta RADs ja
     sincronizados (rad_colaboradores e uma copia independente).
+    O login vinculado NAO e excluido automaticamente -- fica orfao,
+    e removido manualmente na tela de usuarios se necessario.
     """
     try:
         colaborador = ColaboradorCadastro.objects.get(id=id_colaborador)
@@ -234,15 +289,15 @@ def importar(request):
     """
     POST /colaboradores/importar/
     Multipart, campo "arquivo": um CSV com duas colunas por linha --
-    registro_empresa, nome. Cabecalho e opcional (detectado
-    automaticamente: se a primeira coluna da primeira linha nao for
-    só numero, é tratada como cabecalho e ignorada).
+    registro_empresa (matricula), nome. Cabecalho e opcional
+    (detectado automaticamente).
+
+    Cada linha nova cria tambem o login (matricula = login) com
+    perfil Usuario. Linhas ja existentes so atualizam nome/status,
+    sem mexer no login ja vinculado.
 
     Comportamento "upsert", pensado para poder rodar de novo sempre
-    que a CPTM mandar uma lista atualizada, sem duplicar nem falhar:
-    - registro_empresa que já existe → nome atualizado, reativado
-      caso estivesse desativado.
-    - registro_empresa novo → criado.
+    que a empresa mandar uma lista atualizada, sem duplicar nem falhar.
 
     RG-RESP-012: exclusivo do Administrador, mesma regra dos outros
     endpoints deste app.
@@ -263,7 +318,6 @@ def importar(request):
 
     delimitador = _detectar_delimitador_csv(texto)
     todas_as_linhas = list(csv.reader(io.StringIO(texto), delimiter=delimitador))
-    # Descarta linhas totalmente vazias (comuns no fim de exports do Excel).
     todas_as_linhas = [linha for linha in todas_as_linhas if any((c or '').strip() for c in linha)]
 
     if not todas_as_linhas:
@@ -290,10 +344,12 @@ def importar(request):
                 )
                 continue
 
-            _, criado = ColaboradorCadastro.objects.update_or_create(
+            colaborador, criado = ColaboradorCadastro.objects.update_or_create(
                 registro_empresa=registro_empresa,
                 defaults={'nome': nome, 'ativo': True},
             )
+            _garantir_usuario(colaborador)
+
             if criado:
                 criados += 1
             else:
