@@ -2,49 +2,79 @@
 {% load static %}
 {% block titulo %}Gerenciar Usuários — Sistema RAD{% endblock %}
 
+{% block cabecalho_extra %}
+<style>
+  .container-app { max-width: var(--largura-app-administrativa); }
+</style>
+{% endblock %}
+
 {% block conteudo %}
 <div id="conteudo-protegido" style="display:none;">
   <h1 style="font-size:1.3rem;">Gerenciar Usuários</h1>
   <p class="texto-suave" style="font-size:0.85rem; margin-top:-0.5rem;">
-    Logins de acesso ao Sistema RAD. Distinto do cadastro de colaboradores (funcionários da empresa).
+    Cadastro de pessoas com acesso ao Sistema RAD. A matrícula é o login —
+    a partir do cadastro, a pessoa já pode ser usada em um RAD e já consegue entrar no sistema.
   </p>
 
-  <!-- Formulário de criação -->
+  <!-- Cadastro manual -->
   <div class="cartao">
-    <h2 style="font-size:1rem;">Novo Usuário</h2>
+    <h2 style="font-size:1rem;">Novo usuário</h2>
     <div id="aviso-criar"></div>
-    <div class="campo">
-      <label for="campo-novo-login">Login</label>
-      <input type="text" id="campo-novo-login" maxlength="100"
-             placeholder="Ex: joao.silva"
-             autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-      <span class="campo__ajuda">Letras, números, pontos, hifens ou underline. Mínimo 3 caracteres.</span>
-    </div>
-    <div class="campo">
-      <label>Perfis <span class="texto-suave" style="font-size:0.8rem; font-weight:400;">(selecione até 2)</span></label>
-      <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-top:0.4rem;">
-        <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; min-height:44px;">
-          <input type="checkbox" id="perfil-novo-usuario" value="usuario"> Usuário
-        </label>
-        <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; min-height:44px;">
-          <input type="checkbox" id="perfil-novo-supervisor" value="supervisor"> Supervisor
-        </label>
-        <label id="label-perfil-novo-admin" style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; min-height:44px;">
-          <input type="checkbox" id="perfil-novo-administrador" value="administrador"> Administrador
-        </label>
+    <div class="grade-campos">
+      <div class="campo">
+        <label for="campo-novo-nome">Nome</label>
+        <input type="text" id="campo-novo-nome" maxlength="200">
+      </div>
+      <div class="campo">
+        <label for="campo-novo-matricula">Matrícula</label>
+        <input type="text" id="campo-novo-matricula" inputmode="numeric" maxlength="20">
+        <span class="campo__ajuda">Vira o login automaticamente.</span>
+      </div>
+      <div class="campo">
+        <label>Perfis <span class="texto-suave" style="font-size:0.8rem; font-weight:400;">(até 2)</span></label>
+        <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-top:0.4rem;">
+          <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; min-height:44px;">
+            <input type="checkbox" id="perfil-novo-usuario" value="usuario" checked> Usuário
+          </label>
+          <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; min-height:44px;">
+            <input type="checkbox" id="perfil-novo-supervisor" value="supervisor"> Supervisor
+          </label>
+          <label id="label-perfil-novo-admin" style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; min-height:44px;">
+            <input type="checkbox" id="perfil-novo-administrador" value="administrador"> Administrador
+          </label>
+        </div>
       </div>
     </div>
-    <button type="button" class="botao botao--primaria" id="botao-criar-usuario">Criar usuário</button>
+    <button type="button" class="botao botao--primaria" id="botao-criar-usuario" style="margin-top:0.5rem; width:auto;">
+      Cadastrar
+    </button>
+  </div>
+
+  <!-- Importação CSV -->
+  <div class="cartao" style="margin-top:1rem;">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+      <h2 style="font-size:1rem; margin:0;">Importar lista (CSV)</h2>
+      <button type="button" class="botao botao--secundaria" id="botao-como-importar" style="width:auto; min-height:36px; padding:0 1rem; font-size:0.85rem;">
+        Como importar
+      </button>
+    </div>
+    <div id="aviso-importar" style="margin-top:0.75rem;"></div>
+    <input type="file" id="campo-arquivo-importar" accept=".csv,text/csv" style="margin-top:0.5rem;">
+    <button type="button" class="botao botao--secundaria" id="botao-importar" style="margin-top:0.75rem; width:auto;">
+      Importar
+    </button>
   </div>
 
   <!-- Busca e filtros -->
   <div class="cartao" style="margin-top:1rem;">
-    <div class="campo" style="margin-bottom:0.75rem;">
-      <label for="campo-busca">Buscar por login</label>
-      <input type="text" id="campo-busca" placeholder="Digite parte do login…"
-             autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    <div class="grade-campos">
+      <div class="campo" style="margin-bottom:0;">
+        <label for="campo-busca">Buscar por nome ou matrícula</label>
+        <input type="text" id="campo-busca" placeholder="Digite para buscar…"
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      </div>
     </div>
-    <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+    <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:0.9rem;">
       <label style="display:flex; align-items:center; gap:0.35rem; font-size:0.9rem; cursor:pointer;">
         <input type="checkbox" id="filtro-usuario" checked> Usuário
       </label>
@@ -61,17 +91,79 @@
   </div>
 
   <div id="aviso-lista" style="margin-top:1rem;"></div>
-  <div id="lista-usuarios" class="pilha" style="margin-top:1rem;"></div>
+
+  <div class="tabela-wrap" style="margin-top:1rem;">
+    <table class="tabela">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>Matrícula / Login</th>
+          <th>Perfis</th>
+          <th>Status</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody id="corpo-tabela-pessoas"></tbody>
+    </table>
+  </div>
+  <p id="mensagem-vazia" class="texto-suave centro" style="display:none; margin-top:2rem;">
+    Nenhum usuário encontrado.
+  </p>
 </div>
 
-<!-- Modal de exclusão -->
-<div id="modal-excluir-usuario"
+<!-- Modal: como importar -->
+<div id="modal-como-importar"
+     style="display:none; position:fixed; inset:0; background:rgba(28,31,30,0.5);
+            z-index:30; align-items:center; justify-content:center; padding:1rem;">
+  <div class="cartao" style="max-width:460px; width:100%;">
+    <h2 style="font-size:1.05rem;">Como importar</h2>
+    <p style="margin-bottom:0;">
+      Faça uma lista em Excel com 2 colunas, sendo coluna 1 = Matrícula,
+      coluna 2 = Nome; grave em .CSV e importe.
+      A partir do momento que está cadastrado, o usuário/colaborador pode
+      ser usado em RAD automaticamente.
+    </p>
+    <button type="button" class="botao botao--secundaria" id="botao-fechar-como-importar" style="margin-top:1rem;">
+      Entendi
+    </button>
+  </div>
+</div>
+
+<!-- Modal: editar perfis -->
+<div id="modal-editar-perfis"
      style="display:none; position:fixed; inset:0; background:rgba(28,31,30,0.5);
             z-index:30; align-items:center; justify-content:center; padding:1rem;">
   <div class="cartao" style="max-width:420px; width:100%;">
-    <h2 style="font-size:1.05rem;">Excluir usuário?</h2>
-    <p>Remove <strong id="login-usuario-excluir"></strong> permanentemente.
-       O usuário perderá o acesso ao sistema imediatamente.</p>
+    <h2 style="font-size:1.05rem;">Editar perfis — <span id="nome-pessoa-editar"></span></h2>
+    <div id="aviso-editar-perfis"></div>
+    <div style="display:flex; gap:1rem; flex-wrap:wrap; margin:0.75rem 0;">
+      <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; min-height:44px;">
+        <input type="checkbox" id="perfil-editar-usuario" value="usuario"> Usuário
+      </label>
+      <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; min-height:44px;">
+        <input type="checkbox" id="perfil-editar-supervisor" value="supervisor"> Supervisor
+      </label>
+      <label id="label-perfil-editar-admin" style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; min-height:44px;">
+        <input type="checkbox" id="perfil-editar-administrador" value="administrador"> Administrador
+      </label>
+    </div>
+    <div class="pilha">
+      <button type="button" class="botao botao--primaria" id="botao-salvar-perfis">Salvar</button>
+      <button type="button" class="botao botao--secundaria" id="botao-cancelar-editar-perfis">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: excluir -->
+<div id="modal-excluir-pessoa"
+     style="display:none; position:fixed; inset:0; background:rgba(28,31,30,0.5);
+            z-index:30; align-items:center; justify-content:center; padding:1rem;">
+  <div class="cartao" style="max-width:420px; width:100%;">
+    <h2 style="font-size:1.05rem;">Excluir?</h2>
+    <p>Remove <strong id="nome-pessoa-excluir"></strong> do cadastro permanentemente,
+       incluindo o acesso ao sistema. RADs já sincronizados que citam esta pessoa
+       <strong>não são afetados</strong> — eles guardam uma cópia própria do nome.
+       Considere <strong>desativar</strong> em vez de excluir.</p>
     <div class="pilha">
       <button type="button" class="botao botao--perigo" id="botao-confirmar-exclusao">Excluir definitivamente</button>
       <button type="button" class="botao botao--secundaria" id="botao-cancelar-exclusao">Cancelar</button>

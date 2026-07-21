@@ -33,11 +33,11 @@ def tela_detalhe_rad(request, numero_rad):
     return render(request, 'interface/detalhe_rad.html', {'numero_rad': numero_rad})
 
 
-def tela_gerenciar_colaboradores(request):
-    return render(request, 'interface/gerenciar_colaboradores.html')
-
-
 def tela_gerenciar_usuarios(request):
+    """
+    Tela unica de gestao de pessoas -- unifica o que antes eram as
+    telas separadas "Gerenciar Usuarios" e "Gerenciar Colaboradores".
+    """
     return render(request, 'interface/gerenciar_usuarios.html')
 
 

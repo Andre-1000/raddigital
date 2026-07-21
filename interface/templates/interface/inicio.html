@@ -1,33 +1,77 @@
 {% extends "interface/base.html" %}
 {% block titulo %}Início — Sistema RAD{% endblock %}
 
+{% block cabecalho_extra %}
+<style>
+  .container-app { max-width: var(--largura-app-administrativa); }
+
+  .grade-acoes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 1.25rem;
+  }
+
+  .cartao-acao {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 0.35rem;
+    padding: 1.4rem 1.25rem;
+    min-height: 108px;
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .cartao-acao__rotulo {
+    font-weight: 700;
+    font-size: 1.02rem;
+  }
+
+  .cartao-acao__descricao {
+    font-size: 0.82rem;
+    color: var(--cor-tinta-suave);
+  }
+
+  .cartao-acao--primaria {
+    background: var(--cor-primaria);
+    color: #fff;
+    border-color: transparent;
+  }
+  .cartao-acao--primaria .cartao-acao__descricao {
+    color: rgba(255, 255, 255, 0.85);
+  }
+</style>
+{% endblock %}
+
 {% block conteudo %}
 <div id="conteudo-protegido" style="display:none;">
   <h1 style="font-size:1.3rem;">Olá, <span id="nome-usuario"></span></h1>
   <p class="texto-suave">O que você quer fazer agora?</p>
 
-  <div class="pilha" style="margin-top:1.25rem;">
-    <a href="{% url 'interface:novo_rad' %}" class="botao botao--primaria" id="link-novo-rad">+ Novo RAD</a>
+  <div class="grade-acoes">
+    <a href="{% url 'interface:novo_rad' %}" class="cartao cartao--interativo cartao-acao cartao-acao--primaria" id="link-novo-rad">
+      <span class="cartao-acao__rotulo">+ Novo RAD</span>
+      <span class="cartao-acao__descricao">Preencher um novo relatório em campo</span>
+    </a>
 
-    <div id="bloco-gestao" style="display:none;">
-      <div class="pilha">
-        <a href="{% url 'interface:consulta' %}" class="botao botao--secundaria">Consultar RADs</a>
-        <a href="{% url 'interface:gerenciar_usuarios' %}" class="botao botao--secundaria">Gerenciar Usuários</a>
-      </div>
-    </div>
+    <a href="{% url 'interface:consulta' %}" class="cartao cartao--interativo cartao-acao" id="link-consultar" style="display:none;">
+      <span class="cartao-acao__rotulo">Consultar RADs</span>
+      <span class="cartao-acao__descricao">Buscar, filtrar e revisar RADs enviados</span>
+    </a>
 
-    <div id="bloco-admin" style="display:none;">
-      <a href="{% url 'interface:gerenciar_colaboradores' %}" class="botao botao--secundaria">Gerenciar Colaboradores</a>
-    </div>
+    <a href="{% url 'interface:gerenciar_usuarios' %}" class="cartao cartao--interativo cartao-acao" id="link-gerenciar-usuarios" style="display:none;">
+      <span class="cartao-acao__rotulo">Gerenciar Usuários</span>
+      <span class="cartao-acao__descricao">Cadastrar, importar e administrar acessos</span>
+    </a>
   </div>
 
   <div class="cartao" style="margin-top:1.5rem;">
-    <p class="texto-suave" style="margin:0 0 0.6rem; font-size:0.85rem;" id="status-catalogos">
+    <p class="texto-suave" style="margin:0; font-size:0.85rem;" id="status-catalogos">
       Catálogos: verificando…
     </p>
-    <button type="button" class="botao botao--secundaria" id="botao-atualizar-catalogos">
-      Atualizar catálogos
-    </button>
   </div>
 
   <div class="cartao" style="margin-top:1rem;">
@@ -46,18 +90,18 @@
     document.getElementById('conteudo-protegido').style.display = '';
 
     if (RadAuth.temPerfil('supervisor', 'administrador')) {
-      document.getElementById('bloco-gestao').style.display = '';
-    }
-    if (RadAuth.temPerfil('administrador')) {
-      document.getElementById('bloco-admin').style.display = '';
+      document.getElementById('link-consultar').style.display = '';
+      document.getElementById('link-gerenciar-usuarios').style.display = '';
     }
 
     document.getElementById('botao-sair').addEventListener('click', function () {
       RadAuth.sair();
     });
 
+    // Catalogos se atualizam sozinhos ao abrir a ferramenta com
+    // conexao (RG-SYNC-010) -- aqui so mostramos a data da ultima
+    // atualizacao (RG-SYNC-011), sem botao manual.
     const statusCatalogos = document.getElementById('status-catalogos');
-    const botaoAtualizar = document.getElementById('botao-atualizar-catalogos');
 
     function formatarDataHora(isoString) {
       if (!isoString) return null;
@@ -74,26 +118,13 @@
       }
     }
 
-    async function atualizarCatalogosAgora() {
-      if (!navigator.onLine) {
-        statusCatalogos.textContent = 'Sem conexão — não é possível atualizar os catálogos agora.';
-        return;
-      }
-      botaoAtualizar.disabled = true;
-      botaoAtualizar.textContent = 'Atualizando…';
-      try {
-        await RadDB.atualizarCatalogos();
-        await mostrarStatusCatalogos();
-      } catch (erro) {
-        statusCatalogos.textContent = 'Não foi possível atualizar os catálogos agora.';
-      } finally {
-        botaoAtualizar.disabled = false;
-        botaoAtualizar.textContent = 'Atualizar catálogos';
-      }
-    }
-
     mostrarStatusCatalogos();
-    botaoAtualizar.addEventListener('click', atualizarCatalogosAgora);
+
+    if (navigator.onLine) {
+      RadDB.atualizarCatalogos().then(mostrarStatusCatalogos).catch(function () {
+        // Falha silenciosa -- tela nao deve travar por causa disso.
+      });
+    }
   });
 </script>
 {% endblock %}

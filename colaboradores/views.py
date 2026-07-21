@@ -63,6 +63,7 @@ def _serializar(colaborador):
         'registro_empresa': colaborador.registro_empresa,
         'nome': colaborador.nome,
         'ativo': colaborador.ativo,
+        'usuario_id': usuario.id if usuario else None,
         'login': usuario.login if usuario else None,
         'perfis': usuario.lista_perfis if usuario else [],
         'usuario_ativo': usuario.ativo if usuario else None,

@@ -1,423 +1,430 @@
 /*
- * Gerenciar Usuarios — Supervisor e Administrador (EFD secao 4.4).
+ * Gerenciar Usuários — tela única que substitui as antigas telas
+ * separadas "Gerenciar Usuários" e "Gerenciar Colaboradores".
  *
- * Correcoes aplicadas vs versao anterior:
- * - ES6+ (const/let, arrow functions, template literals)
- * - Objeto usuario mantido em memoria — sem leitura fragil do DOM
- * - Edicao inline no card (padrao gerenciar_colaboradores)
- * - Botoes desabilitados durante fetch com finally
- * - Ativar/desativar atualiza card especifico sem recarregar lista
- * - Busca por login em tempo real (sem nova requisicao)
- * - Filtro por perfil e status
- * - Estado de carregamento na lista
- * - Login nao e editavel apos criacao (identificador de autenticacao)
- * - Supervisor ve admins mas ve nota "nao pode gerenciar"
- * - Backend retorna pode_gerenciar por usuario
+ * Usa os endpoints do app colaboradores como fonte principal (cada
+ * colaborador já traz login/perfis/status do usuário vinculado, ver
+ * colaboradores/views.py::_serializar). Editar perfis usa o endpoint
+ * de usuarios (usuarios/administrar/<id>/editar/), porque perfil e'
+ * um dado do Usuario, nao do Colaborador.
  */
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', function () {
   if (!RadAuth.exigirSessao()) return;
-
-  const ehAdmin = RadAuth.temPerfil('administrador');
-  const ehSupervisor = RadAuth.temPerfil('supervisor');
-
-  if (!ehSupervisor && !ehAdmin) {
+  if (!RadAuth.temPerfil('supervisor', 'administrador')) {
     window.location.href = '/inicio/';
     return;
   }
-
   document.getElementById('conteudo-protegido').style.display = '';
 
-  // Supervisor nao ve nem pode atribuir perfil Administrador (PRM-024)
-  if (!ehAdmin) {
+  const souAdministrador = RadAuth.temPerfil('administrador');
+  if (!souAdministrador) {
+    // Supervisor nao pode atribuir/ver o checkbox de Administrador
+    // nos formularios (PRM-016/017/024), mas continua vendo a coluna
+    // de perfis normalmente na tabela.
     document.getElementById('label-perfil-novo-admin').style.display = 'none';
     document.getElementById('label-filtro-admin').style.display = 'none';
+    document.getElementById('label-perfil-editar-admin').style.display = 'none';
   }
 
-  const listaEl = document.getElementById('lista-usuarios');
-  const avisoLista = document.getElementById('aviso-lista');
+  let pessoaEmEdicao = null;
+  let pessoaEmExclusao = null;
+
   const avisoCriar = document.getElementById('aviso-criar');
+  const avisoImportar = document.getElementById('aviso-importar');
+  const avisoLista = document.getElementById('aviso-lista');
+  const corpoTabela = document.getElementById('corpo-tabela-pessoas');
+  const mensagemVazia = document.getElementById('mensagem-vazia');
 
-  // Todos os usuarios em memoria — nao lemos o DOM para obter dados
-  let todosOsUsuarios = [];
+  function html(strings, ...valores) {
+    return strings.reduce((acc, str, i) => acc + str + (valores[i] ?? ''), '');
+  }
 
-  // ---------------------------------------------------------------------------
-  // Utilitarios
-  // ---------------------------------------------------------------------------
+  function escapar(texto) {
+    const div = document.createElement('div');
+    div.textContent = texto ?? '';
+    return div.innerHTML;
+  }
 
-  const mensagemDeErro = (corpo, padrao) => {
-    if (corpo?.erros?.length) return corpo.erros.map((e) => e.mensagem).join(' ');
-    if (corpo?.erro) return corpo.erro;
-    return padrao;
-  };
+  function mostrarAviso(container, mensagem, tipo) {
+    container.innerHTML = `<div class="aviso aviso--${tipo}">${escapar(mensagem)}</div>`;
+  }
 
-  const exibirAviso = (el, texto, tipo) => {
-    el.innerHTML = `<div class="aviso aviso--${tipo}">${texto}</div>`;
-  };
+  function limparAviso(container) {
+    container.innerHTML = '';
+  }
 
-  const rotuloPerfis = (perfis) => {
-    const mapa = { usuario: 'Usuário', supervisor: 'Supervisor', administrador: 'Administrador' };
-    return perfis.map((p) => mapa[p] || p).join(', ');
-  };
+  // -------------------------------------------------------------
+  // Modal: Como importar
+  // -------------------------------------------------------------
+  const modalComoImportar = document.getElementById('modal-como-importar');
+  document.getElementById('botao-como-importar').addEventListener('click', function () {
+    modalComoImportar.style.display = 'flex';
+  });
+  document.getElementById('botao-fechar-como-importar').addEventListener('click', function () {
+    modalComoImportar.style.display = 'none';
+  });
 
-  // ---------------------------------------------------------------------------
-  // Listagem e filtragem em memoria (sem nova requisicao)
-  // ---------------------------------------------------------------------------
+  // -------------------------------------------------------------
+  // Cadastro manual
+  // -------------------------------------------------------------
+  document.getElementById('botao-criar-usuario').addEventListener('click', async function () {
+    limparAviso(avisoCriar);
 
-  const carregarLista = async () => {
-    avisoLista.innerHTML = '';
-    listaEl.innerHTML = '<p class="texto-suave centro">Carregando…</p>';
-    try {
-      const resposta = await RadAuth.requisicaoAutenticada('/usuarios/administrar/');
-      if (!resposta.ok) {
-        exibirAviso(avisoLista, 'Não foi possível carregar os usuários.', 'erro');
-        listaEl.innerHTML = '';
-        return;
-      }
-      const dados = await resposta.json();
-      todosOsUsuarios = dados.usuarios;
-      renderizarLista();
-    } catch (e) {
-      exibirAviso(avisoLista, 'Erro de conexão ao carregar os usuários.', 'erro');
-      listaEl.innerHTML = '';
+    const nome = document.getElementById('campo-novo-nome').value.trim();
+    const matricula = document.getElementById('campo-novo-matricula').value.trim();
+    const perfis = [];
+    if (document.getElementById('perfil-novo-usuario').checked) perfis.push('usuario');
+    if (document.getElementById('perfil-novo-supervisor').checked) perfis.push('supervisor');
+    if (souAdministrador && document.getElementById('perfil-novo-administrador').checked) {
+      perfis.push('administrador');
     }
-  };
 
-  const renderizarLista = () => {
-    listaEl.innerHTML = '';
-    const busca = document.getElementById('campo-busca').value.trim().toLowerCase();
-    const mostrarInativos = document.getElementById('filtro-inativos').checked;
-    const filtroUsuario = document.getElementById('filtro-usuario').checked;
-    const filtroSupervisor = document.getElementById('filtro-supervisor').checked;
-    const filtroAdmin = document.getElementById('filtro-administrador')?.checked ?? false;
-
-    const filtrados = todosOsUsuarios.filter((u) => {
-      if (!mostrarInativos && !u.ativo) return false;
-      if (busca && !u.login.toLowerCase().includes(busca)) return false;
-      if (u.perfis.includes('usuario') && filtroUsuario) return true;
-      if (u.perfis.includes('supervisor') && filtroSupervisor) return true;
-      if (u.perfis.includes('administrador') && filtroAdmin) return true;
-      return false;
-    });
-
-    if (filtrados.length === 0) {
-      const vazio = document.createElement('p');
-      vazio.className = 'texto-suave centro';
-      vazio.textContent = 'Nenhum usuário encontrado.';
-      listaEl.appendChild(vazio);
+    if (!nome || !matricula) {
+      mostrarAviso(avisoCriar, 'Preencha nome e matrícula.', 'erro');
       return;
     }
 
-    filtrados.forEach((u) => listaEl.appendChild(criarCartao(u)));
-  };
-
-  // Filtros em tempo real — sem bater na API
-  document.getElementById('campo-busca').addEventListener('input', renderizarLista);
-  document.getElementById('filtro-usuario').addEventListener('change', renderizarLista);
-  document.getElementById('filtro-supervisor').addEventListener('change', renderizarLista);
-  document.getElementById('filtro-inativos').addEventListener('change', renderizarLista);
-  document.getElementById('filtro-administrador')?.addEventListener('change', renderizarLista);
-
-  // ---------------------------------------------------------------------------
-  // Card: modo visualizacao e edicao inline (padrao gerenciar_colaboradores)
-  // ---------------------------------------------------------------------------
-
-  const criarCartao = (usuario) => {
-    const cartao = document.createElement('div');
-    cartao.className = 'cartao';
-    cartao.dataset.id = usuario.id;
-
-    const desenharModoVisualizacao = () => {
-      cartao.innerHTML = '';
-
-      const topo = document.createElement('div');
-      topo.style.cssText = 'display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;';
-      topo.innerHTML = `
-        <div>
-          <strong>${usuario.login}</strong>
-          <div class="texto-suave" style="font-size:0.85rem;">${rotuloPerfis(usuario.perfis)} &bull; Criado em ${usuario.data_criacao}</div>
-        </div>
-        <span class="selo ${usuario.ativo ? 'selo--online' : 'selo--offline'}">${usuario.ativo ? 'Ativo' : 'Inativo'}</span>
-      `;
-      cartao.appendChild(topo);
-
-      const avisoLinha = document.createElement('div');
-      cartao.appendChild(avisoLinha);
-
-      const acoes = document.createElement('div');
-      acoes.className = 'pilha';
-      acoes.style.marginTop = '0.75rem';
-
-      if (usuario.pode_gerenciar) {
-        // Editar (edicao inline no card, sem modal)
-        const botaoEditar = document.createElement('button');
-        botaoEditar.type = 'button';
-        botaoEditar.className = 'botao botao--secundaria';
-        botaoEditar.textContent = 'Editar';
-        botaoEditar.addEventListener('click', desenharModoEdicao);
-        acoes.appendChild(botaoEditar);
-
-        // Ativar / Desativar — atualiza so este card, sem recarregar a lista
-        const botaoToggle = document.createElement('button');
-        botaoToggle.type = 'button';
-        botaoToggle.className = 'botao botao--secundaria';
-        botaoToggle.textContent = usuario.ativo ? 'Desativar' : 'Ativar';
-        botaoToggle.addEventListener('click', async () => {
-          botaoToggle.disabled = true;
-          try {
-            const resposta = await RadAuth.requisicaoAutenticada(
-              `/usuarios/administrar/${usuario.id}/editar/`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ perfis: usuario.perfis, ativo: !usuario.ativo }),
-              }
-            );
-            if (!resposta.ok) {
-              const corpo = await resposta.json().catch(() => ({}));
-              avisoLinha.innerHTML = `<div class="aviso aviso--erro">${mensagemDeErro(corpo, 'Não foi possível atualizar.')}</div>`;
-              return;
-            }
-            const atualizado = await resposta.json();
-            Object.assign(usuario, atualizado); // atualiza objeto em memoria
-            desenharModoVisualizacao(); // redesenha so este card
-          } catch (e) {
-            avisoLinha.innerHTML = '<div class="aviso aviso--erro">Erro de conexão.</div>';
-          } finally {
-            botaoToggle.disabled = false;
-          }
-        });
-        acoes.appendChild(botaoToggle);
-
-        // Excluir — nao aparece para o proprio usuario logado
-        if (usuario.login !== RadAuth.obterSessao()?.login) {
-          const botaoExcluir = document.createElement('button');
-          botaoExcluir.type = 'button';
-          botaoExcluir.className = 'botao botao--perigo';
-          botaoExcluir.textContent = 'Excluir';
-          botaoExcluir.addEventListener('click', () =>
-            abrirModalExclusao(usuario, () => {
-              todosOsUsuarios = todosOsUsuarios.filter((u) => u.id !== usuario.id);
-              cartao.remove();
-            })
-          );
-          acoes.appendChild(botaoExcluir);
-        }
-      } else {
-        // Supervisor vendo Admin puro — mostra nota sem botoes
-        const nota = document.createElement('p');
-        nota.className = 'texto-suave';
-        nota.style.fontSize = '0.85rem';
-        nota.textContent = 'Somente Administrador pode gerenciar este perfil.';
-        acoes.appendChild(nota);
-      }
-
-      cartao.appendChild(acoes);
-    };
-
-    const desenharModoEdicao = () => {
-      cartao.innerHTML = '';
-
-      const avisoEdicao = document.createElement('div');
-      cartao.appendChild(avisoEdicao);
-
-      // Login somente leitura — nao editavel apos criacao
-      const infoLogin = document.createElement('p');
-      infoLogin.style.marginBottom = '0.75rem';
-      infoLogin.innerHTML = `<strong>${usuario.login}</strong> <span class="texto-suave" style="font-size:0.85rem;">(login não pode ser alterado)</span>`;
-      cartao.appendChild(infoLogin);
-
-      // Checkboxes de perfil
-      const campoPerfis = document.createElement('div');
-      campoPerfis.className = 'campo';
-      const labelPerfis = document.createElement('label');
-      labelPerfis.textContent = 'Perfis';
-      campoPerfis.appendChild(labelPerfis);
-
-      const checkboxRow = document.createElement('div');
-      checkboxRow.style.cssText = 'display:flex; gap:1rem; flex-wrap:wrap; margin-top:0.4rem;';
-
-      const perfisDisponiveis = ehAdmin
-        ? ['usuario', 'supervisor', 'administrador']
-        : ['usuario', 'supervisor'];
-      const rotulosPerfis = { usuario: 'Usuário', supervisor: 'Supervisor', administrador: 'Administrador' };
-
-      perfisDisponiveis.forEach((p) => {
-        const label = document.createElement('label');
-        label.style.cssText = 'display:flex; align-items:center; gap:0.4rem; cursor:pointer; min-height:44px;';
-        const cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.value = p;
-        cb.checked = usuario.perfis.includes(p);
-        label.appendChild(cb);
-        label.appendChild(document.createTextNode(rotulosPerfis[p]));
-        checkboxRow.appendChild(label);
-      });
-      campoPerfis.appendChild(checkboxRow);
-      cartao.appendChild(campoPerfis);
-
-      // Radio de status
-      const campoStatus = document.createElement('div');
-      campoStatus.className = 'campo';
-      const labelStatus = document.createElement('label');
-      labelStatus.textContent = 'Status';
-      campoStatus.appendChild(labelStatus);
-
-      const statusRow = document.createElement('div');
-      statusRow.style.cssText = 'display:flex; gap:1rem; flex-wrap:wrap; margin-top:0.4rem;';
-      ['Ativo', 'Inativo'].forEach((rotulo, idx) => {
-        const lab = document.createElement('label');
-        lab.style.cssText = 'display:flex; align-items:center; gap:0.4rem; cursor:pointer; min-height:44px;';
-        const rb = document.createElement('input');
-        rb.type = 'radio';
-        rb.name = `ativo-${usuario.id}`;
-        rb.value = idx === 0 ? 'true' : 'false';
-        rb.checked = idx === 0 ? usuario.ativo : !usuario.ativo;
-        lab.appendChild(rb);
-        lab.appendChild(document.createTextNode(rotulo));
-        statusRow.appendChild(lab);
-      });
-      campoStatus.appendChild(statusRow);
-      cartao.appendChild(campoStatus);
-
-      // Botoes salvar / cancelar
-      const acoes = document.createElement('div');
-      acoes.className = 'pilha';
-
-      const botaoSalvar = document.createElement('button');
-      botaoSalvar.type = 'button';
-      botaoSalvar.className = 'botao botao--primaria';
-      botaoSalvar.textContent = 'Salvar';
-      botaoSalvar.addEventListener('click', async () => {
-        const perfisEscolhidos = [...checkboxRow.querySelectorAll('input[type=checkbox]:checked')]
-          .map((cb) => cb.value);
-        const ativoEscolhido =
-          cartao.querySelector(`input[name="ativo-${usuario.id}"]:checked`)?.value === 'true';
-
-        botaoSalvar.disabled = true;
-        try {
-          const resposta = await RadAuth.requisicaoAutenticada(
-            `/usuarios/administrar/${usuario.id}/editar/`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ perfis: perfisEscolhidos, ativo: ativoEscolhido }),
-            }
-          );
-          if (!resposta.ok) {
-            const corpo = await resposta.json().catch(() => ({}));
-            exibirAviso(avisoEdicao, mensagemDeErro(corpo, 'Não foi possível salvar.'), 'erro');
-            return;
-          }
-          const atualizado = await resposta.json();
-          Object.assign(usuario, atualizado); // atualiza objeto em memoria
-          desenharModoVisualizacao();
-        } catch (e) {
-          exibirAviso(avisoEdicao, 'Erro de conexão ao salvar.', 'erro');
-        } finally {
-          botaoSalvar.disabled = false;
-        }
-      });
-      acoes.appendChild(botaoSalvar);
-
-      const botaoCancelar = document.createElement('button');
-      botaoCancelar.type = 'button';
-      botaoCancelar.className = 'botao botao--secundaria';
-      botaoCancelar.textContent = 'Cancelar';
-      botaoCancelar.addEventListener('click', desenharModoVisualizacao);
-      acoes.appendChild(botaoCancelar);
-
-      cartao.appendChild(acoes);
-    };
-
-    desenharModoVisualizacao();
-    return cartao;
-  };
-
-  // ---------------------------------------------------------------------------
-  // Criar usuario
-  // ---------------------------------------------------------------------------
-
-  document.getElementById('botao-criar-usuario').addEventListener('click', async () => {
-    avisoCriar.innerHTML = '';
-    const login = document.getElementById('campo-novo-login').value.trim();
-    const perfis = ['usuario', 'supervisor', 'administrador']
-      .filter((p) => document.getElementById(`perfil-novo-${p}`)?.checked);
     const botao = document.getElementById('botao-criar-usuario');
-
     botao.disabled = true;
     try {
-      const resposta = await RadAuth.requisicaoAutenticada('/usuarios/administrar/criar/', {
+      // 1) cria o colaborador — isso ja cria o login com perfil
+      //    Usuario automaticamente (ver colaboradores/views.py::_garantir_usuario)
+      const resposta = await RadAuth.requisicaoAutenticada('/colaboradores/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ login, perfis }),
+        body: JSON.stringify({ registro_empresa: matricula, nome }),
       });
-      const dados = await resposta.json().catch(() => ({}));
+      const dados = await resposta.json();
+
       if (!resposta.ok) {
-        exibirAviso(avisoCriar, mensagemDeErro(dados, 'Não foi possível criar o usuário.'), 'erro');
+        const mensagem = (dados.erros || []).map((e) => e.mensagem).join(' ') || 'Não foi possível cadastrar.';
+        mostrarAviso(avisoCriar, mensagem, 'erro');
         return;
       }
-      exibirAviso(avisoCriar, `Usuário <strong>${dados.login}</strong> criado com sucesso.`, 'sucesso');
-      document.getElementById('campo-novo-login').value = '';
-      ['usuario', 'supervisor', 'administrador'].forEach((p) => {
-        const cb = document.getElementById(`perfil-novo-${p}`);
-        if (cb) cb.checked = false;
-      });
-      todosOsUsuarios.push(dados);
-      renderizarLista();
-    } catch (e) {
-      exibirAviso(avisoCriar, 'Erro de conexão ao criar o usuário.', 'erro');
+
+      // 2) se pediram perfis alem do padrao (Usuario), atualiza
+      const perfisDiferentesDoPadrao = perfis.length !== 1 || perfis[0] !== 'usuario';
+      if (perfisDiferentesDoPadrao && dados.usuario_id) {
+        await RadAuth.requisicaoAutenticada(`/usuarios/administrar/${dados.usuario_id}/editar/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ perfis }),
+        });
+      }
+
+      mostrarAviso(avisoCriar, `${nome} cadastrado com sucesso.`, 'sucesso');
+      document.getElementById('campo-novo-nome').value = '';
+      document.getElementById('campo-novo-matricula').value = '';
+      document.getElementById('perfil-novo-usuario').checked = true;
+      document.getElementById('perfil-novo-supervisor').checked = false;
+      document.getElementById('perfil-novo-administrador').checked = false;
+      await carregarLista();
+    } catch (erro) {
+      mostrarAviso(avisoCriar, 'Erro de conexão ao cadastrar.', 'erro');
     } finally {
       botao.disabled = false;
     }
   });
 
-  // ---------------------------------------------------------------------------
-  // Modal de exclusao
-  // ---------------------------------------------------------------------------
+  // -------------------------------------------------------------
+  // Importação CSV
+  // -------------------------------------------------------------
+  document.getElementById('botao-importar').addEventListener('click', async function () {
+    limparAviso(avisoImportar);
+    const campoArquivo = document.getElementById('campo-arquivo-importar');
+    const arquivo = campoArquivo.files[0];
+    if (!arquivo) {
+      mostrarAviso(avisoImportar, 'Selecione um arquivo CSV.', 'erro');
+      return;
+    }
 
-  const modalExcluir = document.getElementById('modal-excluir-usuario');
-  let usuarioParaExcluir = null;
-  let aoExcluirComSucesso = null;
+    const formData = new FormData();
+    formData.append('arquivo', arquivo);
 
-  const abrirModalExclusao = (usuario, callbackSucesso) => {
-    usuarioParaExcluir = usuario;
-    aoExcluirComSucesso = callbackSucesso;
-    document.getElementById('login-usuario-excluir').textContent = usuario.login;
-    modalExcluir.style.display = 'flex';
-  };
+    const botao = document.getElementById('botao-importar');
+    botao.disabled = true;
+    botao.textContent = 'Importando…';
+    try {
+      const resposta = await RadAuth.requisicaoAutenticada('/colaboradores/importar/', {
+        method: 'POST',
+        body: formData,
+      });
+      const dados = await resposta.json();
 
-  document.getElementById('botao-cancelar-exclusao').addEventListener('click', () => {
-    modalExcluir.style.display = 'none';
+      if (!resposta.ok) {
+        mostrarAviso(avisoImportar, dados.erro || 'Não foi possível importar.', 'erro');
+        return;
+      }
+
+      let mensagem = `${dados.criados} criado(s), ${dados.atualizados} atualizado(s).`;
+      if (dados.erros && dados.erros.length > 0) {
+        mensagem += ` ${dados.erros.length} linha(s) com problema.`;
+        mostrarAviso(avisoImportar, mensagem, 'atencao');
+      } else {
+        mostrarAviso(avisoImportar, mensagem, 'sucesso');
+      }
+      campoArquivo.value = '';
+      await carregarLista();
+    } catch (erro) {
+      mostrarAviso(avisoImportar, 'Erro de conexão ao importar.', 'erro');
+    } finally {
+      botao.disabled = false;
+      botao.textContent = 'Importar';
+    }
   });
 
-  document.getElementById('botao-confirmar-exclusao').addEventListener('click', async () => {
-    if (!usuarioParaExcluir) return;
-    const botao = document.getElementById('botao-confirmar-exclusao');
+  // -------------------------------------------------------------
+  // Listagem, busca e filtros
+  // -------------------------------------------------------------
+  function seloStatus(ativo) {
+    return ativo
+      ? '<span class="selo selo--online">Ativo</span>'
+      : '<span class="selo selo--offline">Inativo</span>';
+  }
+
+  function seloPerfil(perfil) {
+    const rotulos = { usuario: 'Usuário', supervisor: 'Supervisor', administrador: 'Administrador' };
+    return `<span class="selo selo--online" style="margin-right:0.3rem;">${rotulos[perfil] || perfil}</span>`;
+  }
+
+  function pessoaCorrespondeAosFiltros(pessoa, termoBusca, perfisPermitidos, mostrarInativos) {
+    if (!mostrarInativos && !pessoa.ativo) return false;
+
+    if (termoBusca) {
+      const alvo = `${pessoa.nome} ${pessoa.registro_empresa}`.toLowerCase();
+      if (!alvo.includes(termoBusca.toLowerCase())) return false;
+    }
+
+    if (pessoa.perfis.length === 0) return true; // sem perfil ainda aparece (cadastro incompleto)
+    return pessoa.perfis.some((p) => perfisPermitidos.has(p));
+  }
+
+  function linhaTabela(pessoa) {
+    const podeGerenciarAdmin = souAdministrador || !pessoa.perfis.includes('administrador');
+    const perfisHtml = pessoa.perfis.length
+      ? pessoa.perfis.map(seloPerfil).join('')
+      : '<span class="texto-suave" style="font-size:0.85rem;">Sem login</span>';
+
+    const botoesAcao = podeGerenciarAdmin
+      ? html`
+        <button type="button" class="botao botao--secundaria botao-editar-perfis"
+                data-id="${pessoa.id}" data-usuario-id="${pessoa.usuario_id ?? ''}"
+                data-nome="${escapar(pessoa.nome)}" data-perfis="${pessoa.perfis.join(',')}"
+                style="width:auto; min-height:36px; padding:0 0.75rem; font-size:0.85rem;">
+          Editar perfis
+        </button>
+        <button type="button" class="botao botao--secundaria botao-alternar-status"
+                data-id="${pessoa.id}" data-ativo="${pessoa.ativo}"
+                style="width:auto; min-height:36px; padding:0 0.75rem; font-size:0.85rem;">
+          ${pessoa.ativo ? 'Desativar' : 'Ativar'}
+        </button>
+        <button type="button" class="botao botao--perigo botao-excluir"
+                data-id="${pessoa.id}" data-nome="${escapar(pessoa.nome)}"
+                style="width:auto; min-height:36px; padding:0 0.75rem; font-size:0.85rem;">
+          Excluir
+        </button>`
+      : '<span class="texto-suave" style="font-size:0.8rem;">Editar/excluir Admin — somente outro Administrador</span>';
+
+    return html`
+      <tr>
+        <td>${escapar(pessoa.nome)}</td>
+        <td>${escapar(pessoa.registro_empresa)}</td>
+        <td>${perfisHtml}</td>
+        <td>${seloStatus(pessoa.ativo)}</td>
+        <td><div style="display:flex; gap:0.4rem; flex-wrap:wrap;">${botoesAcao}</div></td>
+      </tr>`;
+  }
+
+  let todasAsPessoas = [];
+
+  async function carregarLista() {
+    limparAviso(avisoLista);
+    try {
+      const resposta = await RadAuth.requisicaoAutenticada('/colaboradores/administrar/');
+      if (!resposta.ok) {
+        mostrarAviso(avisoLista, 'Não foi possível carregar a lista.', 'erro');
+        return;
+      }
+      const dados = await resposta.json();
+      todasAsPessoas = dados.colaboradores;
+      aplicarFiltrosERenderizar();
+    } catch (erro) {
+      mostrarAviso(avisoLista, 'Erro de conexão ao carregar a lista.', 'erro');
+    }
+  }
+
+  function aplicarFiltrosERenderizar() {
+    const termoBusca = document.getElementById('campo-busca').value.trim();
+    const mostrarInativos = document.getElementById('filtro-inativos').checked;
+
+    const perfisPermitidos = new Set();
+    if (document.getElementById('filtro-usuario').checked) perfisPermitidos.add('usuario');
+    if (document.getElementById('filtro-supervisor').checked) perfisPermitidos.add('supervisor');
+    if (souAdministrador && document.getElementById('filtro-administrador').checked) {
+      perfisPermitidos.add('administrador');
+    } else if (!souAdministrador) {
+      perfisPermitidos.add('administrador'); // supervisor sempre ve admins na lista (so nao gerencia)
+    }
+
+    const filtradas = todasAsPessoas.filter((p) =>
+      pessoaCorrespondeAosFiltros(p, termoBusca, perfisPermitidos, mostrarInativos)
+    );
+
+    if (filtradas.length === 0) {
+      corpoTabela.innerHTML = '';
+      mensagemVazia.style.display = '';
+      return;
+    }
+    mensagemVazia.style.display = 'none';
+    corpoTabela.innerHTML = filtradas.map(linhaTabela).join('');
+
+    corpoTabela.querySelectorAll('.botao-editar-perfis').forEach((botao) => {
+      botao.addEventListener('click', () => abrirModalEditarPerfis(botao.dataset));
+    });
+    corpoTabela.querySelectorAll('.botao-alternar-status').forEach((botao) => {
+      botao.addEventListener('click', () => alternarStatus(botao.dataset));
+    });
+    corpoTabela.querySelectorAll('.botao-excluir').forEach((botao) => {
+      botao.addEventListener('click', () => abrirModalExcluir(botao.dataset));
+    });
+  }
+
+  document.getElementById('campo-busca').addEventListener('input', aplicarFiltrosERenderizar);
+  ['filtro-usuario', 'filtro-supervisor', 'filtro-administrador', 'filtro-inativos'].forEach((id) => {
+    const elemento = document.getElementById(id);
+    if (elemento) elemento.addEventListener('change', aplicarFiltrosERenderizar);
+  });
+
+  // -------------------------------------------------------------
+  // Editar perfis
+  // -------------------------------------------------------------
+  const modalEditarPerfis = document.getElementById('modal-editar-perfis');
+  const avisoEditarPerfis = document.getElementById('aviso-editar-perfis');
+
+  function abrirModalEditarPerfis(dataset) {
+    if (!dataset.usuarioId) {
+      mostrarAviso(avisoLista, 'Esta pessoa ainda não tem login vinculado.', 'atencao');
+      return;
+    }
+    pessoaEmEdicao = { id: dataset.id, usuarioId: dataset.usuarioId, nome: dataset.nome };
+    document.getElementById('nome-pessoa-editar').textContent = dataset.nome;
+    limparAviso(avisoEditarPerfis);
+
+    const perfisAtuais = dataset.perfis ? dataset.perfis.split(',') : [];
+    document.getElementById('perfil-editar-usuario').checked = perfisAtuais.includes('usuario');
+    document.getElementById('perfil-editar-supervisor').checked = perfisAtuais.includes('supervisor');
+    document.getElementById('perfil-editar-administrador').checked = perfisAtuais.includes('administrador');
+
+    modalEditarPerfis.style.display = 'flex';
+  }
+
+  document.getElementById('botao-cancelar-editar-perfis').addEventListener('click', () => {
+    modalEditarPerfis.style.display = 'none';
+    pessoaEmEdicao = null;
+  });
+
+  document.getElementById('botao-salvar-perfis').addEventListener('click', async function () {
+    if (!pessoaEmEdicao) return;
+    limparAviso(avisoEditarPerfis);
+
+    const perfis = [];
+    if (document.getElementById('perfil-editar-usuario').checked) perfis.push('usuario');
+    if (document.getElementById('perfil-editar-supervisor').checked) perfis.push('supervisor');
+    if (souAdministrador && document.getElementById('perfil-editar-administrador').checked) {
+      perfis.push('administrador');
+    }
+
+    if (perfis.length === 0) {
+      mostrarAviso(avisoEditarPerfis, 'Selecione ao menos 1 perfil.', 'erro');
+      return;
+    }
+
+    const botao = document.getElementById('botao-salvar-perfis');
     botao.disabled = true;
     try {
       const resposta = await RadAuth.requisicaoAutenticada(
-        `/usuarios/administrar/${usuarioParaExcluir.id}/excluir/`,
-        { method: 'POST' }
+        `/usuarios/administrar/${pessoaEmEdicao.usuarioId}/editar/`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ perfis }),
+        }
       );
-      modalExcluir.style.display = 'none';
-      if (resposta.ok) {
-        if (aoExcluirComSucesso) aoExcluirComSucesso();
-        exibirAviso(avisoLista, 'Usuário excluído com sucesso.', 'sucesso');
-      } else {
-        const corpo = await resposta.json().catch(() => ({}));
-        exibirAviso(avisoLista, mensagemDeErro(corpo, 'Não foi possível excluir.'), 'erro');
+      const dados = await resposta.json();
+      if (!resposta.ok) {
+        const mensagem = (dados.erros || []).map((e) => e.mensagem).join(' ') || dados.erro || 'Não foi possível salvar.';
+        mostrarAviso(avisoEditarPerfis, mensagem, 'erro');
+        return;
       }
-    } catch (e) {
-      modalExcluir.style.display = 'none';
-      exibirAviso(avisoLista, 'Erro de conexão ao excluir.', 'erro');
+      modalEditarPerfis.style.display = 'none';
+      pessoaEmEdicao = null;
+      await carregarLista();
+    } catch (erro) {
+      mostrarAviso(avisoEditarPerfis, 'Erro de conexão ao salvar.', 'erro');
     } finally {
       botao.disabled = false;
     }
   });
 
-  // ---------------------------------------------------------------------------
-  // Inicializar
-  // ---------------------------------------------------------------------------
+  // -------------------------------------------------------------
+  // Ativar / desativar (usa o endpoint de colaboradores, que e' a
+  // fonte "oficial" de status usada tambem na busca do RAD)
+  // -------------------------------------------------------------
+  async function alternarStatus(dataset) {
+    const ativoAtual = dataset.ativo === 'true';
+    try {
+      const resposta = await RadAuth.requisicaoAutenticada(`/colaboradores/${dataset.id}/editar/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ativo: !ativoAtual }),
+      });
+      if (!resposta.ok) {
+        mostrarAviso(avisoLista, 'Não foi possível alterar o status.', 'erro');
+        return;
+      }
+      await carregarLista();
+    } catch (erro) {
+      mostrarAviso(avisoLista, 'Erro de conexão ao alterar status.', 'erro');
+    }
+  }
 
-  await carregarLista();
+  // -------------------------------------------------------------
+  // Excluir
+  // -------------------------------------------------------------
+  const modalExcluir = document.getElementById('modal-excluir-pessoa');
+
+  function abrirModalExcluir(dataset) {
+    pessoaEmExclusao = dataset.id;
+    document.getElementById('nome-pessoa-excluir').textContent = dataset.nome;
+    modalExcluir.style.display = 'flex';
+  }
+
+  document.getElementById('botao-cancelar-exclusao').addEventListener('click', () => {
+    modalExcluir.style.display = 'none';
+    pessoaEmExclusao = null;
+  });
+
+  document.getElementById('botao-confirmar-exclusao').addEventListener('click', async function () {
+    if (!pessoaEmExclusao) return;
+    const botao = document.getElementById('botao-confirmar-exclusao');
+    botao.disabled = true;
+    try {
+      const resposta = await RadAuth.requisicaoAutenticada(`/colaboradores/${pessoaEmExclusao}/excluir/`, {
+        method: 'POST',
+      });
+      if (!resposta.ok) {
+        mostrarAviso(avisoLista, 'Não foi possível excluir.', 'erro');
+        return;
+      }
+      modalExcluir.style.display = 'none';
+      pessoaEmExclusao = null;
+      await carregarLista();
+    } catch (erro) {
+      mostrarAviso(avisoLista, 'Erro de conexão ao excluir.', 'erro');
+    } finally {
+      botao.disabled = false;
+    }
+  });
+
+  carregarLista();
 });
