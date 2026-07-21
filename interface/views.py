@@ -1,12 +1,5 @@
 """
 Views do app interface — servem apenas o "shell" HTML de cada tela.
-
-Autenticacao e dados sao tratados no cliente (JS + localStorage +
-fetch para as APIs ja existentes), nao aqui: o token fica em
-localStorage, inacessivel a uma view Django comum renderizando uma
-navegacao de pagina normal. Por isso estas views nao usam @requer_token
--- quem decide se a pessoa pode ver a pagina e o RadAuth.exigirSessao()
-no JS de cada template, redirecionando para /entrar/ quando necessario.
 """
 from pathlib import Path
 
@@ -16,11 +9,6 @@ from django.shortcuts import render
 
 
 def saude(request):
-    """
-    GET /saude/ — health check para orquestradores de container/load
-    balancers (Railway, Render, Kubernetes, etc.). Confirma que o banco
-    esta acessivel, nao so que o processo Django respondeu.
-    """
     try:
         with connection.cursor() as cursor:
             cursor.execute('SELECT 1')
@@ -49,17 +37,14 @@ def tela_gerenciar_colaboradores(request):
     return render(request, 'interface/gerenciar_colaboradores.html')
 
 
+def tela_gerenciar_usuarios(request):
+    return render(request, 'interface/gerenciar_usuarios.html')
+
+
 def tela_novo_rad(request):
     return render(request, 'interface/novo_rad.html')
 
 
 def service_worker(request):
-    """
-    GET /sw.js — precisa ser servido na RAIZ do dominio (nao em
-    /static/), porque o escopo de um Service Worker e limitado ao
-    diretorio de onde ele e servido. Servindo em /static/interface/js/
-    o SW so conseguiria controlar paginas dentro desse caminho -- nunca
-    /entrar/, /inicio/, /novo-rad/, etc.
-    """
     caminho = Path(__file__).resolve().parent / 'service_worker_src.js'
     return HttpResponse(caminho.read_text(), content_type='application/javascript')

@@ -10,7 +10,10 @@
     <a href="{% url 'interface:novo_rad' %}" class="botao botao--primaria" id="link-novo-rad">+ Novo RAD</a>
 
     <div id="bloco-gestao" style="display:none;">
-      <a href="{% url 'interface:consulta' %}" class="botao botao--secundaria">Consultar RADs</a>
+      <div class="pilha">
+        <a href="{% url 'interface:consulta' %}" class="botao botao--secundaria">Consultar RADs</a>
+        <a href="{% url 'interface:gerenciar_usuarios' %}" class="botao botao--secundaria">Gerenciar Usuários</a>
+      </div>
     </div>
 
     <div id="bloco-admin" style="display:none;">

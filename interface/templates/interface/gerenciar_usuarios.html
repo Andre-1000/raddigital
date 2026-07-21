@@ -1,0 +1,85 @@
+{% extends "interface/base.html" %}
+{% load static %}
+{% block titulo %}Gerenciar Usuários — Sistema RAD{% endblock %}
+
+{% block conteudo %}
+<div id="conteudo-protegido" style="display:none;">
+  <h1 style="font-size:1.3rem;">Gerenciar Usuários</h1>
+  <p class="texto-suave" style="font-size:0.85rem; margin-top:-0.5rem;">
+    Logins de acesso ao Sistema RAD. Distinto do cadastro de colaboradores (funcionários da empresa).
+  </p>
+
+  <!-- Formulário de criação -->
+  <div class="cartao">
+    <h2 style="font-size:1rem;">Novo Usuário</h2>
+    <div id="aviso-criar"></div>
+    <div class="campo">
+      <label for="campo-novo-login">Login</label>
+      <input type="text" id="campo-novo-login" maxlength="100"
+             placeholder="Ex: joao.silva"
+             autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <span class="campo__ajuda">Letras, números, pontos, hifens ou underline. Mínimo 3 caracteres.</span>
+    </div>
+    <div class="campo">
+      <label>Perfis <span class="texto-suave" style="font-size:0.8rem; font-weight:400;">(selecione até 2)</span></label>
+      <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-top:0.4rem;">
+        <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; min-height:44px;">
+          <input type="checkbox" id="perfil-novo-usuario" value="usuario"> Usuário
+        </label>
+        <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; min-height:44px;">
+          <input type="checkbox" id="perfil-novo-supervisor" value="supervisor"> Supervisor
+        </label>
+        <label id="label-perfil-novo-admin" style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; min-height:44px;">
+          <input type="checkbox" id="perfil-novo-administrador" value="administrador"> Administrador
+        </label>
+      </div>
+    </div>
+    <button type="button" class="botao botao--primaria" id="botao-criar-usuario">Criar usuário</button>
+  </div>
+
+  <!-- Busca e filtros -->
+  <div class="cartao" style="margin-top:1rem;">
+    <div class="campo" style="margin-bottom:0.75rem;">
+      <label for="campo-busca">Buscar por login</label>
+      <input type="text" id="campo-busca" placeholder="Digite parte do login…"
+             autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    </div>
+    <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+      <label style="display:flex; align-items:center; gap:0.35rem; font-size:0.9rem; cursor:pointer;">
+        <input type="checkbox" id="filtro-usuario" checked> Usuário
+      </label>
+      <label style="display:flex; align-items:center; gap:0.35rem; font-size:0.9rem; cursor:pointer;">
+        <input type="checkbox" id="filtro-supervisor" checked> Supervisor
+      </label>
+      <label id="label-filtro-admin" style="display:flex; align-items:center; gap:0.35rem; font-size:0.9rem; cursor:pointer;">
+        <input type="checkbox" id="filtro-administrador" checked> Administrador
+      </label>
+      <label style="display:flex; align-items:center; gap:0.35rem; font-size:0.9rem; cursor:pointer;">
+        <input type="checkbox" id="filtro-inativos"> Mostrar inativos
+      </label>
+    </div>
+  </div>
+
+  <div id="aviso-lista" style="margin-top:1rem;"></div>
+  <div id="lista-usuarios" class="pilha" style="margin-top:1rem;"></div>
+</div>
+
+<!-- Modal de exclusão -->
+<div id="modal-excluir-usuario"
+     style="display:none; position:fixed; inset:0; background:rgba(28,31,30,0.5);
+            z-index:30; align-items:center; justify-content:center; padding:1rem;">
+  <div class="cartao" style="max-width:420px; width:100%;">
+    <h2 style="font-size:1.05rem;">Excluir usuário?</h2>
+    <p>Remove <strong id="login-usuario-excluir"></strong> permanentemente.
+       O usuário perderá o acesso ao sistema imediatamente.</p>
+    <div class="pilha">
+      <button type="button" class="botao botao--perigo" id="botao-confirmar-exclusao">Excluir definitivamente</button>
+      <button type="button" class="botao botao--secundaria" id="botao-cancelar-exclusao">Cancelar</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block script_extra %}
+<script src="{% static 'interface/js/gerenciar_usuarios.js' %}"></script>
+{% endblock %}
