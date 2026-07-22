@@ -1,16 +1,5 @@
 /*
  * Logica do formulario de preenchimento do RAD.
- *
- * Arquitetura: um unico objeto `rascunho` guarda o estado do
- * formulario inteiro, no MESMO formato que /rad/sincronizar/ espera
- * (ver rad/regras_negocio.py). Cada alteracao de campo atualiza
- * `rascunho` e chama salvarRascunhoAgora(), que grava no IndexedDB
- * (RadDB) -- e assim que o "salvamento a cada alteracao de campo" da
- * EFD 3.8 funciona neste bloco.
- *
- * Este arquivo cresce a cada bloco de trabalho (horarios, servicos,
- * colaboradores, anexos, sincronizacao). Nesta etapa (Bloco 1) ele
- * cobre Identificacao, Localizacao e Controle Operacional.
  */
 document.addEventListener('DOMContentLoaded', async function () {
   if (!RadAuth.exigirSessao()) return;
@@ -21,16 +10,11 @@ document.addEventListener('DOMContentLoaded', async function () {
   const statusRascunho = document.getElementById('status-rascunho');
   const avisoFormulario = document.getElementById('aviso-formulario');
 
-  // ---- Estado ---------------------------------------------------------
-
   let rascunho = await RadDB.obterRascunho(sessao.login);
   const jaExistiaRascunho = rascunho !== null;
   if (!rascunho) {
     rascunho = criarRascunhoVazio();
   } else {
-    // Preenche com defaults quaisquer campos novos que ainda nao
-    // existiam em rascunhos salvos por uma versao anterior do
-    // formulario (o formulario cresce em blocos de trabalho).
     const padrao = criarRascunhoVazio();
     for (const chave in padrao) {
       if (!(chave in rascunho)) rascunho[chave] = padrao[chave];
@@ -43,18 +27,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     rascunho.anexos = { fotos_intervencao_verificada: [], fotos_acao_realizada: [], pdf: [] };
   }
 
-  // ---- Apagar rascunho (RG-SYNC-019/020/022) ------------------------------
-  //
-  // Precisa estar cabeado ANTES do gate de conflito abaixo (que pode
-  // pausar a execucao do script com um await): o modal de conflito
-  // reaproveita este mesmo modal de exclusao para a opcao "apagar e
-  // comecar um novo" (RG-SYNC-019), entao os botoes precisam ja estar
-  // ouvindo clique antes do usuario poder interagir com eles.
-  //
-  // Apos apagar, recarrega esta MESMA pagina -- assim tanto o botao
-  // "Apagar rascunho" do topo quanto "apagar e comecar um novo" do
-  // conflito terminam no mesmo lugar: um formulario limpo.
-
   let resolverConflitoPendente = null;
   const modalConfirmarExclusao = document.getElementById('modal-confirmar-exclusao');
   const modalConflitoRascunho = document.getElementById('modal-conflito-rascunho');
@@ -65,9 +37,6 @@ document.addEventListener('DOMContentLoaded', async function () {
   document.getElementById('botao-cancelar-exclusao').addEventListener('click', function () {
     modalConfirmarExclusao.style.display = 'none';
     if (resolverConflitoPendente) {
-      // Veio do modal de conflito e desistiu de apagar -- volta para
-      // a pergunta original em vez de deixar a tela travada sem
-      // nenhum modal e sem o formulario ter sido renderizado ainda.
       modalConflitoRascunho.style.display = 'flex';
     }
   });
@@ -75,13 +44,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     await RadDB.limparRascunho(sessao.login);
     window.location.reload();
   });
-
-  // ---- Conflito: ja existe um RAD em preenchimento (RG-SYNC-018/019) -----
-  //
-  // So pergunta se o rascunho existente tem conteudo que valha a pena
-  // preservar (RG-SYNC-018 fala em "RAD com status Rascunho Local" --
-  // um rascunho recem-criado, ainda vazio, nao conta como "em
-  // preenchimento" e perguntar aqui so atrapalharia).
 
   function rascunhoTemConteudoRelevante(r) {
     return !!(r.numero_os || r.numero_sa || (r.servicos && r.servicos.length > 0));
@@ -108,8 +70,6 @@ document.addEventListener('DOMContentLoaded', async function () {
       document.getElementById('botao-apagar-e-comecar-novo').addEventListener('click', function () {
         modalConflitoRascunho.style.display = 'none';
         modalConfirmarExclusao.style.display = 'flex';
-        // resolverConflitoPendente continua setado -- se o usuario
-        // cancelar a exclusao no proximo modal, volta para este.
       });
     });
   }
@@ -127,7 +87,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       id_local_final: '',
       linhas: [],
       vias: [],
-      equipes: ['VP'], // RG: VP sempre presente, ja vem marcada
+      equipes: ['VP'],
       km_poste: '',
       id_tipo_manutencao: null,
       numero_falha: null,
@@ -146,11 +106,11 @@ document.addEventListener('DOMContentLoaded', async function () {
       servicos: [],
       outros_servico_desc: '',
       amv: { id_mch: null, tipos_defeito: [], acoes: [] },
-      colaboradores: [], // [{registro_empresa, nome, tipo: 'colaborador'|'participante'}]
+      colaboradores: [],
       anexos: {
-        fotos_intervencao_verificada: [], // File[]
-        fotos_acao_realizada: [], // File[]
-        pdf: [], // File[] (no maximo 1, mas array por simetria com o payload)
+        fotos_intervencao_verificada: [],
+        fotos_acao_realizada: [],
+        pdf: [],
       },
       responsavel_atividade: '',
       operador_ccm: '',
@@ -162,9 +122,6 @@ document.addEventListener('DOMContentLoaded', async function () {
   }
 
   function gerarIdTentativa() {
-    // Identificador local unico para esta tentativa de RAD (usado na
-    // sincronizacao para idempotencia). Gerado uma vez, ao criar o
-    // rascunho, e mantido ate sincronizar com sucesso.
     return 'rascunho-' + Date.now() + '-' + Math.random().toString(36).slice(2, 10);
   }
 
@@ -175,17 +132,13 @@ document.addEventListener('DOMContentLoaded', async function () {
     atualizarEstadoBotaoExportar();
   }
 
-  // RG-EXP-005: botao de exportar so habilita com os obrigatorios
-  // preenchidos. Verificado a cada salvamento (ou seja, a cada
-  // alteracao de campo), reaproveitando o mesmo gancho do autosave.
   function atualizarEstadoBotaoExportar() {
+    const habilitado = ExportarCliente.camposObrigatoriosPreenchidos(rascunho);
     const botaoExportar = document.getElementById('botao-exportar');
-    if (botaoExportar) {
-      botaoExportar.disabled = !ExportarCliente.camposObrigatoriosPreenchidos(rascunho);
-    }
+    const botaoCopiar = document.getElementById('botao-copiar-mensagem');
+    if (botaoExportar) botaoExportar.disabled = !habilitado;
+    if (botaoCopiar) botaoCopiar.disabled = !habilitado;
   }
-
-  // ---- Catalogos --------------------------------------------------------
 
   const locais = await RadDB.obterCatalogo('locais');
   const linhas = await RadDB.obterCatalogo('linhas');
@@ -201,10 +154,8 @@ document.addEventListener('DOMContentLoaded', async function () {
       </div>`;
   }
 
-  // ---- Local Inicial / Final (lista pesquisavel) -------------------------
-
   const listaLocaisEl = document.getElementById('lista-locais');
-  const mapaLocaisPorRotulo = new Map(); // "BFU - Barra Funda" -> "BFU"
+  const mapaLocaisPorRotulo = new Map();
 
   locais.forEach(function (local) {
     const rotulo = `${local.sigla} - ${local.nome}`;
@@ -233,14 +184,6 @@ document.addEventListener('DOMContentLoaded', async function () {
   ligarCampoLocal(document.getElementById('campo-local-inicial'), 'id_local_inicial');
   ligarCampoLocal(document.getElementById('campo-local-final'), 'id_local_final');
 
-  // ---- Chips: Linha, Via, Equipes ----------------------------------------
-
-  /**
-   * Renderiza um grupo de chips clicaveis (selecao multipla).
-   * itens: lista de {valor, rotulo}.
-   * valoresSelecionados: array (referencia direta do rascunho -- mutado in-place).
-   * fixos: valores que nao podem ser desmarcados pelo usuario (ex.: VP).
-   */
   function renderizarChips(containerEl, itens, valoresSelecionados, aoMudar, fixos = []) {
     containerEl.innerHTML = '';
     itens.forEach(function (item) {
@@ -289,10 +232,8 @@ document.addEventListener('DOMContentLoaded', async function () {
     equipes.map((e) => ({ valor: e.codigo, rotulo: e.nome })),
     rascunho.equipes,
     salvarRascunhoAgora,
-    ['VP'] // RG: VP e sempre incluida, nao pode ser desmarcada na tela
+    ['VP']
   );
-
-  // ---- Km/Poste (mascara automatica, RG-LOC-007) -------------------------
 
   const campoKmPoste = document.getElementById('campo-km-poste');
   campoKmPoste.value = rascunho.km_poste || '';
@@ -307,8 +248,6 @@ document.addEventListener('DOMContentLoaded', async function () {
   }
 
   campoKmPoste.addEventListener('input', function () {
-    // So aplica a mascara automatica quando o usuario digitou apenas
-    // numeros (RG-LOC-007) -- edicao manual livre continua permitida.
     const somenteDigitos = /^\d+$/.test(campoKmPoste.value.replace(/[/\s-]/g, ''));
     if (somenteDigitos) {
       campoKmPoste.value = aplicarMascaraKmPoste(campoKmPoste.value);
@@ -316,8 +255,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     rascunho.km_poste = campoKmPoste.value;
     salvarRascunhoAgora();
   });
-
-  // ---- Tipo de Manutencao + N Falha condicional --------------------------
 
   const campoTipoManutencao = document.getElementById('campo-tipo-manutencao');
   tiposManutencao.forEach(function (tipo) {
@@ -343,7 +280,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     const ehFalha = nomeDoTipoSelecionado() === 'Falha';
     campoGrupoNumeroFalha.style.display = ehFalha ? '' : 'none';
     if (!ehFalha) {
-      // RG-COP-009: ao sair de "Falha", limpa o numero da falha.
       campoNumeroFalha.value = '';
       rascunho.numero_falha = null;
     }
@@ -361,8 +297,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     salvarRascunhoAgora();
   });
 
-  // ---- Ajuda: Tipo de Manutencao (EFD-010-A) -----------------------------
-
   const modalAjuda = document.getElementById('modal-ajuda-tipo-manutencao');
   document.getElementById('botao-ajuda-tipo-manutencao').addEventListener('click', function () {
     modalAjuda.style.display = 'flex';
@@ -373,8 +307,6 @@ document.addEventListener('DOMContentLoaded', async function () {
   modalAjuda.addEventListener('click', function (evento) {
     if (evento.target === modalAjuda) modalAjuda.style.display = 'none';
   });
-
-  // ---- Campos simples restantes: OS, N. SA, Data -------------------------
 
   const campoNumeroOs = document.getElementById('campo-numero-os');
   const campoNumeroSa = document.getElementById('campo-numero-sa');
@@ -389,7 +321,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     salvarRascunhoAgora();
   });
   campoNumeroSa.addEventListener('input', function () {
-    // Somente digitos, ate 10 caracteres (VLD-028) -- filtra na digitacao.
     campoNumeroSa.value = campoNumeroSa.value.replace(/\D/g, '').slice(0, 10);
     rascunho.numero_sa = campoNumeroSa.value;
     salvarRascunhoAgora();
@@ -399,16 +330,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     salvarRascunhoAgora();
   });
 
-  // Primeiro salvamento (garante que sync_id_tentativa e os defaults,
-  // como equipes: ['VP'], ja fiquem gravados mesmo sem o usuario alterar nada).
   await salvarRascunhoAgora();
-
-  // ---- Horarios (Bloco 2) -------------------------------------------------
-  //
-  // RG-HOR-001 a 027. Usa RegrasHorario (regras_horario.js), o mesmo
-  // calculo do backend (rad/regras_horario.py), para dar feedback
-  // imediato offline. O calculo definitivo e sempre refeito no
-  // servidor na sincronizacao -- aqui e so para o usuario ver.
 
   const motivosAtraso = await RadDB.obterCatalogo('motivos_atraso');
 
@@ -433,7 +355,6 @@ document.addEventListener('DOMContentLoaded', async function () {
   const campoDescInicio = document.getElementById('campo-desc-atraso-inicio');
   const campoDescTermino = document.getElementById('campo-desc-atraso-termino');
 
-  // Datas HP/HR Inicio nao podem ser futuras.
   const hojeIso = new Date().toISOString().slice(0, 10);
   campoDataHpInicio.max = hojeIso;
   campoDataHrInicio.max = hojeIso;
@@ -459,9 +380,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     return motivo ? motivo.nome : '';
   }
 
-  // Rastreia se o usuario ja editou manualmente a data de termino --
-  // nesse caso a virada de meia-noite automatica para de sobrescrever
-  // (RG-HOR-022: "usuario podera editar a data resultante").
   let dataHpTerminoEditadaManualmente = !!rascunho._dataHpTerminoEditada;
   let dataHrTerminoEditadaManualmente = !!rascunho._dataHrTerminoEditada;
 
@@ -482,7 +400,6 @@ document.addEventListener('DOMContentLoaded', async function () {
   }
 
   function recalcularHorarios() {
-    // --- Virada de meia-noite (HP) ---
     if (rascunho.hora_prog_inicio && rascunho.hora_prog_termino && !dataHpTerminoEditadaManualmente) {
       const novaData = RegrasHorario.ajustarDataPorViradaDeMeiaNoite(
         campoDataHpInicio.value, rascunho.hora_prog_inicio, rascunho.hora_prog_termino
@@ -490,7 +407,6 @@ document.addEventListener('DOMContentLoaded', async function () {
       campoDataHpTermino.value = novaData;
       rascunho.data_hp_termino = novaData;
     }
-    // --- Virada de meia-noite (HR) ---
     if (rascunho.hora_real_inicio && rascunho.hora_real_termino && !dataHrTerminoEditadaManualmente) {
       const novaData = RegrasHorario.ajustarDataPorViradaDeMeiaNoite(
         campoDataHrInicio.value, rascunho.hora_real_inicio, rascunho.hora_real_termino
@@ -499,7 +415,6 @@ document.addEventListener('DOMContentLoaded', async function () {
       rascunho.data_hr_termino = novaData;
     }
 
-    // --- Duracoes ---
     let dtProgInicio = null, dtProgTermino = null, dtRealInicio = null, dtRealTermino = null;
 
     if (rascunho.hora_prog_inicio && campoDataHpInicio.value) {
@@ -530,7 +445,6 @@ document.addEventListener('DOMContentLoaded', async function () {
       valorDuracaoReal.textContent = '--';
     }
 
-    // --- Atrasos (RG-HOR-006/007/019: ocultos quando Tipo = Falha) ---
     const ocultarAtrasos = tipoManutencaoEhFalha();
     let atrasoInicio = false;
     let atrasoTermino = false;
@@ -629,21 +543,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     salvarRascunhoAgora();
   });
 
-  // Tipo de Manutencao ja tinha um listener (Bloco 1); a troca tambem
-  // precisa recalcular a visibilidade dos atrasos (RG-HOR-006/007/019).
   campoTipoManutencao.addEventListener('change', recalcularHorarios);
-
-  // ---- Servicos Executados + Bloco AMV (Bloco 3) ---------------------------
-  //
-  // RG-EXE-001 a 005 (servicos, "Outros"), EFD-020-B/C (bloco AMV).
-  //
-  // Nota de implementacao: a EFD descreve Modelo/Via/Local da MCH como
-  // editaveis pelo usuario, mas o backend atual (rad/regras_negocio.py)
-  // sempre grava os valores vindos do cadastro da MCH, ignorando
-  // qualquer edicao -- entao aqui esses campos sao exibidos como
-  // somente-leitura, para nao sugerir uma edicao que seria descartada
-  // silenciosamente na sincronizacao. Se o backend ganhar suporte a
-  // edicao desses campos, esta tela pode virar campos editaveis.
 
   const servicos = await RadDB.obterCatalogo('servicos');
   const mchs = await RadDB.obterCatalogo('mch');
@@ -740,13 +640,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     detalhesMch.style.display = 'flex';
   }
 
-  /**
-   * Redesenha o conteudo do bloco AMV a partir de rascunho.amv. As
-   * arrays tipos_defeito/acoes de rascunho.amv NUNCA sao substituidas
-   * (sempre mutadas in-place via push/splice) -- assim os checkboxes
-   * renderizados aqui continuam validos mesmo depois do bloco ser
-   * escondido e mostrado de novo.
-   */
   function renderizarBlocoAmv() {
     campoMch.value = rascunho.amv.id_mch ? (mchs.find((m) => m.id === rascunho.amv.id_mch) || {}).identificacao || '' : '';
     preencherDetalhesMch(rascunho.amv.id_mch);
@@ -777,8 +670,6 @@ document.addEventListener('DOMContentLoaded', async function () {
       renderizarBlocoAmv();
     } else {
       blocoAmv.style.display = 'none';
-      // Limpa em memoria (mesmas referencias de array, so esvaziadas)
-      // ao desmarcar o servico de AMV.
       rascunho.amv.id_mch = null;
       rascunho.amv.tipos_defeito.length = 0;
       rascunho.amv.acoes.length = 0;
@@ -811,14 +702,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     preencherDetalhesMch(idMch);
     salvarRascunhoAgora();
   });
-
-  // ---- Colaboradores e Participantes (Bloco 4) -----------------------------
-  //
-  // RG-RESP-001 a 015. A busca funciona offline: colaboradores_cadastro
-  // e cacheado no IndexedDB (ver db.js::atualizarCatalogos) e filtrado
-  // aqui no cliente, em vez de bater em /colaboradores/buscar/ a cada
-  // tecla -- assim o técnico consegue adicionar colaboradores em campo,
-  // sem sinal.
 
   const colaboradoresCadastro = await RadDB.obterCatalogo('colaboradores_cadastro');
 
@@ -860,7 +743,6 @@ document.addEventListener('DOMContentLoaded', async function () {
       botaoRemover.style.padding = '0 0.9rem';
       botaoRemover.textContent = 'Remover';
       botaoRemover.addEventListener('click', function () {
-        // RG-RESP-007: remocao livre antes da sincronizacao.
         rascunho.colaboradores.splice(indice, 1);
         renderizarColaboradoresAdicionados();
         salvarRascunhoAgora();
@@ -873,7 +755,6 @@ document.addEventListener('DOMContentLoaded', async function () {
   renderizarColaboradoresAdicionados();
 
   function jaAdicionado(registroEmpresa) {
-    // RG-RESP-009: mesmo registro nao pode ser adicionado duas vezes.
     return rascunho.colaboradores.some((p) => p.registro_empresa === registroEmpresa);
   }
 
@@ -911,7 +792,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     ).slice(0, 8);
 
     if (encontrados.length === 0) {
-      // RG-RESP-008
       const aviso = document.createElement('p');
       aviso.className = 'texto-suave';
       aviso.style.fontSize = '0.85rem';
@@ -935,7 +815,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         }
         adicionarPessoa({
           registro_empresa: candidato.registro_empresa,
-          nome: candidato.nome, // RG-RESP-004/005: nome nunca editavel manualmente
+          nome: candidato.nome,
           tipo: 'colaborador',
         });
         avisoColaboradores.innerHTML = '';
@@ -956,13 +836,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     avisoColaboradores.innerHTML = '';
     blocoNovoParticipante.style.display = 'none';
   });
-
-  // ---- Anexos (Bloco 5) -----------------------------------------------------
-  //
-  // RG-ANX-001 a 011. Fotos/PDF ficam guardados como File/Blob direto
-  // no rascunho -- IndexedDB clona objetos File nativamente (structured
-  // clone), entao nao precisa de nenhuma conversao especial para
-  // persistir localmente junto com o resto do rascunho.
 
   function configurarGrupoAnexo(opcoes) {
     const {
@@ -1024,7 +897,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     inputEl.addEventListener('change', async function () {
       const arquivo = inputEl.files[0];
-      inputEl.value = ''; // permite selecionar o mesmo arquivo de novo depois
+      inputEl.value = '';
       if (!arquivo) return;
 
       avisoEl.innerHTML = '';
@@ -1080,15 +953,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     ehFoto: false,
   });
 
-  // ---- Campos finais (Bloco 6): Responsavel, Operador CCM, Descricao ----
-  // ---- Tecnica, Materiais Utilizados, Observacoes Gerais -----------------
-  //
-  // Campos de texto livre, sem logica condicional. VLD-029
-  // (responsavel_atividade obrigatorio, 50 caracteres) e VLD-030
-  // (operador_ccm, 25 caracteres) sao reforcados aqui so como limite de
-  // digitacao -- a obrigatoriedade de verdade e conferida no backend na
-  // sincronizacao (Bloco 7), que e a fonte definitiva de validacao.
-
   function ligarCampoTexto(elementoId, chaveRascunho) {
     const elemento = document.getElementById(elementoId);
     elemento.value = rascunho[chaveRascunho] || '';
@@ -1098,18 +962,19 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
   }
 
+  // RG-RESP: usa a mesma lista de colaboradores/usuarios (colaboradoresCadastro,
+  // ja carregada no Bloco 4) para sugerir nomes, em vez de texto livre solto.
+  const listaResponsaveisEl = document.getElementById('lista-responsaveis');
+  colaboradoresCadastro.forEach(function (pessoa) {
+    const opcao = document.createElement('option');
+    opcao.value = pessoa.nome;
+    listaResponsaveisEl.appendChild(opcao);
+  });
   ligarCampoTexto('campo-responsavel-atividade', 'responsavel_atividade');
   ligarCampoTexto('campo-operador-ccm', 'operador_ccm');
   ligarCampoTexto('campo-descricao-tecnica', 'descricao_tecnica_atividade');
   ligarCampoTexto('campo-materiais-utilizados', 'materiais_utilizados');
   ligarCampoTexto('campo-observacoes-gerais', 'observacoes_gerais');
-
-  // ---- Sincronizar (Bloco 7) -------------------------------------------
-  //
-  // RG-SYNC-001 a 027. O botao Sincronizar e o unico jeito de enviar o
-  // RAD ao servidor -- tudo antes disso e so rascunho local. As
-  // validacoes de obrigatoriedade so rodam aqui (RG-SYNC-017); o
-  // servidor e quem decide de verdade se o RAD pode ser criado.
 
   let sincronizando = false;
 
@@ -1124,7 +989,6 @@ document.addEventListener('DOMContentLoaded', async function () {
       botaoSincronizar.textContent = 'Sincronizando…';
       textoStatusBotao.textContent = '';
     } else if (!navigator.onLine) {
-      // RG-SYNC-006/026: visivel, porem desabilitado sem conexao.
       botaoSincronizar.disabled = true;
       botaoSincronizar.textContent = 'Sincronizar';
       textoStatusBotao.textContent = 'Sem conexão';
@@ -1137,15 +1001,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   atualizarEstadoBotaoSincronizar();
   window.addEventListener('online', atualizarEstadoBotaoSincronizar);
   window.addEventListener('offline', atualizarEstadoBotaoSincronizar);
-  atualizarEstadoBotaoExportar(); // caso o rascunho carregado ja tenha tudo preenchido
-
-  // ---- Exportar (RG-EXP-001 a 010) ---------------------------------------
-  //
-  // 100% offline: nao faz nenhuma chamada de rede. PDF via jsPDF
-  // (hospedado localmente, ver vendor/jspdf.umd.min.js), "Word" via
-  // HTML servido com extensao .doc (o Word abre nativamente), mensagem
-  // via texto puro -- tudo montado a partir do rascunho local +
-  // catalogos ja cacheados no IndexedDB.
+  atualizarEstadoBotaoExportar();
 
   const modalExportar = document.getElementById('modal-exportar');
   const avisoExportarRascunho = document.getElementById('aviso-exportar-rascunho');
@@ -1179,12 +1035,11 @@ document.addEventListener('DOMContentLoaded', async function () {
     URL.revokeObjectURL(url);
   }
 
-  document.getElementById('botao-exportar-mensagem').addEventListener('click', async function () {
+  document.getElementById('botao-copiar-mensagem').addEventListener('click', async function () {
     try {
       const mensagem = ExportarCliente.gerarMensagemCopiar(rascunho, catalogosParaExportar());
       await navigator.clipboard.writeText(mensagem);
       avisoExportarRascunho.innerHTML = '<div class="aviso aviso--sucesso">Mensagem copiada para a área de transferência.</div>';
-      modalExportar.style.display = 'none';
     } catch (erro) {
       avisoExportarRascunho.innerHTML = '<div class="aviso aviso--erro">Não foi possível copiar a mensagem.</div>';
     }
@@ -1213,10 +1068,6 @@ document.addEventListener('DOMContentLoaded', async function () {
   });
 
   function montarDadosParaEnvio() {
-    // Mesmas chaves que rad/regras_negocio.py::processar_sincronizacao
-    // espera (ver teste de contrato em interface/tests.py). Os arquivos
-    // (rascunho.anexos.*) NAO entram aqui -- vao direto no FormData,
-    // fora do JSON.
     return {
       numero_os: rascunho.numero_os,
       numero_sa: rascunho.numero_sa,
@@ -1294,8 +1145,6 @@ document.addEventListener('DOMContentLoaded', async function () {
       });
 
       if (resposta.status === 201 || resposta.status === 200) {
-        // RG-SYNC-008/021: sincronizado -- o rascunho local e removido,
-        // o RAD passa a existir so no servidor.
         await RadDB.limparRascunho(sessao.login);
         avisoSincronizacao.innerHTML =
           '<div class="aviso aviso--sucesso">RAD sincronizado com sucesso!</div>';
@@ -1306,8 +1155,6 @@ document.addEventListener('DOMContentLoaded', async function () {
       }
 
       if (resposta.status === 422) {
-        // RG-SYNC-012/017: validacao falhou -- volta para Rascunho
-        // Local, nada e perdido, usuario corrige e tenta de novo.
         const corpo = await resposta.json();
         renderizarErrosSincronizacao(corpo.erros || []);
       } else {
@@ -1317,7 +1164,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         ]);
       }
     } catch (erro) {
-      // RG-SYNC-012: falha de rede -- volta para Rascunho Local.
       renderizarErrosSincronizacao([
         { mensagem: 'Erro de conexão durante a sincronização. Seus dados continuam salvos neste dispositivo — tente novamente.' },
       ]);

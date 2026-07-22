@@ -285,7 +285,8 @@
 
       <div class="campo">
         <label for="campo-responsavel-atividade">Responsável Atividade</label>
-        <input type="text" id="campo-responsavel-atividade" maxlength="50" required>
+        <input type="text" id="campo-responsavel-atividade" list="lista-responsaveis" autocomplete="off" maxlength="200" required>
+        <datalist id="lista-responsaveis"></datalist>
       </div>
 
       <div class="campo">
@@ -323,6 +324,9 @@
   <div id="aviso-sincronizacao"></div>
   <div id="aviso-exportar-rascunho"></div>
   <div style="display:flex; gap:0.5rem;">
+    <button type="button" class="botao botao--secundaria" id="botao-copiar-mensagem" disabled style="flex:1;">
+      Copiar
+    </button>
     <button type="button" class="botao botao--secundaria" id="botao-exportar" disabled style="flex:1;">
       Exportar
     </button>
@@ -333,7 +337,7 @@
   <p class="texto-suave centro" id="texto-status-botao" style="margin: 0.4rem 0 0; font-size: 0.8rem;"></p>
 </div>
 
-<!-- RG-EXP-003: escolha de formato (PDF ou Word) ou copiar mensagem -->
+<!-- RG-EXP-003: escolha de formato (PDF ou Word) -->
 <div id="modal-exportar" style="display:none; position:fixed; inset:0; background:rgba(28,31,30,0.5); z-index:30; align-items:center; justify-content:center; padding:1rem;">
   <div class="cartao" style="max-width:380px;">
     <h2 style="font-size:1.05rem;">Exportar RAD</h2>
@@ -341,7 +345,6 @@
       Gerado neste dispositivo, sem precisar de conexão. O arquivo é salvo na pasta de downloads.
     </p>
     <div class="pilha">
-      <button type="button" class="botao botao--secundaria" id="botao-exportar-mensagem">Copiar mensagem</button>
       <button type="button" class="botao botao--secundaria" id="botao-exportar-pdf">Baixar PDF</button>
       <button type="button" class="botao botao--secundaria" id="botao-exportar-docx">Baixar Word</button>
       <button type="button" class="botao botao--secundaria" id="botao-fechar-exportar">Fechar</button>
