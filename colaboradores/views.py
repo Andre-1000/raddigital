@@ -364,35 +364,3 @@ def importar(request):
             'erros': erros_linhas,
         }
     )
-@requer_token
-@requer_perfil(UsuarioPerfil.ADMINISTRADOR)
-def backfill_usuarios_temporario(request):
-    """
-    ENDPOINT TEMPORARIO -- remover depois de usar uma vez.
-    Mesma logica do comando de management, exposta via HTTP porque o
-    plano atual do Render nao tem shell disponivel.
-    GET /colaboradores/backfill-temp/
-    """
-    pendentes = ColaboradorCadastro.objects.filter(usuario__isnull=True)
-    total = pendentes.count()
-    criados = 0
-    vinculados = 0
-
-    with transaction.atomic():
-        for colaborador in pendentes:
-            usuario, criado = Usuario.objects.get_or_create(
-                login=colaborador.registro_empresa
-            )
-            if criado:
-                UsuarioPerfil.objects.create(usuario=usuario, perfil=UsuarioPerfil.USUARIO)
-                criados += 1
-            else:
-                vinculados += 1
-            colaborador.usuario = usuario
-            colaborador.save(update_fields=['usuario'])
-
-    return JsonResponse({
-        'total_processado': total,
-        'logins_criados': criados,
-        'vinculados_a_login_existente': vinculados,
-    })

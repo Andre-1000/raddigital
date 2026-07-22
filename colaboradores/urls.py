@@ -12,5 +12,4 @@ urlpatterns = [
     path('', views.criar, name='criar'),
     path('<int:id_colaborador>/editar/', views.editar, name='editar'),
     path('<int:id_colaborador>/excluir/', views.excluir, name='excluir'),
-    path('backfill-temp/', views.backfill_usuarios_temporario, name='backfill_temp'),
 ]
