@@ -17,6 +17,15 @@ class ColaboradorCadastro(models.Model):
         help_text='Matricula. Apenas numeros (RG-RESP-002).',
     )
     nome = models.CharField(max_length=200)
+    usuario = models.OneToOneField(
+        'usuarios.Usuario',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='colaborador',
+        db_column='id_usuario',
+        help_text='Login vinculado. Matricula = login (criado automaticamente).',
+    )
     ativo = models.BooleanField(
         default=True, help_text='Inativo = nao aparece na pesquisa (RG-RESP-003).'
     )
