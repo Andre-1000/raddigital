@@ -33,6 +33,14 @@ def tela_detalhe_rad(request, numero_rad):
     return render(request, 'interface/detalhe_rad.html', {'numero_rad': numero_rad})
 
 
+def tela_meus_rads(request):
+    """
+    Tela "RADs Preenchidos" (22/07/2026) -- qualquer usuario logado,
+    sempre filtrada ao proprio login (ver consulta/views.py::listar_meus_rads).
+    """
+    return render(request, 'interface/meus_rads.html')
+
+
 def tela_gerenciar_usuarios(request):
     """
     Tela unica de gestao de pessoas -- unifica o que antes eram as

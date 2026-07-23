@@ -1,10 +1,14 @@
 """
 Views do app consulta — Tela de Consulta de RADs (EFD secao 4.6).
 
-Acesso restrito a Supervisor e Administrador (PRM-028 a PRM-038).
+Listagem administrativa (listar_rads) e detalhe (detalhe_rad): acesso
+Supervisor, Administrador, ou o proprio criador do RAD (PRM-028 a
+PRM-038 + tela "RADs Preenchidos", 22/07/2026).
+listar_meus_rads: qualquer usuario autenticado, sempre filtrado ao
+proprio login.
 """
 from django.core.paginator import Paginator
-from django.http import JsonResponse
+from django.http import FileResponse, JsonResponse
 
 from comum.datas import parse_data, parse_datetime_aware
 from usuarios.decorators import requer_perfil, requer_token
@@ -107,6 +111,7 @@ def _linha_resumo(rad):
         'login_usuario': rad.usuario.login,
         'hora_prog_inicio': rad.hora_prog_inicio.isoformat(),
         'hora_real_inicio': rad.hora_real_inicio.isoformat(),
+        'dispositivo': rad.get_dispositivo_display(),
     }
 
 
@@ -139,6 +144,35 @@ def listar_rads(request):
     )
 
 
+@requer_token
+def listar_meus_rads(request):
+    """
+    GET /consulta/meus-rads/?pagina=1
+    Tela "RADs Preenchidos" (22/07/2026) -- qualquer usuario
+    autenticado, qualquer perfil, sempre filtrado ao proprio login.
+    Sem filtros administrativos (o volume por pessoa e naturalmente
+    pequeno); so pagina e mostra tudo que ela mesma preencheu.
+    """
+    queryset = Rad.objects.select_related(
+        'local_inicial', 'local_final', 'tipo_manutencao', 'usuario'
+    ).filter(usuario_id=request.usuario_rad.login).order_by('-data_sincronizacao')
+
+    numero_pagina = request.GET.get('pagina') or 1
+    paginador = Paginator(queryset, RADS_POR_PAGINA)
+    pagina = paginador.get_page(numero_pagina)
+
+    return JsonResponse(
+        {
+            'total_encontrado': paginador.count,
+            'pagina_atual': pagina.number,
+            'total_paginas': paginador.num_pages,
+            'resultados': [
+                _remover_campos_desabilitados(_linha_resumo(rad)) for rad in pagina.object_list
+            ],
+        }
+    )
+
+
 def _colaboradores_resumo(rad):
     return [
         {'registro_empresa': c.registro_empresa, 'nome': c.nome, 'tipo': c.tipo}
@@ -149,6 +183,7 @@ def _colaboradores_resumo(rad):
 def _anexos_resumo(rad):
     return [
         {
+            'id': a.id,
             'tipo_arquivo': a.tipo_arquivo,
             'categoria_foto': a.get_categoria_foto_display() if a.categoria_foto else None,
             'nome_original': a.nome_original,
@@ -257,6 +292,49 @@ def exportar_docx(request, numero_rad):
     return resposta
 
 
+@requer_token
+def visualizar_anexo(request, numero_rad, id_anexo):
+    """
+    GET /consulta/rads/<numero_rad>/anexos/<id_anexo>/?baixar=1
+    Novo (22/07/2026): serve o arquivo de uma foto ou PDF anexado a um
+    RAD ja sincronizado. Mesma regra de acesso das outras rotas de
+    exportacao (_pode_exportar): Supervisor, Administrador, ou o
+    proprio criador do RAD -- nunca publico, mesmo com o link em maos.
+
+    Sem '?baixar=1': serve inline (abre no navegador -- usado para
+    "Ver" uma foto). Com '?baixar=1': forca download
+    (Content-Disposition attachment).
+    """
+    from django.core.files.storage import default_storage
+
+    from rad.models import RadAnexo
+
+    try:
+        rad = Rad.objects.get(numero_rad=numero_rad)
+    except Rad.DoesNotExist:
+        return JsonResponse({'erro': 'RAD nao encontrado.'}, status=404)
+
+    if not _pode_exportar(request.usuario_rad, rad):
+        return JsonResponse({'erro': 'Acesso nao autorizado.'}, status=403)
+
+    try:
+        anexo = RadAnexo.objects.get(id=id_anexo, rad=rad)
+    except RadAnexo.DoesNotExist:
+        return JsonResponse({'erro': 'Anexo nao encontrado para este RAD.'}, status=404)
+
+    if not default_storage.exists(anexo.caminho_servidor):
+        return JsonResponse({'erro': 'Arquivo nao encontrado no servidor.'}, status=404)
+
+    arquivo = default_storage.open(anexo.caminho_servidor, 'rb')
+    content_type = 'application/pdf' if anexo.tipo_arquivo == RadAnexo.PDF else 'image/jpeg'
+    resposta = FileResponse(arquivo, content_type=content_type)
+
+    forcar_download = request.GET.get('baixar') == '1'
+    disposicao = 'attachment' if forcar_download else 'inline'
+    resposta['Content-Disposition'] = f'{disposicao}; filename="{anexo.nome_original}"'
+    return resposta
+
+
 def _pode_exportar(usuario, rad):
     """
     rad.usuario e uma FK com to_field='login' (ver rad/models.py), entao
@@ -270,7 +348,6 @@ def _pode_exportar(usuario, rad):
 
 
 @requer_token
-@requer_perfil(UsuarioPerfil.SUPERVISOR, UsuarioPerfil.ADMINISTRADOR)
 def detalhe_rad(request, numero_rad):
     """
     GET /consulta/rads/<numero_rad>/
@@ -278,6 +355,9 @@ def detalhe_rad(request, numero_rad):
     selecao e anexos.
     PRM-037: 'pode_cancelar' so e True para Administrador, e somente se
     o RAD ainda nao estiver cancelado (RG-CAN-009).
+    Acesso: Supervisor, Administrador, ou o proprio criador do RAD
+    (22/07/2026 -- tela "RADs Preenchidos", mesma regra de
+    _pode_exportar).
     """
     try:
         rad = Rad.objects.select_related(
@@ -286,6 +366,9 @@ def detalhe_rad(request, numero_rad):
         ).get(numero_rad=numero_rad)
     except Rad.DoesNotExist:
         return JsonResponse({'erro': 'RAD nao encontrado.'}, status=404)
+
+    if not _pode_exportar(request.usuario_rad, rad):
+        return JsonResponse({'erro': 'Acesso nao autorizado.'}, status=403)
 
     perfis_usuario = set(request.usuario_rad.lista_perfis)
     pode_cancelar = (
@@ -336,6 +419,7 @@ def detalhe_rad(request, numero_rad):
                 'amv': _amv_resumo(rad),
                 'anexos': _anexos_resumo(rad),
                 'login_usuario': rad.usuario.login,
+                'dispositivo': rad.get_dispositivo_display(),
                 'data_sincronizacao': rad.data_sincronizacao.isoformat(),
                 'justificativa_cancelamento': rad.justificativa_cancelamento,
                 'login_cancelamento': (

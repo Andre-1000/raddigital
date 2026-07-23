@@ -33,6 +33,21 @@ def _normalizar_payload(dados):
     return dados
 
 
+def _detectar_dispositivo(user_agent):
+    """
+    Heuristica simples e amplamente usada: navegadores mobile sempre
+    incluem 'Mobi' no User-Agent (Android, iPhone, Windows Phone).
+    Tablets ficam classificados como 'mobile' tambem, de proposito --
+    o que importa aqui e distinguir "preenchido em campo" (celular/
+    tablet) de "preenchido no escritorio" (computador). Detectado
+    sempre no servidor a partir do cabecalho HTTP real -- nunca
+    informado pelo cliente, para nao poder ser falsificado a toa.
+    """
+    if not user_agent:
+        return Rad.DESCONHECIDO
+    return Rad.MOBILE if 'Mobi' in user_agent else Rad.DESKTOP
+
+
 @csrf_exempt
 @require_POST
 @requer_token
@@ -86,6 +101,7 @@ def sincronizar(request):
         )
 
     payload = _normalizar_payload(dados_brutos)
+    payload['dispositivo'] = _detectar_dispositivo(request.META.get('HTTP_USER_AGENT', ''))
 
     rad_ja_existia = _sync_id_ja_processado(payload['sync_id_tentativa'])
 

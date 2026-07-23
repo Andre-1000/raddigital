@@ -151,6 +151,26 @@ class Rad(models.Model):
     status = models.CharField(
         max_length=20, choices=STATUS_CHOICES, default=SINCRONIZADO
     )
+
+    # --- Dispositivo (22/07/2026) ------------------------------------------
+    # Detectado automaticamente a partir do User-Agent no momento da
+    # sincronizacao (rad/views.py::_detectar_dispositivo) -- nunca
+    # informado pelo cliente, para nao poder ser falsificado a toa.
+    DESKTOP = 'desktop'
+    MOBILE = 'mobile'
+    DESCONHECIDO = 'desconhecido'
+    DISPOSITIVO_CHOICES = [
+        (DESKTOP, 'Computador'),
+        (MOBILE, 'Celular'),
+        (DESCONHECIDO, 'Desconhecido'),
+    ]
+    dispositivo = models.CharField(
+        max_length=20,
+        choices=DISPOSITIVO_CHOICES,
+        default=DESCONHECIDO,
+        help_text='Detectado automaticamente pelo navegador usado na sincronizacao.',
+    )
+
     usuario = models.ForeignKey(
         Usuario,
         on_delete=models.PROTECT,

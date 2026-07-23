@@ -1,9 +1,55 @@
 {% extends "interface/base.html" %}
 {% block titulo %}{{ numero_rad }} — Sistema RAD{% endblock %}
 
+{% block cabecalho_extra %}
+<style>
+  .container-app { max-width: var(--largura-app-administrativa); }
+
+  .titulo-secao {
+    color: var(--cor-atencao);
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin: 1.25rem 0 0.75rem;
+  }
+  .titulo-secao:first-child { margin-top: 0; }
+
+  .grade-dados .campo-leitura {
+    margin-bottom: 0;
+  }
+  .grade-dados .campo-leitura__rotulo {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--cor-tinta-suave);
+    margin-bottom: 0.15rem;
+  }
+  .grade-dados .campo-leitura__valor {
+    font-weight: 600;
+    word-break: break-word;
+  }
+
+  .item-anexo {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .item-anexo__botoes {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .item-anexo__botoes .botao {
+    width: auto;
+    min-height: 36px;
+    padding: 0 0.9rem;
+    font-size: 0.85rem;
+  }
+</style>
+{% endblock %}
+
 {% block conteudo %}
 <div id="conteudo-protegido" style="display:none;">
-  <a href="{% url 'interface:consulta' %}" class="texto-suave" style="font-size:0.85rem;">&larr; Voltar para a lista</a>
+  <a href="#" id="link-voltar" class="texto-suave" style="font-size:0.85rem;">&larr; Voltar para a lista</a>
   <h1 style="font-size:1.3rem; margin-top:0.5rem;">
     {{ numero_rad }} <span id="selo-status"></span>
   </h1>
@@ -11,22 +57,22 @@
   <div id="aviso-detalhe"></div>
 
   <div class="cartao" id="cartao-dados" style="display:none;">
-    <h2 style="font-size:1rem;">Dados do RAD</h2>
-    <div id="lista-campos" class="pilha"></div>
+    <div id="secoes-dados"></div>
   </div>
 
   <div class="cartao" id="cartao-colaboradores" style="margin-top:1rem; display:none;">
-    <h2 style="font-size:1rem;">Colaboradores e Participantes</h2>
+    <h2 class="titulo-secao">Colaboradores e Participantes</h2>
     <div id="lista-colaboradores-detalhe" class="pilha"></div>
   </div>
 
   <div class="cartao" id="cartao-anexos" style="margin-top:1rem; display:none;">
-    <h2 style="font-size:1rem;">Anexos</h2>
+    <h2 class="titulo-secao">Anexos</h2>
+    <div id="aviso-anexos"></div>
     <div id="lista-anexos-detalhe" class="pilha"></div>
   </div>
 
   <div class="cartao" id="cartao-exportar" style="margin-top:1rem; display:none;">
-    <h2 style="font-size:1rem;">Exportar</h2>
+    <h2 class="titulo-secao">Exportar</h2>
     <div id="aviso-exportar"></div>
     <div class="pilha">
       <button type="button" class="botao botao--secundaria" id="botao-copiar-mensagem">Copiar mensagem</button>
@@ -36,7 +82,7 @@
   </div>
 
   <div class="cartao" id="cartao-cancelar" style="margin-top:1rem; display:none;">
-    <h2 style="font-size:1rem;">Cancelamento</h2>
+    <h2 class="titulo-secao">Cancelamento</h2>
     <p class="texto-suave" style="font-size:0.85rem;">
       Exclusivo do Administrador. O cancelamento é <strong>irreversível</strong>.
     </p>
@@ -67,49 +113,91 @@
 <script>
   document.addEventListener('DOMContentLoaded', async function () {
     if (!RadAuth.exigirSessao()) return;
-    if (!RadAuth.temPerfil('supervisor', 'administrador')) {
-      window.location.href = '/inicio/';
-      return;
-    }
     document.getElementById('conteudo-protegido').style.display = '';
+
+    // Volta para a lista de onde a pessoa provavelmente veio: quem tem
+    // Supervisor/Administrador provavelmente veio de Consultar RADs;
+    // um Usuario comum so pode ter vindo de RADs Preenchidos.
+    document.getElementById('link-voltar').href = RadAuth.temPerfil('supervisor', 'administrador')
+      ? '{% url "interface:consulta" %}'
+      : '{% url "interface:meus_rads" %}';
 
     const NUMERO_RAD = JSON.parse(document.getElementById('numero-rad-raw').textContent);
 
     const avisoDetalhe = document.getElementById('aviso-detalhe');
 
-    const ROTULOS = {
-      numero_os: 'OS',
-      numero_sa: 'N° SA',
-      numero_execucao: 'N° Execução',
-      data_preenchimento: 'Data',
-      local_inicial: 'Local Inicial',
-      local_final: 'Local Final',
-      km_poste: 'Km/Poste',
-      linhas: 'Linhas',
-      vias: 'Vias',
-      equipes: 'Equipes Envolvidas',
-      tipo_manutencao: 'Tipo de Manutenção',
-      numero_falha: 'N° Falha',
-      hora_prog_inicio: 'Horário Programado de Início',
-      hora_prog_termino: 'Horário Programado de Término',
-      hora_real_inicio: 'Horário Real de Início',
-      hora_real_termino: 'Horário Real de Término',
-      duracao_programada_min: 'Duração Programada (min)',
-      duracao_real_min: 'Duração Real (min)',
-      motivo_atraso_inicio: 'Motivo do Atraso no Início',
-      desc_motivo_atraso_inicio: 'Descrição do Atraso no Início',
-      motivo_atraso_termino: 'Motivo do Atraso no Término',
-      desc_motivo_atraso_termino: 'Descrição do Atraso no Término',
-      servicos: 'Serviços Executados',
-      outros_servico_desc: 'Descrição de Outros Serviços',
-      responsavel_atividade: 'Responsável Atividade',
-      operador_ccm: 'Operador CCM',
-      descricao_tecnica_atividade: 'Descrição Técnica da Atividade',
-      materiais_utilizados: 'Materiais Utilizados',
-      observacoes_gerais: 'Observações Gerais',
-      login_usuario: 'Preenchido por',
-      data_sincronizacao: 'Sincronizado em',
-    };
+    // Campos agrupados em secoes -- cada secao vira um bloco com
+    // titulo laranja + grade propria, para nao misturar tipos de dado
+    // diferentes num unico bloco vertical.
+    const SECOES = [
+      {
+        titulo: 'Identificação',
+        campos: {
+          numero_os: 'OS',
+          numero_sa: 'N° SA',
+          numero_execucao: 'N° Execução',
+          data_preenchimento: 'Data',
+        },
+      },
+      {
+        titulo: 'Localização',
+        campos: {
+          local_inicial: 'Local Inicial',
+          local_final: 'Local Final',
+          km_poste: 'Km/Poste',
+          linhas: 'Linhas',
+          vias: 'Vias',
+          equipes: 'Equipes Envolvidas',
+        },
+      },
+      {
+        titulo: 'Controle Operacional',
+        campos: {
+          tipo_manutencao: 'Tipo de Manutenção',
+          numero_falha: 'N° Falha',
+        },
+      },
+      {
+        titulo: 'Horários',
+        campos: {
+          hora_prog_inicio: 'Horário Programado de Início',
+          hora_prog_termino: 'Horário Programado de Término',
+          hora_real_inicio: 'Horário Real de Início',
+          hora_real_termino: 'Horário Real de Término',
+          duracao_programada_min: 'Duração Programada (min)',
+          duracao_real_min: 'Duração Real (min)',
+          motivo_atraso_inicio: 'Motivo do Atraso no Início',
+          desc_motivo_atraso_inicio: 'Descrição do Atraso no Início',
+          motivo_atraso_termino: 'Motivo do Atraso no Término',
+          desc_motivo_atraso_termino: 'Descrição do Atraso no Término',
+        },
+      },
+      {
+        titulo: 'Serviços Executados',
+        campos: {
+          servicos: 'Serviços Executados',
+          outros_servico_desc: 'Descrição de Outros Serviços',
+        },
+      },
+      {
+        titulo: 'Responsáveis e Detalhes',
+        campos: {
+          responsavel_atividade: 'Responsável Atividade',
+          operador_ccm: 'Operador CCM',
+          descricao_tecnica_atividade: 'Descrição Técnica da Atividade',
+          materiais_utilizados: 'Materiais Utilizados',
+          observacoes_gerais: 'Observações Gerais',
+        },
+      },
+      {
+        titulo: 'Registro',
+        campos: {
+          login_usuario: 'Preenchido por',
+          dispositivo: 'Preenchido via',
+          data_sincronizacao: 'Sincronizado em',
+        },
+      },
+    ];
 
     function formatarValor(valor) {
       if (valor === null || valor === undefined || valor === '') return 'N/A';
@@ -119,13 +207,30 @@
     }
 
     function renderizarCampos(dados) {
-      const container = document.getElementById('lista-campos');
+      const container = document.getElementById('secoes-dados');
       container.innerHTML = '';
-      Object.keys(ROTULOS).forEach(function (chave) {
-        if (!(chave in dados)) return; // campo pode ter sido desabilitado (app configuracoes)
-        const linha = document.createElement('div');
-        linha.innerHTML = `<span class="texto-suave" style="font-size:0.8rem;">${ROTULOS[chave]}</span><br><strong>${formatarValor(dados[chave])}</strong>`;
-        container.appendChild(linha);
+
+      SECOES.forEach(function (secao) {
+        const chavesPresentes = Object.keys(secao.campos).filter((chave) => chave in dados);
+        if (chavesPresentes.length === 0) return; // secao inteira desabilitada (app configuracoes)
+
+        const titulo = document.createElement('h2');
+        titulo.className = 'titulo-secao';
+        titulo.textContent = secao.titulo;
+        container.appendChild(titulo);
+
+        const grade = document.createElement('div');
+        grade.className = 'grade-campos grade-dados';
+        chavesPresentes.forEach(function (chave) {
+          const bloco = document.createElement('div');
+          bloco.className = 'campo-leitura';
+          bloco.innerHTML = `
+            <span class="campo-leitura__rotulo">${secao.campos[chave]}</span>
+            <span class="campo-leitura__valor">${formatarValor(dados[chave])}</span>
+          `;
+          grade.appendChild(bloco);
+        });
+        container.appendChild(grade);
       });
     }
 
@@ -143,6 +248,41 @@
       });
     }
 
+    // ---- Anexos: ver/baixar (22/07/2026) --------------------------------
+    // Os arquivos exigem token de autenticacao, entao nao dao pra usar
+    // um <a href> simples -- busca autenticada, vira blob, e so entao
+    // abre numa aba nova (ver) ou dispara o download (baixar).
+
+    const avisoAnexos = document.getElementById('aviso-anexos');
+
+    async function abrirAnexoAutenticado(idAnexo, forcarDownload, nomeArquivo) {
+      avisoAnexos.innerHTML = '';
+      try {
+        const url = `/consulta/rads/${encodeURIComponent(NUMERO_RAD)}/anexos/${idAnexo}/${forcarDownload ? '?baixar=1' : ''}`;
+        const resposta = await RadAuth.requisicaoAutenticada(url);
+        if (!resposta.ok) {
+          avisoAnexos.innerHTML = '<div class="aviso aviso--erro">Não foi possível abrir o arquivo.</div>';
+          return;
+        }
+        const blob = await resposta.blob();
+        const urlObjeto = URL.createObjectURL(blob);
+
+        if (forcarDownload) {
+          const link = document.createElement('a');
+          link.href = urlObjeto;
+          link.download = nomeArquivo;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+        } else {
+          window.open(urlObjeto, '_blank');
+        }
+        setTimeout(() => URL.revokeObjectURL(urlObjeto), 60000);
+      } catch (erro) {
+        avisoAnexos.innerHTML = '<div class="aviso aviso--erro">Erro de conexão ao abrir o arquivo.</div>';
+      }
+    }
+
     function renderizarAnexos(anexos) {
       const cartao = document.getElementById('cartao-anexos');
       const container = document.getElementById('lista-anexos-detalhe');
@@ -150,9 +290,26 @@
       cartao.style.display = '';
       anexos.forEach(function (anexo) {
         const linha = document.createElement('div');
+        linha.className = 'cartao item-anexo';
+        linha.style.padding = '0.75rem 1rem';
         const categoria = anexo.categoria_foto ? ` — ${anexo.categoria_foto}` : '';
         const tamanhoKb = Math.round(anexo.tamanho_bytes / 1024);
-        linha.innerHTML = `<strong>${anexo.nome_original}</strong><div class="texto-suave" style="font-size:0.8rem;">${anexo.tipo_arquivo}${categoria} · ${tamanhoKb}KB</div>`;
+        linha.innerHTML = `
+          <div>
+            <strong>${anexo.nome_original}</strong>
+            <div class="texto-suave" style="font-size:0.8rem;">${anexo.tipo_arquivo}${categoria} · ${tamanhoKb}KB</div>
+          </div>
+          <div class="item-anexo__botoes">
+            <button type="button" class="botao botao--secundaria botao-ver-anexo">Ver</button>
+            <button type="button" class="botao botao--secundaria botao-baixar-anexo">Baixar</button>
+          </div>
+        `;
+        linha.querySelector('.botao-ver-anexo').addEventListener('click', function () {
+          abrirAnexoAutenticado(anexo.id, false, anexo.nome_original);
+        });
+        linha.querySelector('.botao-baixar-anexo').addEventListener('click', function () {
+          abrirAnexoAutenticado(anexo.id, true, anexo.nome_original);
+        });
         container.appendChild(linha);
       });
     }
@@ -164,6 +321,10 @@
         const resposta = await RadAuth.requisicaoAutenticada(`/consulta/rads/${encodeURIComponent(NUMERO_RAD)}/`);
         if (resposta.status === 404) {
           avisoDetalhe.innerHTML = '<div class="aviso aviso--erro">RAD não encontrado.</div>';
+          return;
+        }
+        if (resposta.status === 403) {
+          avisoDetalhe.innerHTML = '<div class="aviso aviso--erro">Você só pode ver RADs que você mesmo preencheu.</div>';
           return;
         }
         if (!resposta.ok) {

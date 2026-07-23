@@ -1,0 +1,95 @@
+{% extends "interface/base.html" %}
+{% block titulo %}RADs Preenchidos — Sistema RAD{% endblock %}
+
+{% block cabecalho_extra %}
+<style>
+  .container-app { max-width: var(--largura-app-administrativa); }
+</style>
+{% endblock %}
+
+{% block conteudo %}
+<div id="conteudo-protegido" style="display:none;">
+  <h1 style="font-size:1.3rem;">RADs Preenchidos</h1>
+  <p class="texto-suave" style="margin-top:-0.5rem;">Somente os RADs que você mesmo preencheu.</p>
+
+  <div id="aviso-meus-rads" style="margin-top:1rem;"></div>
+
+  <div id="lista-meus-rads" class="pilha" style="margin-top:1rem;"></div>
+  <p id="mensagem-vazia" class="texto-suave centro" style="display:none; margin-top:2rem;">
+    Você ainda não preencheu nenhum RAD.
+  </p>
+</div>
+{% endblock %}
+
+{% block script_extra %}
+<script>
+  document.addEventListener('DOMContentLoaded', async function () {
+    if (!RadAuth.exigirSessao()) return;
+    document.getElementById('conteudo-protegido').style.display = '';
+
+    const lista = document.getElementById('lista-meus-rads');
+    const aviso = document.getElementById('aviso-meus-rads');
+    const mensagemVazia = document.getElementById('mensagem-vazia');
+
+    function seloStatus(status) {
+      const classe = status === 'cancelado' ? 'selo--offline' : 'selo--online';
+      return `<span class="selo ${classe}">${status}</span>`;
+    }
+
+    async function carregarLista(pagina) {
+      aviso.innerHTML = '';
+      mensagemVazia.style.display = 'none';
+      lista.innerHTML = '';
+
+      try {
+        const resposta = await RadAuth.requisicaoAutenticada(`/consulta/meus-rads/?pagina=${pagina || 1}`);
+        if (!resposta.ok) {
+          aviso.innerHTML = '<div class="aviso aviso--erro">Não foi possível carregar seus RADs.</div>';
+          return;
+        }
+        const dados = await resposta.json();
+
+        if (dados.resultados.length === 0) {
+          mensagemVazia.style.display = '';
+          return;
+        }
+
+        dados.resultados.forEach(function (rad) {
+          const item = document.createElement('a');
+          item.className = 'cartao cartao--interativo';
+          item.style.display = 'block';
+          item.style.textDecoration = 'none';
+          item.style.color = 'inherit';
+          item.href = `/consultar/${rad.numero_rad}/`;
+          item.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <strong>${rad.numero_rad}</strong>
+              ${seloStatus(rad.status)}
+            </div>
+            <div class="grade-campos" style="margin-top:0.6rem; gap:0.4rem 1rem;">
+              <div><span class="texto-suave" style="font-size:0.78rem;">OS</span><br>${rad.numero_os}</div>
+              <div><span class="texto-suave" style="font-size:0.78rem;">N° SA</span><br>${rad.numero_sa}</div>
+              <div><span class="texto-suave" style="font-size:0.78rem;">Data de execução</span><br>${rad.data_preenchimento}</div>
+              <div><span class="texto-suave" style="font-size:0.78rem;">Horário real</span><br>${rad.hora_real_inicio}</div>
+              <div><span class="texto-suave" style="font-size:0.78rem;">Dispositivo</span><br>${rad.dispositivo}</div>
+            </div>
+          `;
+          lista.appendChild(item);
+        });
+
+        if (dados.total_paginas > 1) {
+          const infoPaginas = document.createElement('p');
+          infoPaginas.className = 'texto-suave centro';
+          infoPaginas.style.fontSize = '0.85rem';
+          infoPaginas.textContent = `${dados.total_encontrado} RAD(s) — página ${dados.pagina_atual} de ${dados.total_paginas}`;
+          lista.appendChild(infoPaginas);
+        }
+      } catch (erro) {
+        aviso.innerHTML = '<div class="aviso aviso--erro">Erro de conexão ao carregar seus RADs.</div>';
+      }
+    }
+
+    await carregarLista(1);
+  });
+</script>
+{% endblock %}

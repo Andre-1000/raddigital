@@ -409,6 +409,7 @@ def processar_sincronizacao(payload, usuario, fotos_intervencao=None, fotos_acao
         'operador_ccm': payload.get('operador_ccm') or None,
         'descricao_tecnica_atividade': payload.get('descricao_tecnica_atividade') or None,
         'usuario': usuario,
+        'dispositivo': payload.get('dispositivo', Rad.DESCONHECIDO),
         'data_sincronizacao': timezone.now(),
         'sync_id_tentativa': payload['sync_id_tentativa'],
         **{k: v for k, v in horarios.items() if k not in ('atraso_inicio', 'atraso_termino')},
