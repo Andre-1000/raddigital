@@ -551,24 +551,32 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   campoTipoManutencao.addEventListener('change', recalcularHorarios);
 
-  const servicos = await RadDB.obterCatalogo('servicos');
+  const servicosCarregados = await RadDB.obterCatalogo('servicos');
   const mchs = await RadDB.obterCatalogo('mch');
   const tiposDefeitoAmv = await RadDB.obterCatalogo('tipos_defeito_amv');
   const acoesAmv = await RadDB.obterCatalogo('acoes_amv');
+
+  // Ordem alfabetica, com "Outros" sempre por ultimo (nao importa a
+  // ordem que veio do catalogo/banco) -- "Outros" e a opcao de escape
+  // que abre a descricao livre, entao faz sentido ficar visualmente
+  // separada do resto da lista ordenada.
+  function ordenarComOutrosPorUltimo(lista) {
+    const semOutros = lista.filter((item) => item.nome !== 'Outros');
+    const outros = lista.filter((item) => item.nome === 'Outros');
+    semOutros.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    return [...semOutros, ...outros];
+  }
+  const servicos = ordenarComOutrosPorUltimo(servicosCarregados);
 
   const listaServicosEl = document.getElementById('lista-servicos');
   const grupoOutrosServico = document.getElementById('campo-grupo-outros-servico');
   const campoOutrosServicoDesc = document.getElementById('campo-outros-servico-desc');
   const blocoAmv = document.getElementById('bloco-amv');
 
-  function renderizarListaCheckbox(containerEl, itens, valoresSelecionados, aoMudar, comAjuda) {
+  function renderizarListaCheckbox(containerEl, itens, valoresSelecionados, aoMudar) {
     containerEl.innerHTML = '';
     itens.forEach(function (item) {
       const linha = document.createElement('label');
-      linha.style.display = 'flex';
-      linha.style.alignItems = 'flex-start';
-      linha.style.gap = '0.5rem';
-      linha.style.fontWeight = '400';
 
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
@@ -590,28 +598,37 @@ document.addEventListener('DOMContentLoaded', async function () {
       textoWrapper.textContent = item.rotulo;
       linha.appendChild(checkbox);
       linha.appendChild(textoWrapper);
-
-      if (comAjuda && item.ajuda) {
-        const detalhes = document.createElement('details');
-        detalhes.style.marginLeft = '1.75rem';
-        detalhes.style.fontSize = '0.8rem';
-        detalhes.style.color = 'var(--cor-tinta-suave)';
-        const resumo = document.createElement('summary');
-        resumo.textContent = 'O que é isso?';
-        resumo.style.cursor = 'pointer';
-        detalhes.appendChild(resumo);
-        const paragrafo = document.createElement('p');
-        paragrafo.textContent = item.ajuda;
-        detalhes.appendChild(paragrafo);
-        const envolucro = document.createElement('div');
-        envolucro.appendChild(linha);
-        envolucro.appendChild(detalhes);
-        containerEl.appendChild(envolucro);
-      } else {
-        containerEl.appendChild(linha);
-      }
+      containerEl.appendChild(linha);
     });
   }
+
+  // Modal "O que é cada serviço?" -- substitui o antigo "O que é
+  // isso?" por item: um unico botao, o usuario escolhe qual serviço
+  // quer entender num select, e a explicacao aparece embaixo.
+  const modalSobreServicos = document.getElementById('modal-sobre-servicos');
+  const selectServicoExplicacao = document.getElementById('select-servico-explicacao');
+  const textoExplicacaoServico = document.getElementById('texto-explicacao-servico');
+
+  servicos.forEach(function (servico) {
+    const opcao = document.createElement('option');
+    opcao.value = servico.id;
+    opcao.textContent = servico.nome;
+    selectServicoExplicacao.appendChild(opcao);
+  });
+
+  selectServicoExplicacao.addEventListener('change', function () {
+    const servico = servicos.find((s) => String(s.id) === selectServicoExplicacao.value);
+    textoExplicacaoServico.textContent = servico ? (servico.descricao || 'Sem descrição cadastrada.') : '';
+  });
+
+  document.getElementById('botao-sobre-servicos').addEventListener('click', function () {
+    selectServicoExplicacao.value = '';
+    textoExplicacaoServico.textContent = '';
+    modalSobreServicos.style.display = 'flex';
+  });
+  document.getElementById('botao-fechar-sobre-servicos').addEventListener('click', function () {
+    modalSobreServicos.style.display = 'none';
+  });
 
   function servicoRequerAmvSelecionado() {
     return servicos.some((s) => s.requer_amv && rascunho.servicos.includes(s.id));
@@ -686,13 +703,12 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   renderizarListaCheckbox(
     listaServicosEl,
-    servicos.map((s) => ({ valor: s.id, rotulo: s.nome, ajuda: s.descricao })),
+    servicos.map((s) => ({ valor: s.id, rotulo: s.nome })),
     rascunho.servicos,
     function () {
       atualizarVisibilidadeServicos();
       salvarRascunhoAgora();
-    },
-    true
+    }
   );
   atualizarVisibilidadeServicos();
 

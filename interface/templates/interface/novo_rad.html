@@ -182,7 +182,11 @@
 
     <div class="cartao" style="margin-top:1rem;">
       <h2 style="font-size:1rem;">Serviços Executados</h2>
-      <div class="pilha" id="lista-servicos"></div>
+      <button type="button" class="botao botao--secundaria" id="botao-sobre-servicos"
+              style="width:auto; min-height:36px; padding:0 0.9rem; margin-bottom:0.9rem; font-size:0.85rem;">
+        O que é cada serviço?
+      </button>
+      <div class="grade-checkboxes" id="lista-servicos"></div>
 
       <div class="campo" id="campo-grupo-outros-servico" style="display:none; margin-top:0.8rem;">
         <label for="campo-outros-servico-desc">Descreva o serviço</label>
@@ -365,6 +369,23 @@
 </div>
 
 <!-- Modal de ajuda: Tipo de Manutenção (EFD-010-A). Conteudo estatico, nao vem de API. -->
+<!-- Modal de ajuda: explicacao de cada Servico Executado. Substitui o
+     antigo "O que é isso?" por item -- agora e um unico botao que abre
+     este modal, e o usuario escolhe qual servico quer entender. -->
+<div id="modal-sobre-servicos" style="display:none; position:fixed; inset:0; background:rgba(28,31,30,0.5); z-index:30; align-items:center; justify-content:center; padding:1rem;">
+  <div class="cartao" style="max-width:480px; max-height:80vh; overflow-y:auto;">
+    <h2 style="font-size:1.05rem;">O que é cada serviço?</h2>
+    <div class="campo">
+      <label for="select-servico-explicacao">Selecione um serviço</label>
+      <select id="select-servico-explicacao">
+        <option value="">Escolha…</option>
+      </select>
+    </div>
+    <p id="texto-explicacao-servico" class="texto-suave" style="min-height:1.5em;"></p>
+    <button type="button" class="botao botao--secundaria" id="botao-fechar-sobre-servicos">Fechar</button>
+  </div>
+</div>
+
 <div id="modal-ajuda-tipo-manutencao" style="display:none; position:fixed; inset:0; background:rgba(28,31,30,0.5); z-index:30; align-items:center; justify-content:center; padding:1rem;">
   <div class="cartao" style="max-width:480px; max-height:80vh; overflow-y:auto;">
     <h2 style="font-size:1.05rem;">Tipos de manutenção</h2>
@@ -380,6 +401,22 @@
 {% block cabecalho_extra %}
 <style>
   .grupo-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+  /* Lista de servicos (e outras listas de checkbox longas) em colunas,
+     em vez de empilhada verticalmente -- melhor aproveitamento de
+     espaco quando ha muitas opcoes. Colapsa para 1 coluna sozinha em
+     telas estreitas. */
+  .grade-checkboxes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.6rem 1rem;
+  }
+  .grade-checkboxes label {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    font-weight: 400;
+  }
   .chip {
     border: 1px solid var(--cor-linha);
     background: var(--cor-superficie);
