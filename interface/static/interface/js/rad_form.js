@@ -133,11 +133,17 @@ document.addEventListener('DOMContentLoaded', async function () {
   }
 
   function atualizarEstadoBotaoExportar() {
+    // Os botoes ficam sempre clicaveis (nao usamos mais .disabled) --
+    // so o estilo visual muda. Ao clicar com obrigatorios faltando,
+    // mostramos exatamente quais campos faltam em vez de bloquear
+    // silenciosamente o clique.
     const habilitado = ExportarCliente.camposObrigatoriosPreenchidos(rascunho);
     const botaoExportar = document.getElementById('botao-exportar');
     const botaoCopiar = document.getElementById('botao-copiar-mensagem');
-    if (botaoExportar) botaoExportar.disabled = !habilitado;
-    if (botaoCopiar) botaoCopiar.disabled = !habilitado;
+    [botaoExportar, botaoCopiar].forEach(function (botao) {
+      if (!botao) return;
+      botao.style.opacity = habilitado ? '1' : '0.6';
+    });
   }
 
   const locais = await RadDB.obterCatalogo('locais');
@@ -1006,7 +1012,18 @@ document.addEventListener('DOMContentLoaded', async function () {
   const modalExportar = document.getElementById('modal-exportar');
   const avisoExportarRascunho = document.getElementById('aviso-exportar-rascunho');
 
+  function avisarCamposFaltando() {
+    const faltando = ExportarCliente.camposObrigatoriosFaltando(rascunho);
+    avisoExportarRascunho.innerHTML =
+      '<div class="aviso aviso--erro">Preencha os campos obrigatórios antes de continuar: ' +
+      faltando.join(', ') + '.</div>';
+  }
+
   document.getElementById('botao-exportar').addEventListener('click', function () {
+    if (!ExportarCliente.camposObrigatoriosPreenchidos(rascunho)) {
+      avisarCamposFaltando();
+      return;
+    }
     modalExportar.style.display = 'flex';
   });
   document.getElementById('botao-fechar-exportar').addEventListener('click', function () {
@@ -1036,6 +1053,10 @@ document.addEventListener('DOMContentLoaded', async function () {
   }
 
   document.getElementById('botao-copiar-mensagem').addEventListener('click', async function () {
+    if (!ExportarCliente.camposObrigatoriosPreenchidos(rascunho)) {
+      avisarCamposFaltando();
+      return;
+    }
     try {
       const mensagem = ExportarCliente.gerarMensagemCopiar(rascunho, catalogosParaExportar());
       await navigator.clipboard.writeText(mensagem);

@@ -27,13 +27,6 @@ const ExportarCliente = (function () {
     return item ? item.nome : null;
   }
 
-  /**
-   * Monta a mesma lista (chave, rotulo, valor) do backend, a partir do
-   * rascunho local + catalogos cacheados. `catalogos` e um objeto com
-   * as mesmas chaves de RadDB.obterCatalogo: {locais, linhas, vias,
-   * equipes, tipos_manutencao, servicos, motivos_atraso, mch,
-   * tipos_defeito_amv, acoes_amv, colaboradores_cadastro}.
-   */
   function montarCampos(rascunho, catalogos) {
     const local = function (sigla) {
       const item = catalogos.locais.find((l) => l.sigla === sigla);
@@ -112,11 +105,6 @@ const ExportarCliente = (function () {
     return `RAD - (Relatório de Atividade Diária)\n\n${corpo}`;
   }
 
-  /**
-   * PDF gerado com jsPDF (biblioteca hospedada localmente em
-   * vendor/jspdf.umd.min.js -- nunca via CDN externo, para funcionar
-   * offline desde a primeira visita, igual ao resto do app).
-   */
   function gerarPdfBlob(rascunho, catalogos) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'mm', format: 'a4' });
@@ -145,12 +133,6 @@ const ExportarCliente = (function () {
     return doc.output('blob');
   }
 
-  /**
-   * "Word" gerado como HTML servido com Content-Type/extensao .doc --
-   * o Microsoft Word abre esse formato nativamente (tecnica padrao,
-   * usada quando nao ha uma biblioteca de geracao de .docx binario
-   * disponivel no navegador sem bundler). Mesmos campos do PDF.
-   */
   function gerarDocxBlob(rascunho, catalogos) {
     const campos = montarCampos(rascunho, catalogos);
     const linhasTabela = campos
@@ -181,12 +163,33 @@ const ExportarCliente = (function () {
     return div.innerHTML;
   }
 
-  /**
-   * RG-EXP-005: botao de exportar so habilita quando os campos
-   * obrigatorios estao preenchidos. Checagem leve no cliente -- a
-   * validacao definitiva e sempre a do backend na sincronizacao;
-   * aqui e so para decidir se o botao fica clicavel.
-   */
+  const CAMPOS_OBRIGATORIOS_ROTULOS = [
+    ['numero_os', 'OS'],
+    ['numero_sa', 'N° SA'],
+    ['data_preenchimento', 'Data'],
+    ['id_local_inicial', 'Local Inicial'],
+    ['id_local_final', 'Local Final'],
+    ['linhas', 'Linha'],
+    ['vias', 'Via'],
+    ['id_tipo_manutencao', 'Tipo de Manutenção'],
+    ['hora_prog_inicio', 'Horário Programado de Início'],
+    ['hora_prog_termino', 'Horário Programado de Término'],
+    ['hora_real_inicio', 'Horário Real de Início'],
+    ['hora_real_termino', 'Horário Real de Término'],
+    ['servicos', 'Serviços Executados'],
+    ['responsavel_atividade', 'Responsável Atividade'],
+  ];
+
+  function camposObrigatoriosFaltando(rascunho) {
+    return CAMPOS_OBRIGATORIOS_ROTULOS.filter(function ([chave]) {
+      const valor = rascunho[chave];
+      if (Array.isArray(valor)) return valor.length === 0;
+      return !valor;
+    }).map(function ([, rotulo]) {
+      return rotulo;
+    });
+  }
+
   function camposObrigatoriosPreenchidos(rascunho) {
     return !!(
       rascunho.numero_os &&
@@ -212,5 +215,6 @@ const ExportarCliente = (function () {
     gerarPdfBlob,
     gerarDocxBlob,
     camposObrigatoriosPreenchidos,
+    camposObrigatoriosFaltando,
   };
 })();
