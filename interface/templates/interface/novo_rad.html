@@ -400,7 +400,7 @@
 
 {% block cabecalho_extra %}
 <style>
-  .grupo-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .grupo-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 
   /* Lista de servicos (e outras listas de checkbox longas) em colunas,
      em vez de empilhada verticalmente -- melhor aproveitamento de
@@ -417,13 +417,16 @@
     gap: 0.5rem;
     font-weight: 400;
   }
+  /* Estilo "tag" compacto (retangular, cantos levemente arredondados)
+     -- escolhido em vez da pilula, para caber mais opcoes por linha
+     em Linha/Via/Equipes Envolvidas. */
   .chip {
     border: 1px solid var(--cor-linha);
     background: var(--cor-superficie);
     color: var(--cor-tinta);
-    border-radius: 999px;
-    padding: 0.45rem 0.9rem;
-    font-size: 0.9rem;
+    border-radius: 6px;
+    padding: 0.35rem 0.7rem;
+    font-size: 0.85rem;
     font-weight: 600;
     cursor: pointer;
     min-height: var(--alvo-toque);
