@@ -1097,15 +1097,54 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
   }
 
-  // RG-RESP: usa a mesma lista de colaboradores/usuarios (colaboradoresCadastro,
-  // ja carregada no Bloco 4) para sugerir nomes, em vez de texto livre solto.
-  const listaResponsaveisEl = document.getElementById('lista-responsaveis');
-  colaboradoresCadastro.forEach(function (pessoa) {
-    const opcao = document.createElement('option');
-    opcao.value = pessoa.nome;
-    listaResponsaveisEl.appendChild(opcao);
-  });
-  ligarCampoTexto('campo-responsavel-atividade', 'responsavel_atividade');
+  // RG-RESP: sugere nomes da mesma lista de colaboradores/usuarios
+  // (colaboradoresCadastro, ja carregada no Bloco 4), no mesmo padrao
+  // visual da busca de colaborador/local -- mas aqui o campo continua
+  // aceitando texto livre (nao e FK), a lista e so uma sugestao.
+  function configurarSugestaoResponsavel(inputEl, resultadosEl, chaveRascunho) {
+    inputEl.value = rascunho[chaveRascunho] || '';
+
+    inputEl.addEventListener('input', function () {
+      rascunho[chaveRascunho] = inputEl.value;
+      salvarRascunhoAgora();
+
+      const termo = inputEl.value.trim().toLowerCase();
+      resultadosEl.innerHTML = '';
+      if (!termo) return;
+
+      const encontrados = colaboradoresCadastro
+        .filter((pessoa) => pessoa.nome.toLowerCase().includes(termo))
+        .slice(0, 8);
+
+      encontrados.forEach(function (pessoa) {
+        const botao = document.createElement('button');
+        botao.type = 'button';
+        botao.className = 'botao botao--secundaria';
+        botao.style.textAlign = 'left';
+        botao.style.justifyContent = 'flex-start';
+        botao.textContent = pessoa.nome;
+        botao.addEventListener('click', function () {
+          inputEl.value = pessoa.nome;
+          rascunho[chaveRascunho] = pessoa.nome;
+          resultadosEl.innerHTML = '';
+          salvarRascunhoAgora();
+        });
+        resultadosEl.appendChild(botao);
+      });
+    });
+
+    inputEl.addEventListener('blur', function () {
+      setTimeout(function () {
+        resultadosEl.innerHTML = '';
+      }, 150);
+    });
+  }
+
+  configurarSugestaoResponsavel(
+    document.getElementById('campo-responsavel-atividade'),
+    document.getElementById('resultados-responsavel-atividade'),
+    'responsavel_atividade'
+  );
   ligarCampoTexto('campo-operador-ccm', 'operador_ccm');
   ligarCampoTexto('campo-descricao-tecnica', 'descricao_tecnica_atividade');
   ligarCampoTexto('campo-tipo-veiculo', 'tipo_veiculo');

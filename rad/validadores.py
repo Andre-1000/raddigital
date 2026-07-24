@@ -144,15 +144,16 @@ def _validar_consistencia_datetime(payload, erros):
 
 
 def _validar_motivos_atraso(payload, erros):
-    """VLD-014/VLD-015/VLD-016."""
-    if payload.get('atraso_inicio') and not payload.get('id_motivo_atraso_inicio'):
-        erros.append(
-            _erro(
-                'VLD-014',
-                'id_motivo_atraso_inicio',
-                'Informe o motivo do atraso no inicio.',
-            )
-        )
+    """
+    VLD-015: motivo do atraso no TERMINO continua obrigatorio quando ha
+    atraso identificado.
+
+    VLD-014 (motivo do atraso no INICIO obrigatorio): removido por
+    decisao de negocio (22/07/2026) -- o campo passou a ser opcional,
+    mesmo quando atraso_inicio e True. So mantido o VLD-016 (descricao
+    obrigatoria quando o motivo escolhido for "Outros"), que so se
+    aplica quando o usuario de fato escolheu um motivo.
+    """
     if payload.get('atraso_termino') and not payload.get('id_motivo_atraso_termino'):
         erros.append(
             _erro(
