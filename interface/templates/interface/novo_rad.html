@@ -52,15 +52,15 @@
 
       <div class="campo">
         <label for="campo-local-inicial">Local Inicial <span class="obrigatorio">*</span></label>
-        <input type="text" id="campo-local-inicial" list="lista-locais" autocomplete="off" placeholder="Buscar por código ou nome…" required>
+        <input type="text" id="campo-local-inicial" autocomplete="off" placeholder="Buscar por código ou nome…" required>
+        <div class="pilha" id="resultados-local-inicial" style="margin-top:0.5rem;"></div>
       </div>
 
       <div class="campo">
         <label for="campo-local-final">Local Final <span class="obrigatorio">*</span></label>
-        <input type="text" id="campo-local-final" list="lista-locais" autocomplete="off" placeholder="Buscar por código ou nome…" required>
+        <input type="text" id="campo-local-final" autocomplete="off" placeholder="Buscar por código ou nome…" required>
+        <div class="pilha" id="resultados-local-final" style="margin-top:0.5rem;"></div>
       </div>
-
-      <datalist id="lista-locais"></datalist>
 
       <div class="campo">
         <label>Linha <span class="obrigatorio">*</span></label>

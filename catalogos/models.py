@@ -45,6 +45,10 @@ class CatLocal(models.Model):
     sigla = models.CharField(max_length=20, primary_key=True)
     nome = models.CharField(max_length=200)
     categoria = models.CharField(max_length=50, choices=CATEGORIA_CHOICES)
+    ativo = models.BooleanField(
+        default=True,
+        help_text='Locais inativos somem da selecao mas continuam existindo para RADs antigos.',
+    )
 
     class Meta:
         db_table = 'cat_locais'

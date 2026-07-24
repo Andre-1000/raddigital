@@ -167,35 +167,83 @@ document.addEventListener('DOMContentLoaded', async function () {
       </div>`;
   }
 
-  const listaLocaisEl = document.getElementById('lista-locais');
-  const mapaLocaisPorRotulo = new Map();
-
-  locais.forEach(function (local) {
-    const rotulo = `${local.sigla} - ${local.nome}`;
-    mapaLocaisPorRotulo.set(rotulo, local.sigla);
-    const opcao = document.createElement('option');
-    opcao.value = rotulo;
-    listaLocaisEl.appendChild(opcao);
-  });
-
   function rotuloDoLocal(sigla) {
     const local = locais.find((l) => l.sigla === sigla);
     return local ? `${local.sigla} - ${local.nome}` : '';
   }
 
-  function ligarCampoLocal(inputEl, chaveRascunho) {
+  // Mesmo padrao visual da busca de colaborador (botoes clicaveis
+  // abaixo do campo, sem depender do <datalist> nativo do navegador --
+  // o datalist nao tem estilo controlavel pelo CSS do sistema e podia
+  // aparecer com fundo escuro dependendo do navegador/SO).
+  function configurarBuscaLocal(inputEl, resultadosEl, chaveRascunho) {
     if (rascunho[chaveRascunho]) {
       inputEl.value = rotuloDoLocal(rascunho[chaveRascunho]);
     }
-    inputEl.addEventListener('change', function () {
-      const sigla = mapaLocaisPorRotulo.get(inputEl.value.trim());
-      rascunho[chaveRascunho] = sigla || '';
+
+    function selecionarLocal(local) {
+      inputEl.value = `${local.sigla} - ${local.nome}`;
+      rascunho[chaveRascunho] = local.sigla;
+      resultadosEl.innerHTML = '';
       salvarRascunhoAgora();
+    }
+
+    inputEl.addEventListener('input', function () {
+      const termo = inputEl.value.trim().toLowerCase();
+      resultadosEl.innerHTML = '';
+
+      // Campo alterado manualmente sem selecionar um resultado -- nao
+      // aceita valor livre, precisa escolher da lista.
+      rascunho[chaveRascunho] = '';
+
+      if (!termo) return;
+
+      const encontrados = locais
+        .filter((l) => l.sigla.toLowerCase().includes(termo) || l.nome.toLowerCase().includes(termo))
+        .slice(0, 8);
+
+      if (encontrados.length === 0) {
+        const aviso = document.createElement('p');
+        aviso.className = 'texto-suave';
+        aviso.style.fontSize = '0.85rem';
+        aviso.textContent = 'Nenhum local encontrado.';
+        resultadosEl.appendChild(aviso);
+        return;
+      }
+
+      encontrados.forEach(function (local) {
+        const botao = document.createElement('button');
+        botao.type = 'button';
+        botao.className = 'botao botao--secundaria';
+        botao.style.textAlign = 'left';
+        botao.style.justifyContent = 'flex-start';
+        botao.textContent = `${local.sigla} — ${local.nome}`;
+        botao.addEventListener('click', function () {
+          selecionarLocal(local);
+        });
+        resultadosEl.appendChild(botao);
+      });
+    });
+
+    inputEl.addEventListener('blur', function () {
+      // Pequeno atraso para o clique no resultado (blur) registrar
+      // antes de fechar a lista.
+      setTimeout(function () {
+        resultadosEl.innerHTML = '';
+      }, 150);
     });
   }
 
-  ligarCampoLocal(document.getElementById('campo-local-inicial'), 'id_local_inicial');
-  ligarCampoLocal(document.getElementById('campo-local-final'), 'id_local_final');
+  configurarBuscaLocal(
+    document.getElementById('campo-local-inicial'),
+    document.getElementById('resultados-local-inicial'),
+    'id_local_inicial'
+  );
+  configurarBuscaLocal(
+    document.getElementById('campo-local-final'),
+    document.getElementById('resultados-local-final'),
+    'id_local_final'
+  );
 
   function renderizarChips(containerEl, itens, valoresSelecionados, aoMudar, fixos = []) {
     containerEl.innerHTML = '';

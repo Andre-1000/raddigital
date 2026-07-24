@@ -35,7 +35,9 @@ def listar_todos(request):
     """
     dados = {
         'linhas': list(CatLinha.objects.values('codigo', 'nome')),
-        'locais': list(CatLocal.objects.values('sigla', 'nome', 'categoria')),
+        'locais': list(
+            CatLocal.objects.filter(ativo=True).values('sigla', 'nome', 'categoria')
+        ),
         'vias': list(CatVia.objects.values('id', 'nome')),
         'equipes': list(CatEquipe.objects.values('codigo', 'nome')),
         'tipos_manutencao': list(CatTipoManutencao.objects.values('id', 'nome')),
