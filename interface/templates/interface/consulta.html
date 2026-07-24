@@ -85,8 +85,10 @@
       </div>
 
       <div class="campo">
-        <label for="filtro-login-usuario">Técnico (login)</label>
-        <input type="text" id="filtro-login-usuario">
+        <label for="filtro-login-usuario-busca">Técnico (login/matrícula)</label>
+        <input type="text" id="filtro-login-usuario-busca" autocomplete="off" placeholder="Buscar por nome ou matrícula…">
+        <input type="hidden" id="filtro-login-usuario">
+        <div class="pilha" id="resultados-login-usuario" style="margin-top:0.5rem;"></div>
       </div>
       <div class="campo">
         <label for="filtro-dispositivo">Dispositivo</label>
@@ -117,7 +119,7 @@
     </div>
 
     <div class="linha-acoes">
-      <button type="button" class="botao botao--primaria" id="botao-filtrar">Filtrar</button>
+      <button type="button" class="botao botao--primaria" id="botao-filtrar">Pesquisar</button>
       <button type="button" class="botao botao--secundaria" id="botao-limpar-filtros">Limpar filtros</button>
     </div>
   </div>
@@ -127,6 +129,9 @@
   <div id="lista-rads" class="pilha" style="margin-top:1rem;"></div>
   <p id="mensagem-vazia" class="texto-suave centro" style="display:none; margin-top:2rem;">
     Nenhum RAD encontrado.
+  </p>
+  <p id="mensagem-antes-de-pesquisar" class="texto-suave centro" style="margin-top:2rem;">
+    Informe os critérios de busca e clique em "Pesquisar".
   </p>
 </div>
 {% endblock %}
@@ -144,6 +149,7 @@
     const lista = document.getElementById('lista-rads');
     const aviso = document.getElementById('aviso-consulta');
     const mensagemVazia = document.getElementById('mensagem-vazia');
+    const mensagemAntesDePesquisar = document.getElementById('mensagem-antes-de-pesquisar');
 
     function seloStatus(status) {
       const classe = status === 'cancelado' ? 'selo--offline' : 'selo--online';
@@ -208,9 +214,69 @@
       }
     }
 
+    // Busca de Tecnico: mesma lista e mesmo padrao visual usado no
+    // campo de colaborador ao preencher o RAD (busca com resultados
+    // clicaveis, sem depender de digitar o login exato de cabeca).
+    async function configurarBuscaTecnico() {
+      const campoBusca = document.getElementById('filtro-login-usuario-busca');
+      const campoValor = document.getElementById('filtro-login-usuario');
+      const resultadosEl = document.getElementById('resultados-login-usuario');
+
+      let colaboradores = [];
+      try {
+        const resposta = await RadAuth.requisicaoAutenticada('/colaboradores/todos/');
+        if (resposta.ok) {
+          const dados = await resposta.json();
+          colaboradores = dados.colaboradores;
+        }
+      } catch (erro) {
+        // Sem a lista, o filtro de tecnico so fica indisponivel --
+        // o resto da tela continua funcionando.
+        return;
+      }
+
+      campoBusca.addEventListener('input', function () {
+        const termo = campoBusca.value.trim().toLowerCase();
+        resultadosEl.innerHTML = '';
+        campoValor.value = ''; // digitou sem selecionar -- filtro fica vazio ate escolher
+
+        if (!termo) return;
+
+        const encontrados = colaboradores
+          .filter(
+            (c) =>
+              c.registro_empresa.toLowerCase().includes(termo) ||
+              c.nome.toLowerCase().includes(termo)
+          )
+          .slice(0, 8);
+
+        encontrados.forEach(function (colaborador) {
+          const botao = document.createElement('button');
+          botao.type = 'button';
+          botao.className = 'botao botao--secundaria';
+          botao.style.textAlign = 'left';
+          botao.style.justifyContent = 'flex-start';
+          botao.textContent = `${colaborador.registro_empresa} — ${colaborador.nome}`;
+          botao.addEventListener('click', function () {
+            campoBusca.value = `${colaborador.registro_empresa} — ${colaborador.nome}`;
+            campoValor.value = colaborador.registro_empresa;
+            resultadosEl.innerHTML = '';
+          });
+          resultadosEl.appendChild(botao);
+        });
+      });
+
+      campoBusca.addEventListener('blur', function () {
+        setTimeout(function () {
+          resultadosEl.innerHTML = '';
+        }, 150);
+      });
+    }
+
     async function carregarLista() {
       aviso.innerHTML = '';
       mensagemVazia.style.display = 'none';
+      mensagemAntesDePesquisar.style.display = 'none';
       lista.innerHTML = '';
 
       const parametros = new URLSearchParams();
@@ -295,14 +361,25 @@
       ].forEach(function (id) {
         document.getElementById(id).value = '';
       });
-      carregarLista();
+      document.getElementById('filtro-login-usuario-busca').value = '';
+      document.getElementById('resultados-login-usuario').innerHTML = '';
+      // "Limpar filtros" so reseta os campos -- nao dispara pesquisa
+      // sozinho, mesma logica de "nao carregar nada sem criterio".
+      aviso.innerHTML = '';
+      lista.innerHTML = '';
+      mensagemVazia.style.display = 'none';
+      mensagemAntesDePesquisar.style.display = '';
     }
 
     document.getElementById('botao-filtrar').addEventListener('click', carregarLista);
     document.getElementById('botao-limpar-filtros').addEventListener('click', limparFiltros);
 
+    // So carrega os catalogos usados nos selects de filtro -- a lista
+    // de RADs so aparece depois que a pessoa definir criterios e
+    // clicar em "Pesquisar" (isso e uma busca, nao um filtro que
+    // reordena algo ja carregado).
     await carregarCatalogos();
-    await carregarLista();
+    await configurarBuscaTecnico();
   });
 </script>
 {% endblock %}
