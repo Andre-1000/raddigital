@@ -146,7 +146,6 @@ def listar_rads(request):
     )
 
 
-@requer_token
 def _pode_ver_dispositivo(usuario):
     """
     Regra de negocio (22/07/2026): o campo Dispositivo (computador/
@@ -158,6 +157,7 @@ def _pode_ver_dispositivo(usuario):
     return UsuarioPerfil.SUPERVISOR in perfis or UsuarioPerfil.ADMINISTRADOR in perfis
 
 
+@requer_token
 def listar_meus_rads(request):
     """
     GET /consulta/meus-rads/?pagina=1
