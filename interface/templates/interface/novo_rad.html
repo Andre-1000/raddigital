@@ -32,17 +32,17 @@
       <h2 style="font-size:1rem;">Identificação</h2>
 
       <div class="campo">
-        <label for="campo-numero-os">OS</label>
+        <label for="campo-numero-os">OS <span class="obrigatorio">*</span></label>
         <input type="number" id="campo-numero-os" inputmode="numeric" min="1" max="9999999" required>
       </div>
 
       <div class="campo">
-        <label for="campo-numero-sa">N° SA</label>
+        <label for="campo-numero-sa">N° SA <span class="obrigatorio">*</span></label>
         <input type="text" id="campo-numero-sa" inputmode="numeric" maxlength="10" required>
       </div>
 
       <div class="campo">
-        <label for="campo-data">Data</label>
+        <label for="campo-data">Data <span class="obrigatorio">*</span></label>
         <input type="date" id="campo-data" required>
       </div>
     </div>
@@ -51,25 +51,25 @@
       <h2 style="font-size:1rem;">Localização</h2>
 
       <div class="campo">
-        <label for="campo-local-inicial">Local Inicial</label>
+        <label for="campo-local-inicial">Local Inicial <span class="obrigatorio">*</span></label>
         <input type="text" id="campo-local-inicial" list="lista-locais" autocomplete="off" placeholder="Buscar por código ou nome…" required>
       </div>
 
       <div class="campo">
-        <label for="campo-local-final">Local Final</label>
+        <label for="campo-local-final">Local Final <span class="obrigatorio">*</span></label>
         <input type="text" id="campo-local-final" list="lista-locais" autocomplete="off" placeholder="Buscar por código ou nome…" required>
       </div>
 
       <datalist id="lista-locais"></datalist>
 
       <div class="campo">
-        <label>Linha</label>
+        <label>Linha <span class="obrigatorio">*</span></label>
         <div class="grupo-chips" id="chips-linhas"></div>
         <p class="campo__ajuda" id="ajuda-linhas"></p>
       </div>
 
       <div class="campo">
-        <label>Via</label>
+        <label>Via <span class="obrigatorio">*</span></label>
         <div class="grupo-chips" id="chips-vias"></div>
         <p class="campo__ajuda" id="ajuda-vias"></p>
       </div>
@@ -84,6 +84,16 @@
         <label for="campo-km-poste">Km / Poste <span class="texto-suave">(opcional)</span></label>
         <input type="text" id="campo-km-poste" inputmode="numeric" placeholder="XX/XX - XX/XX" maxlength="13">
       </div>
+
+      <div class="campo">
+        <label for="campo-tipo-veiculo">Tipo de Veículo <span class="texto-suave">(opcional)</span></label>
+        <input type="text" id="campo-tipo-veiculo">
+      </div>
+
+      <div class="campo">
+        <label for="campo-operador">Operador <span class="texto-suave">(opcional)</span></label>
+        <input type="text" id="campo-operador">
+      </div>
     </div>
 
     <div class="cartao" style="margin-top:1rem;">
@@ -93,7 +103,7 @@
       </h2>
 
       <div class="campo">
-        <label for="campo-tipo-manutencao">Tipo de Manutenção</label>
+        <label for="campo-tipo-manutencao">Tipo de Manutenção <span class="obrigatorio">*</span></label>
         <select id="campo-tipo-manutencao" required>
           <option value="">Selecione…</option>
         </select>
@@ -109,7 +119,7 @@
       <h2 style="font-size:1rem;">Horários</h2>
 
       <div class="campo">
-        <label for="campo-hp-inicio">Horário Programado de Início</label>
+        <label for="campo-hp-inicio">Horário Programado de Início <span class="obrigatorio">*</span></label>
         <input type="time" id="campo-hp-inicio" required>
         <p class="campo__ajuda">
           Data: <input type="date" id="campo-data-hp-inicio" style="width:auto; display:inline-block; min-height:auto; padding:0.3rem 0.5rem;">
@@ -117,7 +127,7 @@
       </div>
 
       <div class="campo">
-        <label for="campo-hp-termino">Horário Programado de Término</label>
+        <label for="campo-hp-termino">Horário Programado de Término <span class="obrigatorio">*</span></label>
         <input type="time" id="campo-hp-termino" required>
         <p class="campo__ajuda">
           Data: <input type="date" id="campo-data-hp-termino" style="width:auto; display:inline-block; min-height:auto; padding:0.3rem 0.5rem;">
@@ -126,7 +136,7 @@
       </div>
 
       <div class="campo">
-        <label for="campo-hr-inicio">Horário Real de Início</label>
+        <label for="campo-hr-inicio">Horário Real de Início <span class="obrigatorio">*</span></label>
         <input type="time" id="campo-hr-inicio" required>
         <p class="campo__ajuda">
           Data: <input type="date" id="campo-data-hr-inicio" style="width:auto; display:inline-block; min-height:auto; padding:0.3rem 0.5rem;">
@@ -134,7 +144,7 @@
       </div>
 
       <div class="campo">
-        <label for="campo-hr-termino">Horário Real de Término</label>
+        <label for="campo-hr-termino">Horário Real de Término <span class="obrigatorio">*</span></label>
         <input type="time" id="campo-hr-termino" required>
         <p class="campo__ajuda">
           Data: <input type="date" id="campo-data-hr-termino" style="width:auto; display:inline-block; min-height:auto; padding:0.3rem 0.5rem;">
@@ -157,7 +167,7 @@
         <div class="campo" id="campo-grupo-atraso-inicio" style="display:none;">
           <span class="selo selo--offline">Atraso identificado no início</span>
           <div style="margin-top:0.6rem;">
-            <label for="campo-motivo-atraso-inicio">Motivo do atraso no início</label>
+            <label for="campo-motivo-atraso-inicio">Motivo do atraso no início <span class="obrigatorio">*</span></label>
             <select id="campo-motivo-atraso-inicio" required></select>
           </div>
           <div id="campo-grupo-desc-atraso-inicio" style="display:none; margin-top:0.6rem;">
@@ -169,7 +179,7 @@
         <div class="campo" id="campo-grupo-atraso-termino" style="display:none;">
           <span class="selo selo--offline">Atraso identificado no término</span>
           <div style="margin-top:0.6rem;">
-            <label for="campo-motivo-atraso-termino">Motivo do atraso no término</label>
+            <label for="campo-motivo-atraso-termino">Motivo do atraso no término <span class="obrigatorio">*</span></label>
             <select id="campo-motivo-atraso-termino" required></select>
           </div>
           <div id="campo-grupo-desc-atraso-termino" style="display:none; margin-top:0.6rem;">
@@ -181,7 +191,7 @@
     </div>
 
     <div class="cartao" style="margin-top:1rem;">
-      <h2 style="font-size:1rem;">Serviços Executados</h2>
+      <h2 style="font-size:1rem;">Serviços Executados <span class="obrigatorio">*</span></h2>
       <button type="button" class="botao botao--secundaria" id="botao-sobre-servicos"
               style="width:auto; min-height:36px; padding:0 0.9rem; margin-bottom:0.9rem; font-size:0.85rem;">
         O que é cada serviço?
@@ -191,6 +201,41 @@
       <div class="campo" id="campo-grupo-outros-servico" style="display:none; margin-top:0.8rem;">
         <label for="campo-outros-servico-desc">Descreva o serviço</label>
         <textarea id="campo-outros-servico-desc" maxlength="500"></textarea>
+      </div>
+    </div>
+
+    <!-- Terceiros: aparece quando ao menos um dos servicos que exige
+         mao de obra terceirizada e selecionado (Recolhimento de Lixo,
+         Limpeza de Canaleta, Capina Quimica, Rocada/Poda). Os campos
+         "N Op Maquina" e "Volume" so aparecem quando algum servico
+         selecionado exige aquele campo especificamente -- os demais
+         (Encarregados, Ajudantes, Motorista) sao comuns aos quatro. -->
+    <div class="cartao" id="bloco-terceiros" style="margin-top:1rem; display:none;">
+      <h2 style="font-size:1rem;">Terceiros</h2>
+
+      <div class="campo">
+        <label for="campo-terceiros-encarregados">N° Encarregados <span class="texto-suave">(opcional)</span></label>
+        <input type="text" id="campo-terceiros-encarregados" inputmode="numeric" maxlength="3">
+      </div>
+
+      <div class="campo" id="campo-grupo-terceiros-op-maquina">
+        <label for="campo-terceiros-op-maquina">N° Op Máquina <span class="texto-suave">(opcional)</span></label>
+        <input type="text" id="campo-terceiros-op-maquina" inputmode="numeric" maxlength="3">
+      </div>
+
+      <div class="campo">
+        <label for="campo-terceiros-ajudantes">N° Ajudantes <span class="texto-suave">(opcional)</span></label>
+        <input type="text" id="campo-terceiros-ajudantes" inputmode="numeric" maxlength="3">
+      </div>
+
+      <div class="campo">
+        <label for="campo-terceiros-motorista">N° Motorista <span class="texto-suave">(opcional)</span></label>
+        <input type="text" id="campo-terceiros-motorista" inputmode="numeric" maxlength="3">
+      </div>
+
+      <div class="campo" id="campo-grupo-terceiros-volume">
+        <label for="campo-terceiros-volume">Volume <span class="texto-suave">(opcional)</span></label>
+        <input type="text" id="campo-terceiros-volume" inputmode="numeric" maxlength="3">
       </div>
     </div>
 
@@ -288,7 +333,7 @@
       <h2 style="font-size:1rem;">Responsáveis e Detalhes</h2>
 
       <div class="campo">
-        <label for="campo-responsavel-atividade">Responsável Atividade</label>
+        <label for="campo-responsavel-atividade">Responsável Atividade <span class="obrigatorio">*</span></label>
         <input type="text" id="campo-responsavel-atividade" list="lista-responsaveis" autocomplete="off" maxlength="200" required>
         <datalist id="lista-responsaveis"></datalist>
       </div>
@@ -437,6 +482,9 @@
     color: #fff;
   }
   .chip:disabled { opacity: 0.7; cursor: not-allowed; }
+
+  /* Asterisco vermelho ao lado de rotulos de campos obrigatorios. */
+  .obrigatorio { color: var(--cor-perigo); }
 </style>
 {% endblock %}
 

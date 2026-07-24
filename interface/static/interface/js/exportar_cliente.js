@@ -76,6 +76,8 @@ const ExportarCliente = (function () {
       ['vias', 'Via', listaOuNA(nomesVias)],
       ['equipes', 'Equipes Envolvidas', listaOuNA(nomesEquipes)],
       ['km_poste', 'Km/Poste', ouNA(rascunho.km_poste)],
+      ['tipo_veiculo', 'Tipo de Veículo', ouNA(rascunho.tipo_veiculo)],
+      ['operador', 'Operador', ouNA(rascunho.operador)],
       [
         'hora_prog_inicio', 'Horário programado',
         `${ouNA(rascunho.hora_prog_inicio)} a ${ouNA(rascunho.hora_prog_termino)}`,
@@ -83,6 +85,11 @@ const ExportarCliente = (function () {
       ['hora_real_inicio', 'Início', ouNA(rascunho.hora_real_inicio)],
       ['hora_real_termino', 'Término', ouNA(rascunho.hora_real_termino)],
       ['servicos', 'Serviços realizados', textoServicos], // duplicado, igual ao backend (EFD 3.13)
+      ['terceiros_num_encarregados', 'N° Encarregados (Terceiros)', ouNA(rascunho.terceiros_num_encarregados)],
+      ['terceiros_num_op_maquina', 'N° Op Máquina (Terceiros)', ouNA(rascunho.terceiros_num_op_maquina)],
+      ['terceiros_num_ajudantes', 'N° Ajudantes (Terceiros)', ouNA(rascunho.terceiros_num_ajudantes)],
+      ['terceiros_num_motorista', 'N° Motorista (Terceiros)', ouNA(rascunho.terceiros_num_motorista)],
+      ['terceiros_volume', 'Volume (Terceiros)', ouNA(rascunho.terceiros_volume)],
       ['materiais_utilizados', 'Equipamentos utilizados', ouNA(rascunho.materiais_utilizados)],
       ['motivo_atraso_inicio', 'Motivo dos atrasos', textoMotivoAtrasos],
       ['colaboradores', 'Responsável', listaOuNA(nomesColaboradores)],

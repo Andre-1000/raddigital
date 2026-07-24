@@ -72,6 +72,12 @@ class Rad(models.Model):
         db_column='id_local_final',
     )
     km_poste = models.CharField(max_length=20, null=True, blank=True)
+    tipo_veiculo = models.TextField(
+        null=True, blank=True, help_text='Texto livre, sem limite de caracteres.'
+    )
+    operador = models.TextField(
+        null=True, blank=True, help_text='Texto livre, sem limite de caracteres.'
+    )
 
     # --- Controle operacional (EFD-010, EFD-011) ------------------------
     tipo_manutencao = models.ForeignKey(
@@ -126,6 +132,20 @@ class Rad(models.Model):
 
     # --- Execucao (EFD-020) ----------------------------------------------
     outros_servico_desc = models.CharField(max_length=500, null=True, blank=True)
+
+    # --- Terceiros (22/07/2026) --------------------------------------------
+    # Preenchido quando ao menos um servico que exige mao de obra
+    # terceirizada e selecionado (Recolhimento de Lixo, Limpeza de
+    # Canaleta, Capina Quimica, Rocada/Poda -- ver
+    # catalogos.models.CatServico.requer_terceiros). Todos opcionais,
+    # numericos, ate 3 digitos -- validado no cliente, armazenado como
+    # inteiro.
+    terceiros_num_encarregados = models.IntegerField(null=True, blank=True)
+    terceiros_num_op_maquina = models.IntegerField(null=True, blank=True)
+    terceiros_num_ajudantes = models.IntegerField(null=True, blank=True)
+    terceiros_num_motorista = models.IntegerField(null=True, blank=True)
+    terceiros_volume = models.IntegerField(null=True, blank=True)
+
     materiais_utilizados = models.TextField(null=True, blank=True)
     observacoes_gerais = models.TextField(null=True, blank=True)
 

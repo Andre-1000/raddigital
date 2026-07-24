@@ -41,7 +41,8 @@ def listar_todos(request):
         'tipos_manutencao': list(CatTipoManutencao.objects.values('id', 'nome')),
         'servicos': list(
             CatServico.objects.filter(ativo=True).values(
-                'id', 'nome', 'descricao', 'requer_amv', 'requer_descricao'
+                'id', 'nome', 'descricao', 'requer_amv', 'requer_descricao',
+                'requer_terceiros', 'terceiros_tem_op_maquina', 'terceiros_tem_volume',
             )
         ),
         'motivos_atraso': list(

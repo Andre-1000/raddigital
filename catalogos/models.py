@@ -103,7 +103,16 @@ class CatVia(models.Model):
 
 
 class CatServico(models.Model):
-    """CAT-003: 13 servicos executados. requer_amv abre o bloco AMV."""
+    """
+    CAT-003: servicos executados. requer_amv abre o bloco AMV;
+    requer_descricao abre a descricao livre (Outros).
+
+    requer_terceiros (22/07/2026): abre o bloco "Terceiros" (mao de
+    obra terceirizada). Dos campos desse bloco, Encarregados/
+    Ajudantes/Motorista sao comuns a todo servico que exige Terceiros;
+    Op Maquina e Volume sao especificos de cada servico, controlados
+    por terceiros_tem_op_maquina e terceiros_tem_volume.
+    """
 
     nome = models.CharField(max_length=100, unique=True)
     descricao = models.TextField(
@@ -114,6 +123,16 @@ class CatServico(models.Model):
     )
     requer_descricao = models.BooleanField(
         default=False, help_text='TRUE somente para Outros.'
+    )
+    requer_terceiros = models.BooleanField(
+        default=False,
+        help_text='TRUE para Recolhimento de Lixo, Limpeza de Canaleta, Capina Quimica, Rocada/Poda.',
+    )
+    terceiros_tem_op_maquina = models.BooleanField(
+        default=False, help_text='So relevante quando requer_terceiros=True.'
+    )
+    terceiros_tem_volume = models.BooleanField(
+        default=False, help_text='So relevante quando requer_terceiros=True.'
     )
     ativo = models.BooleanField(default=True)
 

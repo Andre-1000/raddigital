@@ -89,6 +89,8 @@ document.addEventListener('DOMContentLoaded', async function () {
       vias: [],
       equipes: ['VP'],
       km_poste: '',
+      tipo_veiculo: '',
+      operador: '',
       id_tipo_manutencao: null,
       numero_falha: null,
       hora_prog_inicio: '',
@@ -105,6 +107,11 @@ document.addEventListener('DOMContentLoaded', async function () {
       desc_motivo_atraso_termino: '',
       servicos: [],
       outros_servico_desc: '',
+      terceiros_num_encarregados: '',
+      terceiros_num_op_maquina: '',
+      terceiros_num_ajudantes: '',
+      terceiros_num_motorista: '',
+      terceiros_volume: '',
       amv: { id_mch: null, tipos_defeito: [], acoes: [] },
       colaboradores: [],
       anexos: {
@@ -636,6 +643,12 @@ document.addEventListener('DOMContentLoaded', async function () {
   function servicoOutrosSelecionado() {
     return servicos.some((s) => s.requer_descricao && rascunho.servicos.includes(s.id));
   }
+  function servicoRequerTerceirosSelecionado() {
+    return servicos.some((s) => s.requer_terceiros && rascunho.servicos.includes(s.id));
+  }
+  function algumServicoSelecionadoTem(flag) {
+    return servicos.some((s) => s[flag] && rascunho.servicos.includes(s.id));
+  }
 
   const campoMch = document.getElementById('campo-mch');
   const listaMchEl = document.getElementById('lista-mch');
@@ -681,6 +694,15 @@ document.addEventListener('DOMContentLoaded', async function () {
     );
   }
 
+  const blocoTerceiros = document.getElementById('bloco-terceiros');
+  const campoGrupoTerceirosOpMaquina = document.getElementById('campo-grupo-terceiros-op-maquina');
+  const campoGrupoTerceirosVolume = document.getElementById('campo-grupo-terceiros-volume');
+
+  function limparCampoTerceiros(elementoId, chaveRascunho) {
+    document.getElementById(elementoId).value = '';
+    rascunho[chaveRascunho] = '';
+  }
+
   function atualizarVisibilidadeServicos() {
     grupoOutrosServico.style.display = servicoOutrosSelecionado() ? '' : 'none';
     if (!servicoOutrosSelecionado()) {
@@ -698,6 +720,32 @@ document.addEventListener('DOMContentLoaded', async function () {
       rascunho.amv.acoes.length = 0;
       campoMch.value = '';
       detalhesMch.style.display = 'none';
+    }
+
+    // Bloco Terceiros: aparece se QUALQUER servico selecionado exigir
+    // (Recolhimento de Lixo, Limpeza de Canaleta, Capina Quimica,
+    // Rocada/Poda). Dentro dele, "N Op Maquina" e "Volume" so aparecem
+    // se algum dos servicos selecionados especificamente os exigir --
+    // os outros 3 campos (Encarregados/Ajudantes/Motorista) sao
+    // comuns aos quatro servicos, entao ficam sempre visiveis quando
+    // o bloco aparece.
+    if (servicoRequerTerceirosSelecionado()) {
+      blocoTerceiros.style.display = '';
+      campoGrupoTerceirosOpMaquina.style.display = algumServicoSelecionadoTem('terceiros_tem_op_maquina') ? '' : 'none';
+      campoGrupoTerceirosVolume.style.display = algumServicoSelecionadoTem('terceiros_tem_volume') ? '' : 'none';
+      if (campoGrupoTerceirosOpMaquina.style.display === 'none') {
+        limparCampoTerceiros('campo-terceiros-op-maquina', 'terceiros_num_op_maquina');
+      }
+      if (campoGrupoTerceirosVolume.style.display === 'none') {
+        limparCampoTerceiros('campo-terceiros-volume', 'terceiros_volume');
+      }
+    } else {
+      blocoTerceiros.style.display = 'none';
+      limparCampoTerceiros('campo-terceiros-encarregados', 'terceiros_num_encarregados');
+      limparCampoTerceiros('campo-terceiros-op-maquina', 'terceiros_num_op_maquina');
+      limparCampoTerceiros('campo-terceiros-ajudantes', 'terceiros_num_ajudantes');
+      limparCampoTerceiros('campo-terceiros-motorista', 'terceiros_num_motorista');
+      limparCampoTerceiros('campo-terceiros-volume', 'terceiros_volume');
     }
   }
 
@@ -717,6 +765,23 @@ document.addEventListener('DOMContentLoaded', async function () {
     rascunho.outros_servico_desc = campoOutrosServicoDesc.value;
     salvarRascunhoAgora();
   });
+
+  // Campos numericos do bloco Terceiros -- ate 3 digitos, sem
+  // permitir nada alem de numero (mesmo padrao usado em Km/Poste).
+  function ligarCampoNumericoTerceiros(elementoId, chaveRascunho) {
+    const elemento = document.getElementById(elementoId);
+    elemento.value = rascunho[chaveRascunho] || '';
+    elemento.addEventListener('input', function () {
+      elemento.value = elemento.value.replace(/\D/g, '').slice(0, 3);
+      rascunho[chaveRascunho] = elemento.value;
+      salvarRascunhoAgora();
+    });
+  }
+  ligarCampoNumericoTerceiros('campo-terceiros-encarregados', 'terceiros_num_encarregados');
+  ligarCampoNumericoTerceiros('campo-terceiros-op-maquina', 'terceiros_num_op_maquina');
+  ligarCampoNumericoTerceiros('campo-terceiros-ajudantes', 'terceiros_num_ajudantes');
+  ligarCampoNumericoTerceiros('campo-terceiros-motorista', 'terceiros_num_motorista');
+  ligarCampoNumericoTerceiros('campo-terceiros-volume', 'terceiros_volume');
 
   campoMch.addEventListener('change', function () {
     const idMch = mapaMchPorRotulo.get(campoMch.value.trim());
@@ -995,6 +1060,8 @@ document.addEventListener('DOMContentLoaded', async function () {
   ligarCampoTexto('campo-responsavel-atividade', 'responsavel_atividade');
   ligarCampoTexto('campo-operador-ccm', 'operador_ccm');
   ligarCampoTexto('campo-descricao-tecnica', 'descricao_tecnica_atividade');
+  ligarCampoTexto('campo-tipo-veiculo', 'tipo_veiculo');
+  ligarCampoTexto('campo-operador', 'operador');
   ligarCampoTexto('campo-materiais-utilizados', 'materiais_utilizados');
   ligarCampoTexto('campo-observacoes-gerais', 'observacoes_gerais');
 
@@ -1115,6 +1182,8 @@ document.addEventListener('DOMContentLoaded', async function () {
       vias: rascunho.vias,
       equipes: rascunho.equipes,
       km_poste: rascunho.km_poste,
+      tipo_veiculo: rascunho.tipo_veiculo,
+      operador: rascunho.operador,
       id_tipo_manutencao: rascunho.id_tipo_manutencao,
       numero_falha: rascunho.numero_falha,
       hora_prog_inicio: rascunho.hora_prog_inicio,
@@ -1131,6 +1200,11 @@ document.addEventListener('DOMContentLoaded', async function () {
       desc_motivo_atraso_termino: rascunho.desc_motivo_atraso_termino,
       servicos: rascunho.servicos,
       outros_servico_desc: rascunho.outros_servico_desc,
+      terceiros_num_encarregados: rascunho.terceiros_num_encarregados ? Number(rascunho.terceiros_num_encarregados) : null,
+      terceiros_num_op_maquina: rascunho.terceiros_num_op_maquina ? Number(rascunho.terceiros_num_op_maquina) : null,
+      terceiros_num_ajudantes: rascunho.terceiros_num_ajudantes ? Number(rascunho.terceiros_num_ajudantes) : null,
+      terceiros_num_motorista: rascunho.terceiros_num_motorista ? Number(rascunho.terceiros_num_motorista) : null,
+      terceiros_volume: rascunho.terceiros_volume ? Number(rascunho.terceiros_volume) : null,
       amv: rascunho.amv,
       colaboradores: rascunho.colaboradores,
       responsavel_atividade: rascunho.responsavel_atividade,
