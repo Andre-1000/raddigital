@@ -10,8 +10,11 @@ RG-ANX-005: 10MB por arquivo.
 VLD-023/024: arquivo corrompido ou em formato invalido bloqueia o envio
 -- checado de verdade (nao so pela extensao do nome do arquivo), abrindo
 o conteudo com Pillow (fotos) e pypdf (PDF).
-VLD-026: RAD sem nenhum anexo e permitido (anexos sao opcionais) --
-por isso este modulo nunca gera erro por ausencia de arquivos.
+
+VLD-032 (22/07/2026): ao menos 1 foto (de qualquer uma das duas
+categorias) passou a ser OBRIGATORIA. Isso substitui a regra antiga
+VLD-026 ("RAD sem nenhum anexo e permitido") -- PDF continua opcional,
+so foto virou obrigatoria.
 """
 from django.conf import settings
 from PIL import Image, UnidentifiedImageError
@@ -94,6 +97,21 @@ def _validar_grupo_fotos(fotos, campo, codigo_limite, mensagem_limite):
     return erros
 
 
+def _validar_foto_obrigatoria(fotos_intervencao, fotos_acao, erros):
+    """
+    VLD-032: pelo menos 1 foto e obrigatoria, de qualquer uma das duas
+    categorias -- nao precisa ser especificamente de uma delas.
+    """
+    if len(fotos_intervencao) + len(fotos_acao) == 0:
+        erros.append(
+            _erro(
+                'VLD-032',
+                'fotos_intervencao_verificada',
+                'Anexe ao menos 1 foto (Intervenção verificada ou Ação realizada).',
+            )
+        )
+
+
 def validar_anexos(fotos_intervencao, fotos_acao, pdfs):
     """
     fotos_intervencao: lista de UploadedFile do grupo "Intervencao
@@ -104,14 +122,17 @@ def validar_anexos(fotos_intervencao, fotos_acao, pdfs):
 
     Os dois grupos de foto sao limitados e validados de forma
     independente -- um RAD pode ter 2 fotos de intervencao e 0 de acao,
-    por exemplo, sem afetar o limite do outro grupo.
+    por exemplo, sem afetar o limite do outro grupo. Mas pelo menos 1
+    foto no total e obrigatoria (VLD-032).
 
     Retorna a lista completa de erros (RG-VLD-002: nunca para no
-    primeiro). Lista vazia = tudo valido, incluindo o caso de nenhum
-    anexo enviado (VLD-026).
+    primeiro).
     """
     limite = getattr(settings, 'LIMITE_FOTOS_POR_CATEGORIA', 2)
     erros = []
+
+    _validar_foto_obrigatoria(fotos_intervencao, fotos_acao, erros)
+
     erros += _validar_grupo_fotos(
         fotos_intervencao,
         'fotos_intervencao_verificada',

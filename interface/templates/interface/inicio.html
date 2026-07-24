@@ -73,12 +73,6 @@
     </a>
   </div>
 
-  <div class="cartao" style="margin-top:1.5rem;">
-    <p class="texto-suave" style="margin:0; font-size:0.85rem;" id="status-catalogos">
-      Catálogos: verificando…
-    </p>
-  </div>
-
   <div class="cartao" style="margin-top:1rem;">
     <button type="button" class="botao botao--secundaria" id="botao-sair">Sair</button>
   </div>
@@ -104,29 +98,10 @@
     });
 
     // Catalogos se atualizam sozinhos ao abrir a ferramenta com
-    // conexao (RG-SYNC-010) -- aqui so mostramos a data da ultima
-    // atualizacao (RG-SYNC-011), sem botao manual.
-    const statusCatalogos = document.getElementById('status-catalogos');
-
-    function formatarDataHora(isoString) {
-      if (!isoString) return null;
-      const data = new Date(isoString);
-      return data.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
-    }
-
-    async function mostrarStatusCatalogos() {
-      const dataAtualizacao = await RadDB.dataUltimaAtualizacaoCatalogos();
-      if (dataAtualizacao) {
-        statusCatalogos.textContent = `Catálogos: atualizados em ${formatarDataHora(dataAtualizacao)}`;
-      } else {
-        statusCatalogos.textContent = 'Catálogos: ainda não baixados neste dispositivo.';
-      }
-    }
-
-    mostrarStatusCatalogos();
-
+    // conexao (RG-SYNC-010) -- roda em segundo plano, sem nenhum
+    // indicador visivel na tela (nao e necessario o usuario ver isso).
     if (navigator.onLine) {
-      RadDB.atualizarCatalogos().then(mostrarStatusCatalogos).catch(function () {
+      RadDB.atualizarCatalogos().catch(function () {
         // Falha silenciosa -- tela nao deve travar por causa disso.
       });
     }

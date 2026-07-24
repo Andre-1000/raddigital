@@ -187,14 +187,23 @@ const ExportarCliente = (function () {
     ['responsavel_atividade', 'Responsável Atividade'],
   ];
 
+  function totalDeFotos(rascunho) {
+    const anexos = rascunho.anexos || {};
+    return (anexos.fotos_intervencao_verificada || []).length + (anexos.fotos_acao_realizada || []).length;
+  }
+
   function camposObrigatoriosFaltando(rascunho) {
-    return CAMPOS_OBRIGATORIOS_ROTULOS.filter(function ([chave]) {
+    const faltando = CAMPOS_OBRIGATORIOS_ROTULOS.filter(function ([chave]) {
       const valor = rascunho[chave];
       if (Array.isArray(valor)) return valor.length === 0;
       return !valor;
     }).map(function ([, rotulo]) {
       return rotulo;
     });
+    if (totalDeFotos(rascunho) === 0) {
+      faltando.push('Fotos (ao menos 1)');
+    }
+    return faltando;
   }
 
   function camposObrigatoriosPreenchidos(rascunho) {
@@ -212,7 +221,8 @@ const ExportarCliente = (function () {
       rascunho.hora_real_inicio &&
       rascunho.hora_real_termino &&
       rascunho.servicos && rascunho.servicos.length > 0 &&
-      rascunho.responsavel_atividade
+      rascunho.responsavel_atividade &&
+      totalDeFotos(rascunho) > 0
     );
   }
 

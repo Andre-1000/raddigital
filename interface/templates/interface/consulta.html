@@ -88,6 +88,15 @@
         <label for="filtro-login-usuario">Técnico (login)</label>
         <input type="text" id="filtro-login-usuario">
       </div>
+      <div class="campo">
+        <label for="filtro-dispositivo">Dispositivo</label>
+        <select id="filtro-dispositivo">
+          <option value="">Todos</option>
+          <option value="desktop">Computador</option>
+          <option value="mobile">Celular</option>
+          <option value="desconhecido">Desconhecido</option>
+        </select>
+      </div>
 
       <div class="campo">
         <label for="filtro-hp-inicio-de">Hora prog. início — de</label>
@@ -224,6 +233,7 @@
       definirSeExistir('filtro-mch', 'id_mch');
       definirSeExistir('filtro-linha-mch', 'linha_mch');
       definirSeExistir('filtro-login-usuario', 'login_usuario');
+      definirSeExistir('filtro-dispositivo', 'dispositivo');
       definirSeExistir('filtro-hp-inicio-de', 'hp_inicio_de');
       definirSeExistir('filtro-hp-inicio-ate', 'hp_inicio_ate');
       definirSeExistir('filtro-hr-inicio-de', 'hr_inicio_de');
@@ -249,13 +259,14 @@
           item.style.textDecoration = 'none';
           item.style.color = 'inherit';
           item.href = `/consultar/${rad.numero_rad}/`;
+          const dispositivoTexto = rad.dispositivo ? ` · ${rad.dispositivo}` : '';
           item.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <strong>${rad.numero_rad}</strong>
               ${seloStatus(rad.status)}
             </div>
             <div class="texto-suave" style="margin-top:0.35rem; font-size:0.9rem;">
-              OS ${rad.numero_os} · ${rad.data_preenchimento} · ${rad.tipo_manutencao}
+              OS ${rad.numero_os} · ${rad.data_preenchimento} · ${rad.tipo_manutencao}${dispositivoTexto}
             </div>
           `;
           lista.appendChild(item);
@@ -279,7 +290,7 @@
         'filtro-status', 'filtro-data-de', 'filtro-data-ate',
         'filtro-local-inicial', 'filtro-local-final', 'filtro-tipo-manutencao',
         'filtro-numero-falha', 'filtro-mch', 'filtro-linha-mch',
-        'filtro-login-usuario', 'filtro-hp-inicio-de', 'filtro-hp-inicio-ate',
+        'filtro-login-usuario', 'filtro-dispositivo', 'filtro-hp-inicio-de', 'filtro-hp-inicio-ate',
         'filtro-hr-inicio-de', 'filtro-hr-inicio-ate',
       ].forEach(function (id) {
         document.getElementById(id).value = '';

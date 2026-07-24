@@ -75,6 +75,8 @@ def _aplicar_filtros(queryset, params):
         queryset = queryset.filter(amv__linha_mch=params['linha_mch'])
     if params.get('login_usuario'):
         queryset = queryset.filter(usuario__login=params['login_usuario'])
+    if params.get('dispositivo'):
+        queryset = queryset.filter(dispositivo=params['dispositivo'])
     if params.get('hp_inicio_de'):
         queryset = queryset.filter(
             data_hora_prog_inicio__gte=parse_datetime_aware(params['hp_inicio_de'])
@@ -145,6 +147,17 @@ def listar_rads(request):
 
 
 @requer_token
+def _pode_ver_dispositivo(usuario):
+    """
+    Regra de negocio (22/07/2026): o campo Dispositivo (computador/
+    celular) so e visivel para Supervisor e Administrador -- um
+    Usuario comum nunca ve essa informacao, nem na lista "RADs
+    Preenchidos" nem no detalhe do RAD, mesmo sendo o proprio autor.
+    """
+    perfis = set(usuario.lista_perfis)
+    return UsuarioPerfil.SUPERVISOR in perfis or UsuarioPerfil.ADMINISTRADOR in perfis
+
+
 def listar_meus_rads(request):
     """
     GET /consulta/meus-rads/?pagina=1
@@ -161,14 +174,20 @@ def listar_meus_rads(request):
     paginador = Paginator(queryset, RADS_POR_PAGINA)
     pagina = paginador.get_page(numero_pagina)
 
+    mostrar_dispositivo = _pode_ver_dispositivo(request.usuario_rad)
+
+    def _linha(rad):
+        dados = _remover_campos_desabilitados(_linha_resumo(rad))
+        if not mostrar_dispositivo:
+            dados.pop('dispositivo', None)
+        return dados
+
     return JsonResponse(
         {
             'total_encontrado': paginador.count,
             'pagina_atual': pagina.number,
             'total_paginas': paginador.num_pages,
-            'resultados': [
-                _remover_campos_desabilitados(_linha_resumo(rad)) for rad in pagina.object_list
-            ],
+            'resultados': [_linha(rad) for rad in pagina.object_list],
         }
     )
 
@@ -375,8 +394,7 @@ def detalhe_rad(request, numero_rad):
         UsuarioPerfil.ADMINISTRADOR in perfis_usuario and rad.status != Rad.CANCELADO
     )
 
-    return JsonResponse(
-        _remover_campos_desabilitados(
+    resposta = _remover_campos_desabilitados(
             {
                 'numero_rad': rad.numero_rad,
                 'numero_os': rad.numero_os,
@@ -437,5 +455,9 @@ def detalhe_rad(request, numero_rad):
                 ),
                 'pode_cancelar': pode_cancelar,  # PRM-037
             }
-        )
     )
+
+    if not _pode_ver_dispositivo(request.usuario_rad):
+        resposta.pop('dispositivo', None)
+
+    return JsonResponse(resposta)

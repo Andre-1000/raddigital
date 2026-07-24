@@ -61,6 +61,9 @@
           item.style.textDecoration = 'none';
           item.style.color = 'inherit';
           item.href = `/consultar/${rad.numero_rad}/`;
+          const blocoDispositivo = RadAuth.temPerfil('supervisor', 'administrador')
+            ? `<div><span class="texto-suave" style="font-size:0.78rem;">Dispositivo</span><br>${rad.dispositivo}</div>`
+            : '';
           item.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <strong>${rad.numero_rad}</strong>
@@ -71,7 +74,7 @@
               <div><span class="texto-suave" style="font-size:0.78rem;">N° SA</span><br>${rad.numero_sa}</div>
               <div><span class="texto-suave" style="font-size:0.78rem;">Data de execução</span><br>${rad.data_preenchimento}</div>
               <div><span class="texto-suave" style="font-size:0.78rem;">Horário real</span><br>${rad.hora_real_inicio}</div>
-              <div><span class="texto-suave" style="font-size:0.78rem;">Dispositivo</span><br>${rad.dispositivo}</div>
+              ${blocoDispositivo}
             </div>
           `;
           lista.appendChild(item);
