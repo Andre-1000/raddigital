@@ -28,11 +28,13 @@
   .cartao-acao__rotulo {
     font-weight: 700;
     font-size: 1.02rem;
+    color: var(--cor-tinta);
   }
 
   .cartao-acao__descricao {
     font-size: 0.82rem;
-    color: var(--cor-tinta-suave);
+    color: var(--cor-tinta);
+    opacity: 0.72;
   }
 
   .cartao-acao--primaria {
@@ -40,8 +42,12 @@
     color: #fff;
     border-color: transparent;
   }
+  .cartao-acao--primaria .cartao-acao__rotulo {
+    color: #fff;
+  }
   .cartao-acao--primaria .cartao-acao__descricao {
-    color: rgba(255, 255, 255, 0.85);
+    color: #fff;
+    opacity: 0.9;
   }
 </style>
 {% endblock %}

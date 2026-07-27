@@ -380,7 +380,7 @@ h1, h2, h3 {
    funciona nos dois fundos sem precisar de uma variante extra. */
 .texto-suave {
   color: inherit;
-  opacity: 0.7;
+  opacity: 0.78;
 }
 
 .centro {

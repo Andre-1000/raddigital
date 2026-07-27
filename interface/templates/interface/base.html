@@ -7,6 +7,11 @@
   <title>{% block titulo %}Sistema RAD{% endblock %}</title>
   <link rel="stylesheet" href="{% static 'interface/css/estilo.css' %}">
   <style>
+    .barra-topo__esquerda {
+      display: flex;
+      align-items: center;
+      gap: 1.1rem;
+    }
     .barra-topo__nav {
       display: flex;
       align-items: center;
@@ -33,22 +38,24 @@
 
 {% block barra_topo %}
 <header class="barra-topo">
-  <div class="barra-topo__nav">
-    <button type="button" class="barra-topo__nav-botao" id="botao-voltar-topo" title="Voltar para a tela anterior">
-      ← Voltar
-    </button>
-    <a class="barra-topo__nav-botao" href="{% url 'interface:inicio' %}" title="Ir para o início">
-      Home
+  <div class="barra-topo__esquerda">
+    <div class="barra-topo__nav">
+      <button type="button" class="barra-topo__nav-botao" id="botao-voltar-topo" title="Voltar para a tela anterior">
+        ← Voltar
+      </button>
+      <a class="barra-topo__nav-botao" href="{% url 'interface:inicio' %}" title="Ir para o início">
+        Home
+      </a>
+    </div>
+    <a class="barra-topo__marca" href="{% url 'interface:inicio' %}">
+      <svg class="trilho" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect width="24" height="24" rx="6" fill="#242472"/>
+        <path d="M8 5v14M16 5v14" stroke="#fffcff" stroke-width="2" stroke-linecap="round"/>
+        <path d="M8 9h8M8 14h8" stroke="#fa5e13" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+      RAD
     </a>
   </div>
-  <a class="barra-topo__marca" href="{% url 'interface:inicio' %}">
-    <svg class="trilho" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <rect width="24" height="24" rx="6" fill="#242472"/>
-      <path d="M8 5v14M16 5v14" stroke="#fffcff" stroke-width="2" stroke-linecap="round"/>
-      <path d="M8 9h8M8 14h8" stroke="#fa5e13" stroke-width="1.8" stroke-linecap="round"/>
-    </svg>
-    RAD
-  </a>
   <div class="barra-topo__usuario">
     <span id="indicador-conexao" class="selo selo--online">Online</span>
     <span id="usuario-logado"></span>
