@@ -23,11 +23,25 @@
   (Consulta, Gestão de Colaboradores, Gestão de Usuários) usadas em
   computador. A tela "Novo RAD" mantém prioridade de uso em celular e
   só adota grade onde isso não prejudica a leitura em uma coluna.
+
+  Atualização (22/07/2026): tema escuro adotado como identidade visual
+  do sistema inteiro -- fundo da página passou a ser o azul-marinho da
+  marca, com cartões brancos flutuando por cima (referência visual
+  aprovada pelo cliente). Ponto-chave da implementação: --cor-fundo
+  virou a cor de fundo da PÁGINA (escura); qualquer uso anterior que
+  dependia dela para um tom claro sutil (fundo de cabeçalho de tabela,
+  hover de botão secundário) foi migrado para a nova variável
+  --cor-fundo-suave, que mantém o valor claro original. .texto-suave
+  passou a usar opacity sobre a cor herdada em vez de uma cor fixa,
+  assim funciona tanto dentro de um cartão branco (fica cinza-navy)
+  quanto direto no fundo escuro da página (fica branco-acinzentado) --
+  sem precisar de duas classes diferentes.
 */
 
 :root {
   /* Cor */
-  --cor-fundo: #f1f0f7;
+  --cor-fundo: #242472;
+  --cor-fundo-suave: #f1f0f7;
   --cor-superficie: #fffcff;
   --cor-tinta: #242472;
   --cor-tinta-suave: #5a5a8f;
@@ -50,8 +64,8 @@
   --raio-grande: 18px;
   --raio-pequeno: 8px;
   --alvo-toque: 44px;
-  --sombra: 0 1px 2px rgba(36, 36, 114, 0.06), 0 8px 24px rgba(36, 36, 114, 0.07);
-  --sombra-elevada: 0 4px 10px rgba(36, 36, 114, 0.08), 0 16px 36px rgba(36, 36, 114, 0.10);
+  --sombra: 0 1px 2px rgba(9, 9, 40, 0.20), 0 8px 24px rgba(9, 9, 40, 0.24);
+  --sombra-elevada: 0 4px 10px rgba(9, 9, 40, 0.24), 0 16px 36px rgba(9, 9, 40, 0.30);
   --transicao: 0.16s ease;
   --transicao-lenta: 0.22s ease;
 
@@ -71,7 +85,7 @@ html, body {
 
 body {
   background: var(--cor-fundo);
-  color: var(--cor-tinta);
+  color: #fffcff;
   font-family: var(--fonte-base);
   font-size: 16px;
   line-height: 1.45;
@@ -96,7 +110,9 @@ h1, h2, h3 {
   margin: 0 0 0.5rem;
 }
 
-/* Barra superior */
+/* Barra superior -- permanece clara mesmo com o fundo da página
+   escuro, funciona como separador visual fixo entre navegação e
+   conteúdo (mesma ideia da referência visual aprovada). */
 .barra-topo {
   background: var(--cor-superficie);
   border-bottom: 3px solid var(--cor-primaria);
@@ -149,9 +165,12 @@ h1, h2, h3 {
   max-width: var(--largura-app-administrativa);
 }
 
-/* Cartões */
+/* Cartões -- cor de texto explícita (não herdada do body), já que o
+   body agora é claro-sobre-escuro e o cartão precisa do padrão
+   original claro-sobre-branco independente de onde ele estiver. */
 .cartao {
   background: var(--cor-superficie);
+  color: var(--cor-tinta);
   border: 1px solid var(--cor-linha);
   border-radius: var(--raio);
   padding: 1.25rem;
@@ -211,7 +230,7 @@ h1, h2, h3 {
   color: var(--cor-tinta);
   border-color: var(--cor-linha);
 }
-.botao--secundaria:hover { background: var(--cor-fundo); }
+.botao--secundaria:hover { background: var(--cor-fundo-suave); }
 
 .botao--perigo {
   background: var(--cor-perigo);
@@ -314,7 +333,8 @@ h1, h2, h3 {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
-/* Mensagens de estado */
+/* Mensagens de estado -- fundo e texto sempre explícitos nas próprias
+   regras, então funcionam iguais em qualquer fundo por trás delas. */
 .aviso {
   border-radius: var(--raio-pequeno);
   padding: 0.75rem 1rem;
@@ -339,20 +359,28 @@ h1, h2, h3 {
 .selo--offline { background: var(--cor-atencao-fundo); color: #8a3608; }
 .selo--online { background: var(--cor-sucesso-fundo); color: var(--cor-primaria-escura); }
 
-/* Ação fixa no rodapé (mobile) */
+/* Ação fixa no rodapé (mobile) -- cor de texto explícita pelo mesmo
+   motivo do .cartao: fundo branco fixo, independente do fundo escuro
+   da página logo atrás dele. */
 .acao-fixa {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
   background: var(--cor-superficie);
+  color: var(--cor-tinta);
   border-top: 1px solid var(--cor-linha);
   padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom));
   z-index: 20;
 }
 
+/* Texto suave: usa a cor herdada do contexto (navy dentro de um
+   cartão branco, branco direto no fundo escuro da página) com
+   opacidade reduzida, em vez de uma cor fixa -- assim a mesma classe
+   funciona nos dois fundos sem precisar de uma variante extra. */
 .texto-suave {
-  color: var(--cor-tinta-suave);
+  color: inherit;
+  opacity: 0.7;
 }
 
 .centro {
@@ -368,7 +396,8 @@ h1, h2, h3 {
 /*
   Tabela administrativa (Gestão de Colaboradores, Gestão de Usuários):
   visual mais moderno que uma tabela HTML padrão, mas continua sendo
-  uma <table> semântica.
+  uma <table> semântica. Cor de texto explícita pelo mesmo motivo do
+  .cartao.
 */
 .tabela-wrap {
   overflow-x: auto;
@@ -381,6 +410,7 @@ h1, h2, h3 {
   width: 100%;
   border-collapse: collapse;
   background: var(--cor-superficie);
+  color: var(--cor-tinta);
   font-size: 0.92rem;
 }
 
@@ -392,7 +422,7 @@ h1, h2, h3 {
 }
 
 .tabela thead th {
-  background: var(--cor-fundo);
+  background: var(--cor-fundo-suave);
   color: var(--cor-tinta-suave);
   font-size: 0.78rem;
   text-transform: uppercase;
@@ -410,6 +440,6 @@ h1, h2, h3 {
 }
 @media (hover: hover) {
   .tabela tbody tr:hover {
-    background: var(--cor-fundo);
+    background: var(--cor-fundo-suave);
   }
 }
