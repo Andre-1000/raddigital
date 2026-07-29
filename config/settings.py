@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'storages',
     # Apps do Sistema RAD (PADROES_E_DIRETRIZES secao 4.3)
     'usuarios',
     'rad',
@@ -70,11 +71,33 @@ VALIDADE_TOKEN_DIAS = int(os.getenv('VALIDADE_TOKEN_DIAS', 7))
 LOGS_ATIVOS = os.getenv('LOGS_ATIVOS', 'False') == 'True'
 
 # Armazenamento de anexos (RG-ANX-007/008): o banco guarda so a
-# referencia (caminho) ao arquivo, nao o arquivo em si. Em desenvolvimento
-# local os arquivos ficam no filesystem local; em producao a Fase 2
-# (DT-PEND) definira o servidor de arquivos/object storage definitivo.
+# referencia (caminho) ao arquivo, nao o arquivo em si.
+#
+# 22/07/2026: o disco local do Render (plano free) e efemero -- toda
+# foto enviada e apagada a cada deploy/restart/"sono" do servico,
+# mesmo que o registro no banco continue existindo (RadAnexo aponta
+# pra um arquivo que sumiu). Por isso, quando as variaveis R2_* abaixo
+# estao definidas, o storage de anexos passa a ser o Cloudflare R2
+# (compativel com a API do S3) -- um servico de arquivos que nao
+# depende do disco do servidor, entao sobrevive a qualquer deploy.
+#
+# Sem essas variaveis definidas (ex.: rodando local), cai de volta pro
+# disco local de sempre -- nada muda no dia a dia de desenvolvimento.
 MEDIA_ROOT = BASE_DIR / 'media'
 MEDIA_URL = '/media/'
+
+AWS_ACCESS_KEY_ID = os.getenv('R2_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.getenv('R2_SECRET_ACCESS_KEY')
+AWS_STORAGE_BUCKET_NAME = os.getenv('R2_BUCKET_NAME')
+AWS_S3_ENDPOINT_URL = os.getenv('R2_ENDPOINT_URL')  # ex: https://<account_id>.r2.cloudflarestorage.com
+AWS_S3_CUSTOM_DOMAIN = os.getenv('R2_PUBLIC_DOMAIN')  # opcional, se configurar dominio publico no bucket
+AWS_DEFAULT_ACL = None  # R2 nao usa ACL do jeito que o S3 usa -- evita erro na hora do upload
+AWS_S3_FILE_OVERWRITE = False  # dois anexos com o mesmo nome de arquivo nao se sobrescrevem
+AWS_QUERYSTRING_AUTH = True  # URLs assinadas com validade -- os anexos nao sao publicos
+
+USANDO_ARMAZENAMENTO_EM_NUVEM = bool(
+    AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY and AWS_STORAGE_BUCKET_NAME and AWS_S3_ENDPOINT_URL
+)
 
 # RG-ANX-003/004/005: 2 fotos por categoria (Intervenção verificada /
 # Ação realizada), 1 PDF, 10MB por arquivo.
@@ -185,12 +208,22 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# WhiteNoise com hash+compressao so em producao -- em desenvolvimento
-# (DEBUG=True) exigiria rodar collectstatic a cada mudanca de CSS/JS
-# para o runserver enxergar o arquivo, o que atrapalha o ciclo normal
-# de desenvolvimento. runserver ja serve estatico direto sem isso.
+# STORAGES define dois motores separados: 'default' (anexos de RAD --
+# fotos/PDF, ver bloco R2 acima) e 'staticfiles' (CSS/JS do proprio
+# sistema, sempre local + WhiteNoise, nunca precisou ir pra nuvem).
+#
+# Em desenvolvimento (DEBUG=True) nenhum dos dois blocos abaixo roda --
+# Django usa os padroes de sempre (disco local pra tudo, runserver
+# serve estatico nativamente). So em producao (DEBUG=False) e' que
+# isso passa a valer, e mesmo assim 'default' so vira R2 se as
+# variaveis R2_* estiverem configuradas -- do contrario continua no
+# disco local do Render (com o problema de efemeridade ja conhecido).
 if not DEBUG:
     STORAGES = {
-        'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+        'default': (
+            {'BACKEND': 'storages.backends.s3.S3Storage'}
+            if USANDO_ARMAZENAMENTO_EM_NUVEM
+            else {'BACKEND': 'django.core.files.storage.FileSystemStorage'}
+        ),
         'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
     }
