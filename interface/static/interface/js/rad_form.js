@@ -82,6 +82,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     return {
       numero_os: null,
       numero_sa: '',
+      solicitante_sa: '',
       data_preenchimento: isoData,
       id_local_inicial: '',
       id_local_final: '',
@@ -371,10 +372,12 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   const campoNumeroOs = document.getElementById('campo-numero-os');
   const campoNumeroSa = document.getElementById('campo-numero-sa');
+  const campoSolicitanteSa = document.getElementById('campo-solicitante-sa');
   const campoData = document.getElementById('campo-data');
 
   campoNumeroOs.value = rascunho.numero_os || '';
   campoNumeroSa.value = rascunho.numero_sa || '';
+  campoSolicitanteSa.value = rascunho.solicitante_sa || '';
   campoData.value = rascunho.data_preenchimento || '';
 
   campoNumeroOs.addEventListener('input', function () {
@@ -384,6 +387,10 @@ document.addEventListener('DOMContentLoaded', async function () {
   campoNumeroSa.addEventListener('input', function () {
     campoNumeroSa.value = campoNumeroSa.value.replace(/\D/g, '').slice(0, 10);
     rascunho.numero_sa = campoNumeroSa.value;
+    salvarRascunhoAgora();
+  });
+  campoSolicitanteSa.addEventListener('input', function () {
+    rascunho.solicitante_sa = campoSolicitanteSa.value;
     salvarRascunhoAgora();
   });
   campoData.addEventListener('change', function () {
@@ -1262,6 +1269,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     return {
       numero_os: rascunho.numero_os,
       numero_sa: rascunho.numero_sa,
+      solicitante_sa: rascunho.solicitante_sa,
       data_preenchimento: rascunho.data_preenchimento,
       id_local_inicial: rascunho.id_local_inicial,
       id_local_final: rascunho.id_local_final,

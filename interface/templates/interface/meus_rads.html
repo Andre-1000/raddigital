@@ -59,7 +59,6 @@
           item.className = 'cartao cartao--interativo';
           item.style.display = 'block';
           item.style.textDecoration = 'none';
-          item.style.color = 'inherit';
           item.href = `/consultar/${rad.numero_rad}/`;
           const blocoDispositivo = RadAuth.temPerfil('supervisor', 'administrador')
             ? `<div><span class="texto-suave" style="font-size:0.78rem;">Dispositivo</span><br>${rad.dispositivo}</div>`

@@ -379,6 +379,7 @@ def processar_sincronizacao(payload, usuario, fotos_intervencao=None, fotos_acao
     dados_rad = {
         'numero_os': payload['numero_os'],
         'numero_sa': str(payload['numero_sa']),
+        'solicitante_sa': payload.get('solicitante_sa') or None,
         'data_preenchimento': payload['data_preenchimento'],
         'local_inicial': local_inicial,
         'local_final': local_final,

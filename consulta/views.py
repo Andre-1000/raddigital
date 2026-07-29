@@ -228,6 +228,21 @@ def _amv_resumo(rad):
     }
 
 
+def nome_de_quem_preencheu(rad):
+    """
+    Nome completo de quem preencheu o RAD (22/07/2026) -- usado no
+    export oficial no lugar de "RESPONSAVEL RAD" digitado manualmente.
+    Busca o nome no cadastro de colaboradores vinculado ao login que
+    sincronizou o RAD; se essa pessoa nao tiver cadastro de colaborador
+    (raro -- ex.: usuario criado direto pelo app de usuarios, sem
+    passar pelo cadastro de colaboradores), cai para o proprio login.
+    """
+    colaborador = getattr(rad.usuario, 'colaborador', None)
+    if colaborador and colaborador.nome:
+        return colaborador.nome
+    return rad.usuario.login
+
+
 @requer_token
 def mensagem_copiar(request, numero_rad):
     """
@@ -308,6 +323,40 @@ def exportar_docx(request, numero_rad):
         content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     )
     resposta['Content-Disposition'] = f'attachment; filename="{rad.numero_rad}.docx"'
+    return resposta
+
+
+@requer_token
+def exportar_docx_oficial(request, numero_rad):
+    """
+    GET /consulta/rads/<numero_rad>/docx-oficial/
+    Novo (22/07/2026): exporta no layout do documento RDA oficial da
+    TRIVIA (RDA_Relatorio_Trivia_Ajustado_original.docx), usado como
+    molde. Mesma regra de acesso das outras exportacoes.
+    """
+    try:
+        rad = Rad.objects.select_related(
+            'local_inicial', 'local_final', 'tipo_manutencao', 'usuario',
+            'motivo_atraso_inicio', 'motivo_atraso_termino',
+        ).prefetch_related(
+            'servicos__servico', 'colaboradores', 'anexos', 'linhas', 'vias', 'equipes'
+        ).get(numero_rad=numero_rad)
+    except Rad.DoesNotExist:
+        return JsonResponse({'erro': 'RAD nao encontrado.'}, status=404)
+
+    if not _pode_exportar(request.usuario_rad, rad):
+        return JsonResponse({'erro': 'Acesso nao autorizado.'}, status=403)
+
+    from django.http import HttpResponse
+
+    from rad.exportacao_oficial import gerar_docx_oficial_bytes
+
+    docx_bytes = gerar_docx_oficial_bytes(rad)
+    resposta = HttpResponse(
+        docx_bytes,
+        content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    )
+    resposta['Content-Disposition'] = f'attachment; filename="{rad.numero_rad}_oficial.docx"'
     return resposta
 
 
@@ -399,6 +448,7 @@ def detalhe_rad(request, numero_rad):
                 'numero_rad': rad.numero_rad,
                 'numero_os': rad.numero_os,
                 'numero_sa': rad.numero_sa,
+                'solicitante_sa': rad.solicitante_sa,
                 'numero_execucao': rad.numero_execucao,
                 'status': rad.status,
                 'data_preenchimento': rad.data_preenchimento.isoformat(),
@@ -444,6 +494,7 @@ def detalhe_rad(request, numero_rad):
                 'amv': _amv_resumo(rad),
                 'anexos': _anexos_resumo(rad),
                 'login_usuario': rad.usuario.login,
+                'preenchido_por_nome': nome_de_quem_preencheu(rad),
                 'dispositivo': rad.get_dispositivo_display(),
                 'data_sincronizacao': rad.data_sincronizacao.isoformat(),
                 'justificativa_cancelamento': rad.justificativa_cancelamento,

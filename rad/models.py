@@ -53,6 +53,10 @@ class Rad(models.Model):
         max_length=10,
         help_text='N. SA. Numerico, ate 10 caracteres. Campo obrigatorio, independente da OS.',
     )
+    solicitante_sa = models.TextField(
+        null=True, blank=True,
+        help_text='Quem solicitou a SA. Texto livre, sem limite de caracteres (22/07/2026).',
+    )
     numero_execucao = models.IntegerField(
         help_text='Ordem de execucao dentro da mesma OS. Gerado atomicamente (RG-IDENT-008/009).'
     )

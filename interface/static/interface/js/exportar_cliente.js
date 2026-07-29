@@ -70,6 +70,7 @@ const ExportarCliente = (function () {
       ['data_preenchimento', 'Data', formatarDataBr(rascunho.data_preenchimento)],
       ['numero_os', 'OS', ouNA(rascunho.numero_os)],
       ['numero_sa', 'N° SA', ouNA(rascunho.numero_sa)],
+      ['solicitante_sa', 'Solicitante SA', ouNA(rascunho.solicitante_sa)],
       ['numero_falha', 'Falha', ouNA(rascunho.numero_falha)],
       ['local_inicial', 'Local', `${local(rascunho.id_local_inicial)}/${local(rascunho.id_local_final)}`],
       ['linhas', 'Linha', listaOuNA(nomesLinhas)],

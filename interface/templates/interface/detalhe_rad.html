@@ -78,6 +78,7 @@
       <button type="button" class="botao botao--secundaria" id="botao-copiar-mensagem">Copiar mensagem</button>
       <button type="button" class="botao botao--secundaria" id="botao-baixar-pdf">Baixar PDF</button>
       <button type="button" class="botao botao--secundaria" id="botao-baixar-docx">Baixar Word</button>
+      <button type="button" class="botao botao--primaria" id="botao-baixar-docx-oficial">Baixar Word (layout oficial TRIVIA)</button>
     </div>
   </div>
 
@@ -135,6 +136,7 @@
         campos: {
           numero_os: 'OS',
           numero_sa: 'N° SA',
+          solicitante_sa: 'Solicitante SA',
           numero_execucao: 'N° Execução',
           data_preenchimento: 'Data',
         },
@@ -204,7 +206,8 @@
       {
         titulo: 'Registro',
         campos: {
-          login_usuario: 'Preenchido por',
+          login_usuario: 'Preenchido por (login)',
+          preenchido_por_nome: 'Preenchido por (nome)',
           dispositivo: 'Preenchido via',
           data_sincronizacao: 'Sincronizado em',
         },
@@ -419,6 +422,9 @@
     });
     document.getElementById('botao-baixar-docx').addEventListener('click', function () {
       baixarArquivoAutenticado(`/consulta/rads/${encodeURIComponent(NUMERO_RAD)}/docx/`, `${NUMERO_RAD}.docx`);
+    });
+    document.getElementById('botao-baixar-docx-oficial').addEventListener('click', function () {
+      baixarArquivoAutenticado(`/consulta/rads/${encodeURIComponent(NUMERO_RAD)}/docx-oficial/`, `${NUMERO_RAD}_oficial.docx`);
     });
 
     // ---- Cancelamento (RG-CAN-001 a 012) --------------------------------
