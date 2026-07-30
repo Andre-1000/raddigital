@@ -244,6 +244,10 @@ def _criar_relacionamentos(rad, payload):
             ur_mch=mch.ur,
             local_mch=mch.local_amv,
             linha_mch=mch.linha,
+            # 22/07/2026: descricao livre quando "Outros" e selecionado
+            # em Tipo de Defeito / Acoes (mesmo padrao de outros_servico_desc).
+            desc_outros_tipo_defeito=amv.get('desc_outros_tipo_defeito') or None,
+            desc_outros_acao=amv.get('desc_outros_acao') or None,
         )
         RadAmvDefeito.objects.bulk_create(
             [

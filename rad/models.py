@@ -335,6 +335,11 @@ class RadAmv(models.Model):
     ur_mch = models.CharField(max_length=50)
     local_mch = models.CharField(max_length=100)
     linha_mch = models.CharField(max_length=10)
+    # 22/07/2026: preenchidos so quando "Outros" e selecionado em Tipo
+    # de Defeito / Acoes (ver catalogos.models.CatTipoDefeitoAmv/
+    # CatAcaoAmv.requer_descricao) -- mesmo padrao de outros_servico_desc.
+    desc_outros_tipo_defeito = models.TextField(null=True, blank=True)
+    desc_outros_acao = models.TextField(null=True, blank=True)
 
     class Meta:
         db_table = 'rad_amv'

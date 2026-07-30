@@ -56,8 +56,10 @@ def listar_todos(request):
             )
         ),
         'tipos_defeito_amv': list(
-            CatTipoDefeitoAmv.objects.filter(ativo=True).values('id', 'nome')
+            CatTipoDefeitoAmv.objects.filter(ativo=True).values('id', 'nome', 'requer_descricao')
         ),
-        'acoes_amv': list(CatAcaoAmv.objects.filter(ativo=True).values('id', 'nome')),
+        'acoes_amv': list(
+            CatAcaoAmv.objects.filter(ativo=True).values('id', 'nome', 'requer_descricao')
+        ),
     }
     return JsonResponse(dados)

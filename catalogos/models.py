@@ -199,6 +199,9 @@ class CatTipoDefeitoAmv(models.Model):
 
     nome = models.CharField(max_length=100, unique=True)
     ativo = models.BooleanField(default=True)
+    requer_descricao = models.BooleanField(
+        default=False, help_text='TRUE somente para Outros (22/07/2026).'
+    )
 
     class Meta:
         db_table = 'cat_tipos_defeito_amv'
@@ -215,6 +218,9 @@ class CatAcaoAmv(models.Model):
 
     nome = models.CharField(max_length=100, unique=True)
     ativo = models.BooleanField(default=True)
+    requer_descricao = models.BooleanField(
+        default=False, help_text='TRUE somente para Outros (22/07/2026).'
+    )
 
     class Meta:
         db_table = 'cat_acoes_amv'

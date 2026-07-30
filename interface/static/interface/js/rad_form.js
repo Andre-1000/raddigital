@@ -21,8 +21,10 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
   }
   if (!rascunho.amv) {
-    rascunho.amv = { id_mch: null, tipos_defeito: [], acoes: [] };
+    rascunho.amv = { id_mch: null, tipos_defeito: [], acoes: [], desc_outros_tipo_defeito: '', desc_outros_acao: '' };
   }
+  if (!('desc_outros_tipo_defeito' in rascunho.amv)) rascunho.amv.desc_outros_tipo_defeito = '';
+  if (!('desc_outros_acao' in rascunho.amv)) rascunho.amv.desc_outros_acao = '';
   if (!rascunho.anexos) {
     rascunho.anexos = { fotos_intervencao_verificada: [], fotos_acao_realizada: [], pdf: [] };
   }
@@ -102,8 +104,6 @@ document.addEventListener('DOMContentLoaded', async function () {
       data_hr_inicio: isoData,
       hora_real_termino: '',
       data_hr_termino: isoData,
-      id_motivo_atraso_inicio: null,
-      desc_motivo_atraso_inicio: '',
       id_motivo_atraso_termino: null,
       desc_motivo_atraso_termino: '',
       servicos: [],
@@ -113,7 +113,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       terceiros_num_ajudantes: '',
       terceiros_num_motorista: '',
       terceiros_volume: '',
-      amv: { id_mch: null, tipos_defeito: [], acoes: [] },
+      amv: { id_mch: null, tipos_defeito: [], acoes: [], desc_outros_tipo_defeito: '', desc_outros_acao: '' },
       colaboradores: [],
       anexos: {
         fotos_intervencao_verificada: [],
@@ -141,10 +141,6 @@ document.addEventListener('DOMContentLoaded', async function () {
   }
 
   function atualizarEstadoBotaoExportar() {
-    // Os botoes ficam sempre clicaveis (nao usamos mais .disabled) --
-    // so o estilo visual muda. Ao clicar com obrigatorios faltando,
-    // mostramos exatamente quais campos faltam em vez de bloquear
-    // silenciosamente o clique.
     const habilitado = ExportarCliente.camposObrigatoriosPreenchidos(rascunho);
     const botaoExportar = document.getElementById('botao-exportar');
     const botaoCopiar = document.getElementById('botao-copiar-mensagem');
@@ -173,10 +169,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     return local ? `${local.sigla} - ${local.nome}` : '';
   }
 
-  // Mesmo padrao visual da busca de colaborador (botoes clicaveis
-  // abaixo do campo, sem depender do <datalist> nativo do navegador --
-  // o datalist nao tem estilo controlavel pelo CSS do sistema e podia
-  // aparecer com fundo escuro dependendo do navegador/SO).
   function configurarBuscaLocal(inputEl, resultadosEl, chaveRascunho) {
     if (rascunho[chaveRascunho]) {
       inputEl.value = rotuloDoLocal(rascunho[chaveRascunho]);
@@ -192,9 +184,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     inputEl.addEventListener('input', function () {
       const termo = inputEl.value.trim().toLowerCase();
       resultadosEl.innerHTML = '';
-
-      // Campo alterado manualmente sem selecionar um resultado -- nao
-      // aceita valor livre, precisa escolher da lista.
       rascunho[chaveRascunho] = '';
 
       if (!termo) return;
@@ -227,8 +216,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
 
     inputEl.addEventListener('blur', function () {
-      // Pequeno atraso para o clique no resultado (blur) registrar
-      // antes de fechar a lista.
       setTimeout(function () {
         resultadosEl.innerHTML = '';
       }, 150);
@@ -414,33 +401,24 @@ document.addEventListener('DOMContentLoaded', async function () {
   const valorDuracaoProgramada = document.getElementById('valor-duracao-programada');
   const valorDuracaoReal = document.getElementById('valor-duracao-real');
 
-  const grupoAtrasoInicio = document.getElementById('campo-grupo-atraso-inicio');
   const grupoAtrasoTermino = document.getElementById('campo-grupo-atraso-termino');
-  const selectMotivoInicio = document.getElementById('campo-motivo-atraso-inicio');
   const selectMotivoTermino = document.getElementById('campo-motivo-atraso-termino');
-  const grupoDescInicio = document.getElementById('campo-grupo-desc-atraso-inicio');
   const grupoDescTermino = document.getElementById('campo-grupo-desc-atraso-termino');
-  const campoDescInicio = document.getElementById('campo-desc-atraso-inicio');
   const campoDescTermino = document.getElementById('campo-desc-atraso-termino');
 
   const hojeIso = new Date().toISOString().slice(0, 10);
   campoDataHpInicio.max = hojeIso;
   campoDataHrInicio.max = hojeIso;
 
-  [
-    ['id_motivo_atraso_inicio', selectMotivoInicio],
-    ['id_motivo_atraso_termino', selectMotivoTermino],
-  ].forEach(function ([_chave, selectEl]) {
-    const opcaoVazia = document.createElement('option');
-    opcaoVazia.value = '';
-    opcaoVazia.textContent = 'Selecione…';
-    selectEl.appendChild(opcaoVazia);
-    motivosAtraso.forEach(function (motivo) {
-      const opcao = document.createElement('option');
-      opcao.value = motivo.id;
-      opcao.textContent = motivo.nome;
-      selectEl.appendChild(opcao);
-    });
+  const opcaoVaziaMotivoTermino = document.createElement('option');
+  opcaoVaziaMotivoTermino.value = '';
+  opcaoVaziaMotivoTermino.textContent = 'Selecione…';
+  selectMotivoTermino.appendChild(opcaoVaziaMotivoTermino);
+  motivosAtraso.forEach(function (motivo) {
+    const opcao = document.createElement('option');
+    opcao.value = motivo.id;
+    opcao.textContent = motivo.nome;
+    selectMotivoTermino.appendChild(opcao);
   });
 
   function nomeDoMotivo(lista, id) {
@@ -514,26 +492,14 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     const ocultarAtrasos = tipoManutencaoEhFalha();
-    let atrasoInicio = false;
     let atrasoTermino = false;
 
-    if (!ocultarAtrasos && dtProgInicio && dtRealInicio) {
-      atrasoInicio = RegrasHorario.calcularAtrasoInicio(dtProgInicio, dtRealInicio);
-    }
     if (!ocultarAtrasos && dtProgTermino && dtRealTermino) {
       atrasoTermino = RegrasHorario.calcularAtrasoTermino(dtProgTermino, dtRealTermino);
     }
 
-    grupoAtrasoInicio.style.display = atrasoInicio ? '' : 'none';
     grupoAtrasoTermino.style.display = atrasoTermino ? '' : 'none';
 
-    if (!atrasoInicio) {
-      rascunho.id_motivo_atraso_inicio = null;
-      rascunho.desc_motivo_atraso_inicio = '';
-      selectMotivoInicio.value = '';
-      campoDescInicio.value = '';
-      grupoDescInicio.style.display = 'none';
-    }
     if (!atrasoTermino) {
       rascunho.id_motivo_atraso_termino = null;
       rascunho.desc_motivo_atraso_termino = '';
@@ -581,21 +547,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     salvarRascunhoAgora();
   });
 
-  selectMotivoInicio.addEventListener('change', function () {
-    rascunho.id_motivo_atraso_inicio = selectMotivoInicio.value ? Number(selectMotivoInicio.value) : null;
-    const ehOutros = nomeDoMotivo(motivosAtraso, selectMotivoInicio.value) === 'Outros';
-    grupoDescInicio.style.display = ehOutros ? '' : 'none';
-    if (!ehOutros) {
-      rascunho.desc_motivo_atraso_inicio = '';
-      campoDescInicio.value = '';
-    }
-    salvarRascunhoAgora();
-  });
-  campoDescInicio.addEventListener('input', function () {
-    rascunho.desc_motivo_atraso_inicio = campoDescInicio.value;
-    salvarRascunhoAgora();
-  });
-
   selectMotivoTermino.addEventListener('change', function () {
     rascunho.id_motivo_atraso_termino = selectMotivoTermino.value ? Number(selectMotivoTermino.value) : null;
     const ehOutros = nomeDoMotivo(motivosAtraso, selectMotivoTermino.value) === 'Outros';
@@ -618,10 +569,6 @@ document.addEventListener('DOMContentLoaded', async function () {
   const tiposDefeitoAmv = await RadDB.obterCatalogo('tipos_defeito_amv');
   const acoesAmv = await RadDB.obterCatalogo('acoes_amv');
 
-  // Ordem alfabetica, com "Outros" sempre por ultimo (nao importa a
-  // ordem que veio do catalogo/banco) -- "Outros" e a opcao de escape
-  // que abre a descricao livre, entao faz sentido ficar visualmente
-  // separada do resto da lista ordenada.
   function ordenarComOutrosPorUltimo(lista) {
     const semOutros = lista.filter((item) => item.nome !== 'Outros');
     const outros = lista.filter((item) => item.nome === 'Outros');
@@ -664,9 +611,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
   }
 
-  // Modal "O que é cada serviço?" -- substitui o antigo "O que é
-  // isso?" por item: um unico botao, o usuario escolhe qual serviço
-  // quer entender num select, e a explicacao aparece embaixo.
   const modalSobreServicos = document.getElementById('modal-sobre-servicos');
   const selectServicoExplicacao = document.getElementById('select-servico-explicacao');
   const textoExplicacaoServico = document.getElementById('texto-explicacao-servico');
@@ -731,6 +675,42 @@ document.addEventListener('DOMContentLoaded', async function () {
     detalhesMch.style.display = 'flex';
   }
 
+  const campoGrupoOutrosDefeito = document.getElementById('campo-grupo-outros-defeito');
+  const campoDescOutrosDefeito = document.getElementById('campo-desc-outros-defeito');
+  const campoGrupoOutrosAcao = document.getElementById('campo-grupo-outros-acao');
+  const campoDescOutrosAcao = document.getElementById('campo-desc-outros-acao');
+
+  campoDescOutrosDefeito.value = rascunho.amv.desc_outros_tipo_defeito || '';
+  campoDescOutrosDefeito.addEventListener('input', function () {
+    rascunho.amv.desc_outros_tipo_defeito = campoDescOutrosDefeito.value;
+    salvarRascunhoAgora();
+  });
+  campoDescOutrosAcao.value = rascunho.amv.desc_outros_acao || '';
+  campoDescOutrosAcao.addEventListener('input', function () {
+    rascunho.amv.desc_outros_acao = campoDescOutrosAcao.value;
+    salvarRascunhoAgora();
+  });
+
+  function atualizarVisibilidadeOutrosAmv() {
+    const defeitoOutrosSelecionado = tiposDefeitoAmv.some(
+      (t) => t.requer_descricao && rascunho.amv.tipos_defeito.includes(t.id)
+    );
+    campoGrupoOutrosDefeito.style.display = defeitoOutrosSelecionado ? '' : 'none';
+    if (!defeitoOutrosSelecionado) {
+      rascunho.amv.desc_outros_tipo_defeito = '';
+      campoDescOutrosDefeito.value = '';
+    }
+
+    const acaoOutrosSelecionada = acoesAmv.some(
+      (a) => a.requer_descricao && rascunho.amv.acoes.includes(a.id)
+    );
+    campoGrupoOutrosAcao.style.display = acaoOutrosSelecionada ? '' : 'none';
+    if (!acaoOutrosSelecionada) {
+      rascunho.amv.desc_outros_acao = '';
+      campoDescOutrosAcao.value = '';
+    }
+  }
+
   function renderizarBlocoAmv() {
     campoMch.value = rascunho.amv.id_mch ? (mchs.find((m) => m.id === rascunho.amv.id_mch) || {}).identificacao || '' : '';
     preencherDetalhesMch(rascunho.amv.id_mch);
@@ -739,14 +719,21 @@ document.addEventListener('DOMContentLoaded', async function () {
       document.getElementById('lista-tipos-defeito'),
       tiposDefeitoAmv.map((t) => ({ valor: t.id, rotulo: t.nome })),
       rascunho.amv.tipos_defeito,
-      salvarRascunhoAgora
+      function () {
+        atualizarVisibilidadeOutrosAmv();
+        salvarRascunhoAgora();
+      }
     );
     renderizarListaCheckbox(
       document.getElementById('lista-acoes-amv'),
       acoesAmv.map((a) => ({ valor: a.id, rotulo: a.nome })),
       rascunho.amv.acoes,
-      salvarRascunhoAgora
+      function () {
+        atualizarVisibilidadeOutrosAmv();
+        salvarRascunhoAgora();
+      }
     );
+    atualizarVisibilidadeOutrosAmv();
   }
 
   const blocoTerceiros = document.getElementById('bloco-terceiros');
@@ -773,17 +760,12 @@ document.addEventListener('DOMContentLoaded', async function () {
       rascunho.amv.id_mch = null;
       rascunho.amv.tipos_defeito.length = 0;
       rascunho.amv.acoes.length = 0;
+      rascunho.amv.desc_outros_tipo_defeito = '';
+      rascunho.amv.desc_outros_acao = '';
       campoMch.value = '';
       detalhesMch.style.display = 'none';
     }
 
-    // Bloco Terceiros: aparece se QUALQUER servico selecionado exigir
-    // (Recolhimento de Lixo, Limpeza de Canaleta, Capina Quimica,
-    // Rocada/Poda). Dentro dele, "N Op Maquina" e "Volume" so aparecem
-    // se algum dos servicos selecionados especificamente os exigir --
-    // os outros 3 campos (Encarregados/Ajudantes/Motorista) sao
-    // comuns aos quatro servicos, entao ficam sempre visiveis quando
-    // o bloco aparece.
     if (servicoRequerTerceirosSelecionado()) {
       blocoTerceiros.style.display = '';
       campoGrupoTerceirosOpMaquina.style.display = algumServicoSelecionadoTem('terceiros_tem_op_maquina') ? '' : 'none';
@@ -821,8 +803,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     salvarRascunhoAgora();
   });
 
-  // Campos numericos do bloco Terceiros -- ate 3 digitos, sem
-  // permitir nada alem de numero (mesmo padrao usado em Km/Poste).
   function ligarCampoNumericoTerceiros(elementoId, chaveRascunho) {
     const elemento = document.getElementById(elementoId);
     elemento.value = rascunho[chaveRascunho] || '';
@@ -1104,10 +1084,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
   }
 
-  // RG-RESP: sugere nomes da mesma lista de colaboradores/usuarios
-  // (colaboradoresCadastro, ja carregada no Bloco 4), no mesmo padrao
-  // visual da busca de colaborador/local -- mas aqui o campo continua
-  // aceitando texto livre (nao e FK), a lista e so uma sugestao.
   function configurarSugestaoResponsavel(inputEl, resultadosEl, chaveRascunho) {
     inputEl.value = rascunho[chaveRascunho] || '';
 
@@ -1289,8 +1265,6 @@ document.addEventListener('DOMContentLoaded', async function () {
       data_hr_inicio: rascunho.data_hr_inicio,
       hora_real_termino: rascunho.hora_real_termino,
       data_hr_termino: rascunho.data_hr_termino,
-      id_motivo_atraso_inicio: rascunho.id_motivo_atraso_inicio,
-      desc_motivo_atraso_inicio: rascunho.desc_motivo_atraso_inicio,
       id_motivo_atraso_termino: rascunho.id_motivo_atraso_termino,
       desc_motivo_atraso_termino: rascunho.desc_motivo_atraso_termino,
       servicos: rascunho.servicos,

@@ -172,19 +172,10 @@
         </div>
       </div>
 
+      <!-- Atraso no INICIO nao e mais mostrado (decisao de negocio,
+           22/07/2026) -- so o atraso no TERMINO continua sendo
+           identificado e exibido. -->
       <div id="bloco-atrasos">
-        <div class="campo" id="campo-grupo-atraso-inicio" style="display:none;">
-          <span class="selo selo--offline">Atraso identificado no início</span>
-          <div style="margin-top:0.6rem;">
-            <label for="campo-motivo-atraso-inicio">Motivo do atraso no início <span class="texto-suave">(opcional)</span></label>
-            <select id="campo-motivo-atraso-inicio"></select>
-          </div>
-          <div id="campo-grupo-desc-atraso-inicio" style="display:none; margin-top:0.6rem;">
-            <label for="campo-desc-atraso-inicio">Descreva o motivo</label>
-            <textarea id="campo-desc-atraso-inicio" maxlength="500"></textarea>
-          </div>
-        </div>
-
         <div class="campo" id="campo-grupo-atraso-termino" style="display:none;">
           <span class="selo selo--offline">Atraso identificado no término</span>
           <div style="margin-top:0.6rem;">
@@ -269,11 +260,19 @@
       <div class="campo">
         <label>Tipo de Defeito</label>
         <div class="pilha" id="lista-tipos-defeito"></div>
+        <div id="campo-grupo-outros-defeito" style="display:none; margin-top:0.6rem;">
+          <label for="campo-desc-outros-defeito">Descreva o tipo de defeito</label>
+          <textarea id="campo-desc-outros-defeito" maxlength="500"></textarea>
+        </div>
       </div>
 
       <div class="campo">
         <label>Ações</label>
         <div class="pilha" id="lista-acoes-amv"></div>
+        <div id="campo-grupo-outros-acao" style="display:none; margin-top:0.6rem;">
+          <label for="campo-desc-outros-acao">Descreva a ação</label>
+          <textarea id="campo-desc-outros-acao" maxlength="500"></textarea>
+        </div>
       </div>
     </div>
 
