@@ -73,12 +73,14 @@
 
   <div class="cartao" id="cartao-exportar" style="margin-top:1rem; display:none;">
     <h2 class="titulo-secao">Exportar</h2>
+    <p class="texto-suave" style="font-size:0.8rem; margin-top:-0.5rem;">
+      Layout oficial da TRIVIA.
+    </p>
     <div id="aviso-exportar"></div>
     <div class="pilha">
       <button type="button" class="botao botao--secundaria" id="botao-copiar-mensagem">Copiar mensagem</button>
-      <button type="button" class="botao botao--secundaria" id="botao-baixar-pdf">Baixar PDF</button>
-      <button type="button" class="botao botao--secundaria" id="botao-baixar-docx">Baixar Word</button>
-      <button type="button" class="botao botao--primaria" id="botao-baixar-docx-oficial">Baixar Word (layout oficial TRIVIA)</button>
+      <button type="button" class="botao botao--primaria" id="botao-baixar-docx-oficial">Baixar Word</button>
+      <button type="button" class="botao botao--secundaria" id="botao-baixar-pdf-oficial" style="display:none;">Baixar PDF</button>
     </div>
   </div>
 
@@ -194,6 +196,15 @@
         },
       },
       {
+        titulo: 'Descrições das Fotos (VPM001)',
+        campos: {
+          desc_foto_1: 'Descrição foto 1',
+          desc_foto_2: 'Descrição foto 2',
+          desc_foto_3: 'Descrição foto 3',
+          desc_foto_4: 'Descrição foto 4',
+        },
+      },
+      {
         titulo: 'Responsáveis e Detalhes',
         campos: {
           responsavel_atividade: 'Responsável Atividade',
@@ -226,8 +237,8 @@
       container.innerHTML = '';
 
       SECOES.forEach(function (secao) {
-        const chavesPresentes = Object.keys(secao.campos).filter((chave) => chave in dados);
-        if (chavesPresentes.length === 0) return; // secao inteira desabilitada (app configuracoes)
+        const chavesPresentes = Object.keys(secao.campos).filter((chave) => chave in dados && dados[chave]);
+        if (chavesPresentes.length === 0) return; // secao inteira desabilitada, ou (VPM001) sem nenhuma descricao preenchida
 
         const titulo = document.createElement('h2');
         titulo.className = 'titulo-secao';
@@ -359,6 +370,12 @@
 
         if (dados.status !== 'cancelado') {
           document.getElementById('cartao-exportar').style.display = '';
+          // 22/07/2026: PDF so aparece se o Administrador tiver
+          // habilitado em Configuracoes (exige LibreOffice no
+          // servidor, ainda nao instalado -- ver rad/exportacao_oficial.py).
+          if (dados.exportacao_pdf_disponivel) {
+            document.getElementById('botao-baixar-pdf-oficial').style.display = '';
+          }
         }
         if (dados.pode_cancelar) {
           document.getElementById('cartao-cancelar').style.display = '';
@@ -400,7 +417,8 @@
       try {
         const resposta = await RadAuth.requisicaoAutenticada(url);
         if (!resposta.ok) {
-          avisoExportar.innerHTML = '<div class="aviso aviso--erro">Não foi possível gerar o arquivo.</div>';
+          const corpo = await resposta.json().catch(function () { return {}; });
+          avisoExportar.innerHTML = `<div class="aviso aviso--erro">${corpo.erro || 'Não foi possível gerar o arquivo.'}</div>`;
           return;
         }
         const blob = await resposta.blob();
@@ -417,14 +435,11 @@
       }
     }
 
-    document.getElementById('botao-baixar-pdf').addEventListener('click', function () {
-      baixarArquivoAutenticado(`/consulta/rads/${encodeURIComponent(NUMERO_RAD)}/pdf/`, `${NUMERO_RAD}.pdf`);
-    });
-    document.getElementById('botao-baixar-docx').addEventListener('click', function () {
-      baixarArquivoAutenticado(`/consulta/rads/${encodeURIComponent(NUMERO_RAD)}/docx/`, `${NUMERO_RAD}.docx`);
-    });
     document.getElementById('botao-baixar-docx-oficial').addEventListener('click', function () {
-      baixarArquivoAutenticado(`/consulta/rads/${encodeURIComponent(NUMERO_RAD)}/docx-oficial/`, `${NUMERO_RAD}_oficial.docx`);
+      baixarArquivoAutenticado(`/consulta/rads/${encodeURIComponent(NUMERO_RAD)}/docx-oficial/`, `${NUMERO_RAD}.docx`);
+    });
+    document.getElementById('botao-baixar-pdf-oficial').addEventListener('click', function () {
+      baixarArquivoAutenticado(`/consulta/rads/${encodeURIComponent(NUMERO_RAD)}/pdf-oficial/`, `${NUMERO_RAD}.pdf`);
     });
 
     // ---- Cancelamento (RG-CAN-001 a 012) --------------------------------

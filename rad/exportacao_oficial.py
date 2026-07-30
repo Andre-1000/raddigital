@@ -3,7 +3,8 @@ Exportacao no layout do documento RDA oficial da TRIVIA
 (RDA_Relatorio_Trivia_Ajustado_original.docx, fornecido pelo cliente
 em 22/07/2026), usado como molde exato (mesmo cabecalho, cores, caixas
 de selecao) em vez do layout simples gerado no navegador
-(exportar_cliente.js / rad/exportacao.py).
+(exportar_cliente.js), que so serve para RASCUNHOS locais ainda nao
+sincronizados.
 
 O molde tokenizado fica em rad/templates_export/rda_oficial_template.docx
 -- e uma copia do documento original com os valores de exemplo trocados
@@ -14,6 +15,10 @@ original tinha uma lista fixa de 19 itens especifica de outro
 contexto, que nao existe no cadastro atual -- ver conversa de
 22/07/2026) e insere as fotos anexadas nos espacos do "Relatorio
 Fotografico".
+
+22/07/2026: este e' o UNICO formato de exportacao pos-sincronizacao do
+sistema agora (Word). O antigo layout simples (rad/exportacao.py) foi
+descontinuado -- ver consulta/views.py.
 
 Limitacoes conhecidas (a resolver com o cliente):
 - "RESPONSAVEL RAD" e preenchido automaticamente com o nome de quem
@@ -327,3 +332,74 @@ def _inserir_foto_temp(celula, arquivo_django):
         return  # arquivo corrompido -- nao trava a exportacao inteira por causa de 1 foto
     buffer_imagem.seek(0)
     _inserir_foto_na_celula(celula, buffer_imagem)
+
+
+class PdfNaoDisponivelError(Exception):
+    """
+    Levantada quando a exportacao em PDF e chamada mas o servidor nao
+    tem o LibreOffice instalado. A view (consulta/views.py) converte
+    isso em uma resposta HTTP 503 com mensagem clara -- nunca deve
+    virar um erro 500 sem explicacao para quem esta usando o sistema.
+    """
+
+
+def gerar_pdf_oficial_bytes(rad):
+    """
+    Gera o mesmo layout oficial em PDF, convertendo o .docx (ver
+    gerar_docx_oficial_bytes) com o LibreOffice em modo headless.
+
+    22/07/2026: o servidor de producao (Render, plano free, 512MB RAM)
+    ainda NAO tem o LibreOffice instalado -- decisao consciente, ver
+    conversa com o cliente: cada conversao consome ~150-300MB de RAM,
+    o que arrisca derrubar o servico inteiro (OOM) se duas pessoas
+    exportarem ao mesmo tempo. Por isso a chamada a esta funcao fica
+    atras de um interruptor em Configuracoes
+    (CampoFormulario.chave='exportar_pdf_oficial'), desligado por
+    padrao -- ver consulta/views.py::exportar_pdf_oficial.
+
+    Esta funcao em si ja esta pronta para quando o LibreOffice for
+    instalado (ex.: apos migrar para um plano com mais RAM/disco): so
+    precisa adicionar o pacote do LibreOffice ao Dockerfile e ligar o
+    interruptor na tela de Configuracoes -- nenhum outro codigo
+    precisa mudar.
+
+    Levanta PdfNaoDisponivelError se o binario 'soffice' nao existir
+    no PATH do servidor (import tardio de subprocess/shutil para nao
+    pesar a inicializacao do modulo quando o PDF nunca e chamado).
+    """
+    import shutil
+    import subprocess
+    import tempfile
+
+    if shutil.which('soffice') is None:
+        raise PdfNaoDisponivelError(
+            'O LibreOffice (comando "soffice") nao esta instalado neste servidor. '
+            'A exportacao em PDF nao pode ser gerada ate ele ser instalado.'
+        )
+
+    docx_bytes = gerar_docx_oficial_bytes(rad)
+
+    with tempfile.TemporaryDirectory() as pasta_temporaria:
+        caminho_docx = os.path.join(pasta_temporaria, f'{rad.numero_rad}.docx')
+        with open(caminho_docx, 'wb') as arquivo:
+            arquivo.write(docx_bytes)
+
+        resultado = subprocess.run(
+            [
+                'soffice', '--headless', '--convert-to', 'pdf',
+                '--outdir', pasta_temporaria, caminho_docx,
+            ],
+            capture_output=True,
+            timeout=55,  # gunicorn --timeout 60 -- precisa terminar antes disso
+        )
+        if resultado.returncode != 0:
+            raise PdfNaoDisponivelError(
+                f'A conversão para PDF falhou: {resultado.stderr.decode(errors="ignore")[:300]}'
+            )
+
+        caminho_pdf = os.path.join(pasta_temporaria, f'{rad.numero_rad}.pdf')
+        if not os.path.exists(caminho_pdf):
+            raise PdfNaoDisponivelError('A conversão para PDF não produziu um arquivo de saída.')
+
+        with open(caminho_pdf, 'rb') as arquivo:
+            return arquivo.read()

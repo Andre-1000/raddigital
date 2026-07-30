@@ -49,6 +49,17 @@ def tela_gerenciar_usuarios(request):
     return render(request, 'interface/gerenciar_usuarios.html')
 
 
+def tela_configuracoes(request):
+    """
+    Tela "Configurações de Campos" (22/07/2026) -- exclusiva do
+    Administrador. Alternar habilitado/obrigatorio de cada campo do
+    formulario. O acesso e checado no proprio JS da tela (mesmo padrao
+    de tela_consulta) -- o guard real esta nos endpoints da API
+    (configuracoes/views.py, @requer_perfil(ADMINISTRADOR)).
+    """
+    return render(request, 'interface/configuracoes.html')
+
+
 def tela_novo_rad(request):
     return render(request, 'interface/novo_rad.html')
 

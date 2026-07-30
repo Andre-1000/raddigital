@@ -108,6 +108,10 @@ document.addEventListener('DOMContentLoaded', async function () {
       desc_motivo_atraso_termino: '',
       servicos: [],
       outros_servico_desc: '',
+      desc_foto_1: '',
+      desc_foto_2: '',
+      desc_foto_3: '',
+      desc_foto_4: '',
       terceiros_num_encarregados: '',
       terceiros_num_op_maquina: '',
       terceiros_num_ajudantes: '',
@@ -335,9 +339,47 @@ document.addEventListener('DOMContentLoaded', async function () {
   }
   atualizarVisibilidadeNumeroFalha();
 
+  // 22/07/2026: VPM001 abre 4 caixas de descricao de foto (1000
+  // caracteres cada), 2 abaixo de cada grupo de fotos (Intervencao
+  // Verificada: 1/2, Acao Realizada: 3/4).
+  const blocoDescFotosIntervencao = document.getElementById('bloco-desc-fotos-intervencao');
+  const blocoDescFotosAcao = document.getElementById('bloco-desc-fotos-acao');
+  const camposDescFoto = {
+    desc_foto_1: document.getElementById('campo-desc-foto-1'),
+    desc_foto_2: document.getElementById('campo-desc-foto-2'),
+    desc_foto_3: document.getElementById('campo-desc-foto-3'),
+    desc_foto_4: document.getElementById('campo-desc-foto-4'),
+  };
+  Object.keys(camposDescFoto).forEach(function (chave) {
+    const elemento = camposDescFoto[chave];
+    elemento.value = rascunho[chave] || '';
+    elemento.addEventListener('input', function () {
+      rascunho[chave] = elemento.value;
+      salvarRascunhoAgora();
+    });
+  });
+
+  function ehVpm001Selecionado() {
+    return nomeDoTipoSelecionado() === 'VPM001';
+  }
+
+  function atualizarVisibilidadeDescFotos() {
+    const mostrar = ehVpm001Selecionado();
+    blocoDescFotosIntervencao.style.display = mostrar ? '' : 'none';
+    blocoDescFotosAcao.style.display = mostrar ? '' : 'none';
+    if (!mostrar) {
+      Object.keys(camposDescFoto).forEach(function (chave) {
+        rascunho[chave] = '';
+        camposDescFoto[chave].value = '';
+      });
+    }
+  }
+  atualizarVisibilidadeDescFotos();
+
   campoTipoManutencao.addEventListener('change', function () {
     rascunho.id_tipo_manutencao = campoTipoManutencao.value ? Number(campoTipoManutencao.value) : null;
     atualizarVisibilidadeNumeroFalha();
+    atualizarVisibilidadeDescFotos();
     salvarRascunhoAgora();
   });
 
@@ -1269,6 +1311,10 @@ document.addEventListener('DOMContentLoaded', async function () {
       desc_motivo_atraso_termino: rascunho.desc_motivo_atraso_termino,
       servicos: rascunho.servicos,
       outros_servico_desc: rascunho.outros_servico_desc,
+      desc_foto_1: rascunho.desc_foto_1,
+      desc_foto_2: rascunho.desc_foto_2,
+      desc_foto_3: rascunho.desc_foto_3,
+      desc_foto_4: rascunho.desc_foto_4,
       terceiros_num_encarregados: rascunho.terceiros_num_encarregados ? Number(rascunho.terceiros_num_encarregados) : null,
       terceiros_num_op_maquina: rascunho.terceiros_num_op_maquina ? Number(rascunho.terceiros_num_op_maquina) : null,
       terceiros_num_ajudantes: rascunho.terceiros_num_ajudantes ? Number(rascunho.terceiros_num_ajudantes) : null,

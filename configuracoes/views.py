@@ -17,6 +17,7 @@ def _serializar(campo):
         'chave': campo.chave,
         'rotulo': campo.rotulo,
         'habilitado': campo.habilitado,
+        'obrigatorio': campo.obrigatorio,
         'atualizado_em': campo.atualizado_em.isoformat(),
     }
 
@@ -27,7 +28,7 @@ def listar_campos(request):
     GET /configuracoes/campos/
     Disponivel a qualquer usuario autenticado -- o cliente (formulario
     de preenchimento, tela de consulta) usa esta rota para saber quais
-    campos renderizar.
+    campos renderizar e quais sao obrigatorios agora.
     """
     campos = CampoFormulario.objects.all()
     return JsonResponse({'campos': [_serializar(c) for c in campos]})
@@ -44,7 +45,7 @@ def desabilitar_campo(request, chave):
     qualquer usuario -- inclusive Supervisor e outros Administradores
     -- ate ser habilitado novamente.
     """
-    return _alterar_estado(request, chave, habilitado=False)
+    return _alterar_estado(request, chave, campos={'habilitado': False})
 
 
 @csrf_exempt
@@ -53,18 +54,41 @@ def desabilitar_campo(request, chave):
 @requer_perfil(UsuarioPerfil.ADMINISTRADOR)
 def habilitar_campo(request, chave):
     """POST /configuracoes/campos/<chave>/habilitar/ — exclusivo do Administrador."""
-    return _alterar_estado(request, chave, habilitado=True)
+    return _alterar_estado(request, chave, campos={'habilitado': True})
 
 
-def _alterar_estado(request, chave, habilitado):
+@csrf_exempt
+@require_POST
+@requer_token
+@requer_perfil(UsuarioPerfil.ADMINISTRADOR)
+def tornar_obrigatorio(request, chave):
+    """
+    POST /configuracoes/campos/<chave>/tornar-obrigatorio/
+    Exclusivo do Administrador (22/07/2026). O campo passa a ser
+    exigido na sincronizacao, sobrepondo a regra padrao.
+    """
+    return _alterar_estado(request, chave, campos={'obrigatorio': True})
+
+
+@csrf_exempt
+@require_POST
+@requer_token
+@requer_perfil(UsuarioPerfil.ADMINISTRADOR)
+def tornar_opcional(request, chave):
+    """POST /configuracoes/campos/<chave>/tornar-opcional/ — exclusivo do Administrador."""
+    return _alterar_estado(request, chave, campos={'obrigatorio': False})
+
+
+def _alterar_estado(request, chave, campos):
     try:
         campo = CampoFormulario.objects.get(chave=chave)
     except CampoFormulario.DoesNotExist:
         return JsonResponse({'erro': 'Campo nao encontrado.'}, status=404)
 
-    campo.habilitado = habilitado
+    for atributo, valor in campos.items():
+        setattr(campo, atributo, valor)
     campo.atualizado_por = request.usuario_rad
     campo.atualizado_em = timezone.now()
-    campo.save(update_fields=['habilitado', 'atualizado_por', 'atualizado_em'])
+    campo.save(update_fields=[*campos.keys(), 'atualizado_por', 'atualizado_em'])
 
     return JsonResponse(_serializar(campo))

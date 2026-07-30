@@ -9,8 +9,7 @@ urlpatterns = [
     path('meus-rads/', views.listar_meus_rads, name='listar_meus_rads'),
     path('rads/<str:numero_rad>/', views.detalhe_rad, name='detalhe_rad'),
     path('rads/<str:numero_rad>/mensagem/', views.mensagem_copiar, name='mensagem_copiar'),
-    path('rads/<str:numero_rad>/pdf/', views.exportar_pdf, name='exportar_pdf'),
-    path('rads/<str:numero_rad>/docx/', views.exportar_docx, name='exportar_docx'),
     path('rads/<str:numero_rad>/docx-oficial/', views.exportar_docx_oficial, name='exportar_docx_oficial'),
+    path('rads/<str:numero_rad>/pdf-oficial/', views.exportar_pdf_oficial, name='exportar_pdf_oficial'),
     path('rads/<str:numero_rad>/anexos/<int:id_anexo>/', views.visualizar_anexo, name='visualizar_anexo'),
 ]

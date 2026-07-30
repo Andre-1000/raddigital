@@ -1,0 +1,219 @@
+{% extends "interface/base.html" %}
+{% block titulo %}Configurações de Campos — Sistema RAD{% endblock %}
+
+{% block cabecalho_extra %}
+<style>
+  .container-app { max-width: var(--largura-app-administrativa); }
+
+  .linha-campo {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.9rem 0;
+    border-bottom: 1px solid var(--cor-linha);
+  }
+  .linha-campo:last-child { border-bottom: none; }
+
+  .linha-campo__botoes {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .linha-campo__botoes .botao {
+    width: auto;
+    min-height: 36px;
+    padding: 0 0.85rem;
+    font-size: 0.82rem;
+  }
+
+  .selo-obrigatorio { background: var(--cor-atencao-fundo); color: #8a3608; }
+  .selo-opcional { background: var(--cor-fundo-suave); color: var(--cor-tinta-suave); }
+  .selo-desabilitado { background: var(--cor-perigo-fundo); color: var(--cor-perigo); }
+</style>
+{% endblock %}
+
+{% block conteudo %}
+<div id="conteudo-protegido" style="display:none;">
+  <h1 style="font-size:1.3rem;">Configurações de Campos</h1>
+  <p class="texto-suave" style="margin-top:-0.5rem;">
+    Exclusivo do Administrador. Escolha um campo para ver e alterar se ele está habilitado e se é obrigatório.
+  </p>
+
+  <div id="aviso-configuracoes"></div>
+
+  <div class="cartao" style="margin-top:1rem;">
+    <div class="campo">
+      <label for="campo-selecionar">Selecione um campo</label>
+      <select id="campo-selecionar">
+        <option value="">Escolha…</option>
+      </select>
+    </div>
+
+    <div id="detalhe-campo" style="display:none; margin-top:1rem;">
+      <div class="linha-campo">
+        <div>
+          <strong id="detalhe-campo-rotulo"></strong>
+          <div style="margin-top:0.4rem; display:flex; gap:0.4rem;">
+            <span class="selo" id="selo-habilitado"></span>
+            <span class="selo" id="selo-obrigatorio-atual"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="linha-campo__botoes" style="margin-top:0.9rem;">
+        <button type="button" class="botao botao--secundaria" id="botao-alternar-habilitado"></button>
+        <button type="button" class="botao botao--secundaria" id="botao-alternar-obrigatorio"></button>
+      </div>
+
+      <p class="texto-suave" style="font-size:0.8rem; margin-top:0.75rem;">
+        Um campo desabilitado some para todos os usuários, inclusive Administradores — obrigatoriedade não
+        tem efeito nesse caso. Alguns campos têm regra condicional própria (ex.: N° Falha só é exigido
+        quando o Tipo de Manutenção é Falha); marcar como obrigatório aqui faz o campo ser sempre exigido,
+        independente da condição original.
+      </p>
+    </div>
+  </div>
+
+  <div class="cartao" style="margin-top:1rem;">
+    <h2 style="font-size:1rem;">Todos os campos</h2>
+    <div id="lista-todos-campos" class="pilha" style="margin-top:0.5rem;"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block script_extra %}
+<script>
+  document.addEventListener('DOMContentLoaded', async function () {
+    if (!RadAuth.exigirSessao()) return;
+    if (!RadAuth.temPerfil('administrador')) {
+      window.location.href = '{% url "interface:inicio" %}';
+      return;
+    }
+    document.getElementById('conteudo-protegido').style.display = '';
+
+    const aviso = document.getElementById('aviso-configuracoes');
+    const campoSelecionar = document.getElementById('campo-selecionar');
+    const detalheCampo = document.getElementById('detalhe-campo');
+    const detalheRotulo = document.getElementById('detalhe-campo-rotulo');
+    const seloHabilitado = document.getElementById('selo-habilitado');
+    const seloObrigatorioAtual = document.getElementById('selo-obrigatorio-atual');
+    const botaoAlternarHabilitado = document.getElementById('botao-alternar-habilitado');
+    const botaoAlternarObrigatorio = document.getElementById('botao-alternar-obrigatorio');
+    const listaTodosCampos = document.getElementById('lista-todos-campos');
+
+    let campos = [];
+
+    function seloParaCampo(campo) {
+      if (!campo.habilitado) return '<span class="selo selo-desabilitado">Desabilitado</span>';
+      return campo.obrigatorio
+        ? '<span class="selo selo-obrigatorio">Obrigatório</span>'
+        : '<span class="selo selo-opcional">Opcional</span>';
+    }
+
+    async function carregarCampos() {
+      aviso.innerHTML = '';
+      try {
+        const resposta = await RadAuth.requisicaoAutenticada('/configuracoes/campos/');
+        if (!resposta.ok) {
+          aviso.innerHTML = '<div class="aviso aviso--erro">Não foi possível carregar os campos.</div>';
+          return;
+        }
+        const dados = await resposta.json();
+        campos = dados.campos;
+        renderizarSelect();
+        renderizarListaTodos();
+      } catch (erro) {
+        aviso.innerHTML = '<div class="aviso aviso--erro">Erro de conexão ao carregar os campos.</div>';
+      }
+    }
+
+    function renderizarSelect() {
+      const valorAtual = campoSelecionar.value;
+      campoSelecionar.innerHTML = '<option value="">Escolha…</option>';
+      campos.forEach(function (campo) {
+        const opcao = document.createElement('option');
+        opcao.value = campo.chave;
+        opcao.textContent = campo.rotulo;
+        campoSelecionar.appendChild(opcao);
+      });
+      if (valorAtual) campoSelecionar.value = valorAtual;
+    }
+
+    function renderizarListaTodos() {
+      listaTodosCampos.innerHTML = '';
+      campos.forEach(function (campo) {
+        const linha = document.createElement('div');
+        linha.className = 'linha-campo';
+        linha.innerHTML = `
+          <span>${campo.rotulo}</span>
+          ${seloParaCampo(campo)}
+        `;
+        listaTodosCampos.appendChild(linha);
+      });
+    }
+
+    function mostrarDetalheDoCampo(chave) {
+      const campo = campos.find((c) => c.chave === chave);
+      if (!campo) {
+        detalheCampo.style.display = 'none';
+        return;
+      }
+      detalheCampo.style.display = '';
+      detalheRotulo.textContent = campo.rotulo;
+      seloHabilitado.textContent = campo.habilitado ? 'Habilitado' : 'Desabilitado';
+      seloHabilitado.className = 'selo ' + (campo.habilitado ? 'selo--online' : 'selo-desabilitado');
+      seloObrigatorioAtual.textContent = campo.obrigatorio ? 'Obrigatório' : 'Opcional';
+      seloObrigatorioAtual.className = 'selo ' + (campo.obrigatorio ? 'selo-obrigatorio' : 'selo-opcional');
+
+      botaoAlternarHabilitado.textContent = campo.habilitado ? 'Desabilitar este campo' : 'Habilitar este campo';
+      botaoAlternarObrigatorio.textContent = campo.obrigatorio ? 'Tornar opcional' : 'Tornar obrigatório';
+      botaoAlternarObrigatorio.disabled = !campo.habilitado;
+      botaoAlternarObrigatorio.style.opacity = campo.habilitado ? '1' : '0.6';
+    }
+
+    campoSelecionar.addEventListener('change', function () {
+      aviso.innerHTML = '';
+      mostrarDetalheDoCampo(campoSelecionar.value);
+    });
+
+    async function alternarCampo(chave, acao) {
+      aviso.innerHTML = '';
+      try {
+        const resposta = await RadAuth.requisicaoAutenticada(
+          `/configuracoes/campos/${encodeURIComponent(chave)}/${acao}/`,
+          { method: 'POST' }
+        );
+        if (!resposta.ok) {
+          const corpo = await resposta.json().catch(() => ({}));
+          aviso.innerHTML = `<div class="aviso aviso--erro">${corpo.erro || 'Não foi possível alterar o campo.'}</div>`;
+          return;
+        }
+        const campoAtualizado = await resposta.json();
+        const indice = campos.findIndex((c) => c.chave === chave);
+        if (indice !== -1) campos[indice] = campoAtualizado;
+        renderizarListaTodos();
+        mostrarDetalheDoCampo(chave);
+        aviso.innerHTML = '<div class="aviso aviso--sucesso">Atualizado.</div>';
+      } catch (erro) {
+        aviso.innerHTML = '<div class="aviso aviso--erro">Erro de conexão ao alterar o campo.</div>';
+      }
+    }
+
+    botaoAlternarHabilitado.addEventListener('click', function () {
+      const campo = campos.find((c) => c.chave === campoSelecionar.value);
+      if (!campo) return;
+      alternarCampo(campo.chave, campo.habilitado ? 'desabilitar' : 'habilitar');
+    });
+
+    botaoAlternarObrigatorio.addEventListener('click', function () {
+      const campo = campos.find((c) => c.chave === campoSelecionar.value);
+      if (!campo || !campo.habilitado) return;
+      alternarCampo(campo.chave, campo.obrigatorio ? 'tornar-opcional' : 'tornar-obrigatorio');
+    });
+
+    await carregarCampos();
+  });
+</script>
+{% endblock %}

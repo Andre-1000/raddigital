@@ -137,6 +137,16 @@ class Rad(models.Model):
     # --- Execucao (EFD-020) ----------------------------------------------
     outros_servico_desc = models.CharField(max_length=500, null=True, blank=True)
 
+    # --- VPM001 (22/07/2026) ------------------------------------------------
+    # Preenchidos apenas quando Tipo de Manutencao = VPM001. Uma
+    # descricao de texto livre por foto anexada, ate 1000 caracteres
+    # cada. Numeracao fixa: 1/2 = Fotos Intervencao Verificada,
+    # 3/4 = Fotos Acao Realizada (mesma ordem exibida no formulario).
+    desc_foto_1 = models.CharField(max_length=1000, null=True, blank=True)
+    desc_foto_2 = models.CharField(max_length=1000, null=True, blank=True)
+    desc_foto_3 = models.CharField(max_length=1000, null=True, blank=True)
+    desc_foto_4 = models.CharField(max_length=1000, null=True, blank=True)
+
     # --- Terceiros (22/07/2026) --------------------------------------------
     # Preenchido quando ao menos um servico que exige mao de obra
     # terceirizada e selecionado (Recolhimento de Lixo, Limpeza de
@@ -449,6 +459,11 @@ class RadAnexo(models.Model):
     "Intervencao verificada" (situacao encontrada antes da execucao) e
     "Acao realizada" (evidencia do servico apos a execucao). PDF nao
     tem categoria -- e um unico documento, sem distincao tematica.
+
+    As descricoes de foto do VPM001 NAO ficam aqui -- ficam em 4 campos
+    fixos no proprio Rad (desc_foto_1 a desc_foto_4), numerados na
+    mesma ordem exibida no formulario, e nao vinculadas a um RadAnexo
+    especifico. Ver Rad.desc_foto_1..4.
     """
 
     FOTO = 'foto'

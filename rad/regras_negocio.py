@@ -262,15 +262,15 @@ def _criar_relacionamentos(rad, payload):
 
 def _salvar_anexos(rad, fotos_intervencao, fotos_acao, pdfs):
     """
-    RG-ANX-007/008: os arquivos vao para o storage de arquivos (local em
-    desenvolvimento; a definir em producao -- ver DT-PEND). O banco
+    RG-ANX-007/008: os arquivos vao para o storage de arquivos. O banco
     grava apenas a referencia (caminho_servidor), nunca o conteudo do
     arquivo. Chamada somente depois que validar_anexos() ja aprovou
     todos os arquivos -- esta funcao nao valida nada, so persiste.
 
     Cada foto grava sua categoria (Intervencao verificada / Acao
     realizada) para que os dois grupos nunca fiquem misturados sem
-    identificacao.
+    identificacao. As descricoes de foto do VPM001 (desc_foto_1..4)
+    ficam no proprio Rad, nao aqui -- ver processar_sincronizacao.
     """
     from django.core.files.storage import default_storage
     from django.utils import timezone as django_timezone
@@ -313,8 +313,9 @@ def processar_sincronizacao(payload, usuario, fotos_intervencao=None, fotos_acao
     1. Calculo dos horarios derivados (regras_horario) -- necessario
        antes de validar, pois VLD-012/013 dependem dos DateTime
        completos ja calculados.
-    2. Validacao completa (RG-VLD-001 a 003, VLD-001 a 027, incluindo
-       os anexos). Se houver qualquer erro, nao toca o banco nem o
+    2. Validacao completa (RG-VLD-001 a 003, VLD-001 a 033, incluindo
+       os anexos e a configuracao de obrigatoriedade customizada do
+       Administrador). Se houver qualquer erro, nao toca o banco nem o
        storage de arquivos (RG-VLD-002) e retorna (None, erros).
     3. Persistencia atomica do RAD (geracao do numero de execucao e do
        numero do RAD, idempotencia por sync_id_tentativa).
@@ -323,7 +324,7 @@ def processar_sincronizacao(payload, usuario, fotos_intervencao=None, fotos_acao
        duplicar linhas nem arquivos.
 
     fotos_intervencao/fotos_acao/pdfs: listas de UploadedFile
-    (request.FILES), opcionais. RAD sem nenhum anexo e valido (VLD-026).
+    (request.FILES), opcionais.
 
     Retorna (rad, erros). Exatamente um dos dois sera "vazio":
     erros == [] quando rad foi criado/recuperado; rad is None quando ha
@@ -410,6 +411,14 @@ def processar_sincronizacao(payload, usuario, fotos_intervencao=None, fotos_acao
             payload.get('desc_motivo_atraso_termino') if horarios['atraso_termino'] else None
         ),
         'outros_servico_desc': payload.get('outros_servico_desc') or None,
+        # 22/07/2026: descricoes de foto (VPM001) -- so tem valor de
+        # verdade quando Tipo de Manutencao = VPM001, mas gravar
+        # sempre que vier preenchido e inofensivo (o formulario ja so
+        # envia isso quando VPM001 esta selecionado).
+        'desc_foto_1': payload.get('desc_foto_1') or None,
+        'desc_foto_2': payload.get('desc_foto_2') or None,
+        'desc_foto_3': payload.get('desc_foto_3') or None,
+        'desc_foto_4': payload.get('desc_foto_4') or None,
         'terceiros_num_encarregados': payload.get('terceiros_num_encarregados') or None,
         'terceiros_num_op_maquina': payload.get('terceiros_num_op_maquina') or None,
         'terceiros_num_ajudantes': payload.get('terceiros_num_ajudantes') or None,

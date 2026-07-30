@@ -16,11 +16,11 @@ primeiro. Por isso cada verificacao abaixo e independente e todas rodam
 sempre, acumulando em uma lista.
 """
 from catalogos.models import CatMotivoAtraso, CatServico
-from colaboradores.models import ColaboradorCadastro
 
 NOME_MOTIVO_OUTROS = 'Outros'
 NOME_SERVICO_OUTROS = 'Outros'
 NOME_TIPO_MANUTENCAO_FALHA = 'Falha'
+NOME_TIPO_MANUTENCAO_VPM001 = 'VPM001'
 
 
 def _erro(codigo, campo, mensagem):
@@ -241,6 +241,23 @@ def _validar_operador_ccm(payload, erros):
         )
 
 
+def _validar_descricoes_foto_vpm001(payload, erros):
+    """
+    VLD-033 (22/07/2026): descricoes de foto do VPM001, ate 1000
+    caracteres cada. Opcionais (o usuario pode nao escrever nada), so
+    validamos o tamanho maximo quando preenchidas.
+    """
+    for campo in ('desc_foto_1', 'desc_foto_2', 'desc_foto_3', 'desc_foto_4'):
+        valor = payload.get(campo)
+        if valor and len(str(valor)) > 1000:
+            erros.append(
+                _erro(
+                    'VLD-033', campo,
+                    f'A descrição da foto (campo {campo}) deve ter no máximo 1000 caracteres.',
+                )
+            )
+
+
 def _validar_colaboradores_no_cadastro_oficial(payload, erros):
     """
     RG-RESP-008: colaboradores (tipo='colaborador', distinto de
@@ -249,6 +266,8 @@ def _validar_colaboradores_no_cadastro_oficial(payload, erros):
     nao passam por esta checagem -- por definicao nao pertencem ao
     cadastro oficial.
     """
+    from colaboradores.models import ColaboradorCadastro
+
     for colaborador in payload.get('colaboradores') or []:
         if colaborador.get('tipo') != 'colaborador':
             continue
@@ -336,10 +355,93 @@ def _remover_erros_de_campos_desabilitados(erros):
     ]
 
 
+# Mapa: chave de configuracoes.CampoFormulario -> nome do campo no
+# payload (o mesmo nome usado como 'campo' nos erros das funcoes
+# _validar_* acima, para que remover/adicionar erro bata certinho).
+# So cobre campos com valor "simples" (presenca/ausencia direta) --
+# anexos (fotos/pdf) e o bloco AMV inteiro tem logica propria mais
+# complexa (agregada ou aninhada) e nao sao cobertos por este
+# mecanismo generico de toggle obrigatorio/opcional.
+_MAPA_CHAVE_CONFIG_PARA_CAMPO_PAYLOAD = {
+    'numero_os': 'numero_os',
+    'numero_sa': 'numero_sa',
+    'data_preenchimento': 'data_preenchimento',
+    'local_inicial': 'id_local_inicial',
+    'local_final': 'id_local_final',
+    'km_poste': 'km_poste',
+    'linhas': 'linhas',
+    'vias': 'vias',
+    'tipo_manutencao': 'id_tipo_manutencao',
+    'numero_falha': 'numero_falha',
+    'hora_prog_inicio': 'hora_prog_inicio',
+    'hora_prog_termino': 'hora_prog_termino',
+    'hora_real_inicio': 'hora_real_inicio',
+    'hora_real_termino': 'hora_real_termino',
+    'motivo_atraso_inicio': 'id_motivo_atraso_inicio',
+    'desc_motivo_atraso_inicio': 'desc_motivo_atraso_inicio',
+    'motivo_atraso_termino': 'id_motivo_atraso_termino',
+    'desc_motivo_atraso_termino': 'desc_motivo_atraso_termino',
+    'servicos': 'servicos',
+    'outros_servico_desc': 'outros_servico_desc',
+    'materiais_utilizados': 'materiais_utilizados',
+    'observacoes_gerais': 'observacoes_gerais',
+    'colaboradores': 'colaboradores',
+    'responsavel_atividade': 'responsavel_atividade',
+    'operador_ccm': 'operador_ccm',
+    'descricao_tecnica_atividade': 'descricao_tecnica_atividade',
+    'equipes': 'equipes',
+}
+
+
+def _aplicar_configuracao_obrigatoriedade(payload, erros):
+    """
+    22/07/2026: exclusivo do Administrador (tela de Configuracoes),
+    permite tornar QUALQUER campo suportado (ver mapa acima) obrigatorio
+    ou opcional, por cima das regras fixas de cada _validar_* function.
+
+    - obrigatorio=False no config: solta a exigencia -- remove qualquer
+      erro que uma validacao fixa acima ja tenha lancado para aquele
+      campo (ex.: Responsavel Atividade pode ser tornado opcional).
+    - obrigatorio=True no config: adiciona um erro generico se o campo
+      estiver vazio, mesmo quando a regra fixa normalmente nao exigiria
+      (ex.: Km/Poste pode ser tornado obrigatorio).
+
+    Roda por ULTIMO (depois de todas as validacoes fixas), para poder
+    tanto adicionar quanto remover erros ja calculados. So considera
+    campos com habilitado=True -- um campo desabilitado ja e tratado
+    separadamente por _remover_erros_de_campos_desabilitados.
+    """
+    from configuracoes.models import CampoFormulario
+
+    configuracoes = CampoFormulario.objects.filter(habilitado=True)
+    for config in configuracoes:
+        campo_payload = _MAPA_CHAVE_CONFIG_PARA_CAMPO_PAYLOAD.get(config.chave)
+        if campo_payload is None:
+            continue  # campo/funcionalidade nao suportado por este mecanismo generico
+
+        valor = payload.get(campo_payload)
+        vazio = (
+            valor is None
+            or valor == ''
+            or (isinstance(valor, (list, dict)) and not valor)
+        )
+
+        if not config.obrigatorio:
+            erros[:] = [e for e in erros if e['campo'] != campo_payload]
+        elif vazio and not any(e['campo'] == campo_payload for e in erros):
+            erros.append(
+                _erro(
+                    'VLD-CONFIG',
+                    campo_payload,
+                    f'{config.rotulo} é obrigatório (configurado pelo Administrador).',
+                )
+            )
+
+
 def validar_payload_sincronizacao(payload, *, hoje):
     """
     Executa todas as validacoes de bloqueio da sincronizacao (VLD-001 a
-    VLD-030, exceto VLD-023/024 que exigem os arquivos de anexo, ver
+    VLD-033, exceto VLD-023/024 que exigem os arquivos de anexo, ver
     rad.validadores_arquivos).
 
     payload deve conter, alem dos campos brutos do formulario, os campos
@@ -353,9 +455,10 @@ def validar_payload_sincronizacao(payload, *, hoje):
     date.today() implicito dentro da funcao).
 
     Retorna uma lista de erros (vazia se tudo valido). RG-VLD-002: todos
-    os erros sao retornados de uma vez, nao apenas o primeiro. Erros de
-    campos desabilitados pelo Administrador sao removidos no final (ver
-    _remover_erros_de_campos_desabilitados).
+    os erros sao retornados de uma vez, nao apenas o primeiro. A
+    configuracao de obrigatoriedade customizada do Administrador (ver
+    _aplicar_configuracao_obrigatoriedade) roda antes da remocao final
+    de erros de campos desabilitados.
     """
     erros = []
     _validar_os(payload, erros)
@@ -374,4 +477,6 @@ def validar_payload_sincronizacao(payload, *, hoje):
     _validar_bloco_amv(payload, erros)
     _validar_responsavel_atividade(payload, erros)
     _validar_operador_ccm(payload, erros)
+    _validar_descricoes_foto_vpm001(payload, erros)
+    _aplicar_configuracao_obrigatoriedade(payload, erros)
     return _remover_erros_de_campos_desabilitados(erros)

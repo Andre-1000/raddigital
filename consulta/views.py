@@ -6,9 +6,13 @@ Supervisor, Administrador, ou o proprio criador do RAD (PRM-028 a
 PRM-038 + tela "RADs Preenchidos", 22/07/2026).
 listar_meus_rads: qualquer usuario autenticado, sempre filtrado ao
 proprio login.
+
+22/07/2026: exportacao pos-sincronizacao agora usa exclusivamente o
+layout oficial (rad/exportacao_oficial.py) -- o antigo layout simples
+(rad/exportacao.py, endpoints /pdf/ e /docx/) foi descontinuado.
 """
 from django.core.paginator import Paginator
-from django.http import FileResponse, JsonResponse
+from django.http import FileResponse, HttpResponse, JsonResponse
 
 from comum.datas import parse_data, parse_datetime_aware
 from usuarios.decorators import requer_perfil, requer_token
@@ -225,6 +229,8 @@ def _amv_resumo(rad):
         'linha_mch': amv.linha_mch,
         'tipos_defeito': list(rad.amv_defeitos.values_list('tipo_defeito__nome', flat=True)),
         'acoes': list(rad.amv_acoes.values_list('acao__nome', flat=True)),
+        'desc_outros_tipo_defeito': amv.desc_outros_tipo_defeito,
+        'desc_outros_acao': amv.desc_outros_acao,
     }
 
 
@@ -241,6 +247,19 @@ def nome_de_quem_preencheu(rad):
     if colaborador and colaborador.nome:
         return colaborador.nome
     return rad.usuario.login
+
+
+def _exportacao_pdf_oficial_habilitada():
+    """
+    22/07/2026: le o interruptor da tela de Configuracoes
+    (CampoFormulario.chave='exportar_pdf_oficial'). Desligado ate o
+    LibreOffice ser instalado no servidor -- ver
+    rad/exportacao_oficial.py::gerar_pdf_oficial_bytes.
+    """
+    from configuracoes.models import CampoFormulario
+
+    campo = CampoFormulario.objects.filter(chave='exportar_pdf_oficial').first()
+    return bool(campo and campo.habilitado)
 
 
 @requer_token
@@ -268,56 +287,36 @@ def mensagem_copiar(request, numero_rad):
     return JsonResponse({'mensagem': gerar_mensagem_copiar(rad)})
 
 
+def _carregar_rad_para_exportacao(numero_rad):
+    return Rad.objects.select_related(
+        'local_inicial', 'local_final', 'tipo_manutencao', 'usuario',
+        'motivo_atraso_inicio', 'motivo_atraso_termino',
+    ).prefetch_related(
+        'servicos__servico', 'colaboradores', 'anexos', 'linhas', 'vias', 'equipes'
+    ).get(numero_rad=numero_rad)
+
+
 @requer_token
-def exportar_pdf(request, numero_rad):
+def exportar_docx_oficial(request, numero_rad):
     """
-    GET /consulta/rads/<numero_rad>/pdf/
-    RG-EXP-001 a 012. Mesma regra de acesso de mensagem_copiar.
+    GET /consulta/rads/<numero_rad>/docx-oficial/
+    22/07/2026: unico formato de exportacao de arquivo pos-
+    sincronizacao do sistema -- layout do documento RDA oficial da
+    TRIVIA (RDA_Relatorio_Trivia_Ajustado_original.docx), usado como
+    molde. Sempre disponivel (nao depende de nenhuma instalacao extra
+    no servidor, ao contrario do PDF -- ver exportar_pdf_oficial).
     """
     try:
-        rad = Rad.objects.select_related(
-            'local_inicial', 'local_final', 'usuario',
-            'motivo_atraso_inicio', 'motivo_atraso_termino',
-        ).get(numero_rad=numero_rad)
+        rad = _carregar_rad_para_exportacao(numero_rad)
     except Rad.DoesNotExist:
         return JsonResponse({'erro': 'RAD nao encontrado.'}, status=404)
 
     if not _pode_exportar(request.usuario_rad, rad):
         return JsonResponse({'erro': 'Acesso nao autorizado.'}, status=403)
 
-    from django.http import HttpResponse
+    from rad.exportacao_oficial import gerar_docx_oficial_bytes
 
-    from rad.exportacao import gerar_pdf_bytes
-
-    pdf_bytes = gerar_pdf_bytes(rad)
-    resposta = HttpResponse(pdf_bytes, content_type='application/pdf')
-    resposta['Content-Disposition'] = f'attachment; filename="{rad.numero_rad}.pdf"'
-    return resposta
-
-
-@requer_token
-def exportar_docx(request, numero_rad):
-    """
-    GET /consulta/rads/<numero_rad>/docx/
-    RG-EXP-003: segundo formato de exportação. Mesma regra de acesso
-    de mensagem_copiar/exportar_pdf.
-    """
-    try:
-        rad = Rad.objects.select_related(
-            'local_inicial', 'local_final', 'usuario',
-            'motivo_atraso_inicio', 'motivo_atraso_termino',
-        ).get(numero_rad=numero_rad)
-    except Rad.DoesNotExist:
-        return JsonResponse({'erro': 'RAD nao encontrado.'}, status=404)
-
-    if not _pode_exportar(request.usuario_rad, rad):
-        return JsonResponse({'erro': 'Acesso nao autorizado.'}, status=403)
-
-    from django.http import HttpResponse
-
-    from rad.exportacao import gerar_docx_bytes
-
-    docx_bytes = gerar_docx_bytes(rad)
+    docx_bytes = gerar_docx_oficial_bytes(rad)
     resposta = HttpResponse(
         docx_bytes,
         content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -327,36 +326,45 @@ def exportar_docx(request, numero_rad):
 
 
 @requer_token
-def exportar_docx_oficial(request, numero_rad):
+def exportar_pdf_oficial(request, numero_rad):
     """
-    GET /consulta/rads/<numero_rad>/docx-oficial/
-    Novo (22/07/2026): exporta no layout do documento RDA oficial da
-    TRIVIA (RDA_Relatorio_Trivia_Ajustado_original.docx), usado como
-    molde. Mesma regra de acesso das outras exportacoes.
+    GET /consulta/rads/<numero_rad>/pdf-oficial/
+    22/07/2026: mesmo layout oficial, em PDF -- exige LibreOffice no
+    servidor (ver rad/exportacao_oficial.py::gerar_pdf_oficial_bytes).
+    So funciona quando o Administrador habilitar "Exportação em PDF
+    (layout oficial)" na tela de Configuracoes -- desligado por
+    padrao, porque o servidor de producao atual nao tem o LibreOffice
+    instalado (risco de OOM no plano gratuito do Render).
     """
+    if not _exportacao_pdf_oficial_habilitada():
+        return JsonResponse(
+            {
+                'erro': (
+                    'A exportação em PDF está desabilitada. '
+                    'Um Administrador pode habilitá-la em Configurações, '
+                    'quando o servidor tiver suporte a essa conversão.'
+                )
+            },
+            status=403,
+        )
+
     try:
-        rad = Rad.objects.select_related(
-            'local_inicial', 'local_final', 'tipo_manutencao', 'usuario',
-            'motivo_atraso_inicio', 'motivo_atraso_termino',
-        ).prefetch_related(
-            'servicos__servico', 'colaboradores', 'anexos', 'linhas', 'vias', 'equipes'
-        ).get(numero_rad=numero_rad)
+        rad = _carregar_rad_para_exportacao(numero_rad)
     except Rad.DoesNotExist:
         return JsonResponse({'erro': 'RAD nao encontrado.'}, status=404)
 
     if not _pode_exportar(request.usuario_rad, rad):
         return JsonResponse({'erro': 'Acesso nao autorizado.'}, status=403)
 
-    from django.http import HttpResponse
+    from rad.exportacao_oficial import PdfNaoDisponivelError, gerar_pdf_oficial_bytes
 
-    from rad.exportacao_oficial import gerar_docx_oficial_bytes
+    try:
+        pdf_bytes = gerar_pdf_oficial_bytes(rad)
+    except PdfNaoDisponivelError as erro:
+        return JsonResponse({'erro': str(erro)}, status=503)
 
-    docx_bytes = gerar_docx_oficial_bytes(rad)
-    resposta = HttpResponse(
-        docx_bytes,
-        content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    )
-    resposta['Content-Disposition'] = f'attachment; filename="{rad.numero_rad}_oficial.docx"'
+    resposta = HttpResponse(pdf_bytes, content_type='application/pdf')
+    resposta['Content-Disposition'] = f'attachment; filename="{rad.numero_rad}.pdf"'
     return resposta
 
 
@@ -480,6 +488,10 @@ def detalhe_rad(request, numero_rad):
                 'desc_motivo_atraso_termino': rad.desc_motivo_atraso_termino,
                 'servicos': list(rad.servicos.values_list('servico__nome', flat=True)),
                 'outros_servico_desc': rad.outros_servico_desc,
+                'desc_foto_1': rad.desc_foto_1,
+                'desc_foto_2': rad.desc_foto_2,
+                'desc_foto_3': rad.desc_foto_3,
+                'desc_foto_4': rad.desc_foto_4,
                 'terceiros_num_encarregados': rad.terceiros_num_encarregados,
                 'terceiros_num_op_maquina': rad.terceiros_num_op_maquina,
                 'terceiros_num_ajudantes': rad.terceiros_num_ajudantes,
@@ -505,6 +517,7 @@ def detalhe_rad(request, numero_rad):
                     rad.data_cancelamento.isoformat() if rad.data_cancelamento else None
                 ),
                 'pode_cancelar': pode_cancelar,  # PRM-037
+                'exportacao_pdf_disponivel': _exportacao_pdf_oficial_habilitada(),
             }
     )
 

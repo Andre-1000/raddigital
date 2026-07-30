@@ -77,6 +77,11 @@
       <span class="cartao-acao__rotulo">Gerenciar Usuários</span>
       <span class="cartao-acao__descricao">Cadastrar, importar e administrar acessos</span>
     </a>
+
+    <a href="{% url 'interface:configuracoes' %}" class="cartao cartao--interativo cartao-acao" id="link-configuracoes" style="display:none;">
+      <span class="cartao-acao__rotulo">Configurações de Campos</span>
+      <span class="cartao-acao__descricao">Habilitar, desabilitar e tornar campos obrigatórios</span>
+    </a>
   </div>
 
   <div class="cartao" style="margin-top:1rem;">
@@ -97,6 +102,9 @@
     if (RadAuth.temPerfil('supervisor', 'administrador')) {
       document.getElementById('link-consultar').style.display = '';
       document.getElementById('link-gerenciar-usuarios').style.display = '';
+    }
+    if (RadAuth.temPerfil('administrador')) {
+      document.getElementById('link-configuracoes').style.display = '';
     }
 
     document.getElementById('botao-sair').addEventListener('click', function () {
