@@ -653,6 +653,67 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
   }
 
+  // 30/07/2026: variante de renderizarListaCheckbox especifica para
+  // Servicos Executados -- agrupa visualmente em "Geral" e "Infra"
+  // (usando o campo area vindo do catalogo), com "Outros" sempre por
+  // ultimo, fora dos grupos. So muda a apresentacao; a logica de
+  // selecao (checkbox marcado/desmarcado, callback aoMudar) e identica
+  // a renderizarListaCheckbox.
+  function renderizarServicosAgrupados(containerEl, servicosOrdenados, valoresSelecionados, aoMudar) {
+    containerEl.innerHTML = '';
+
+    function adicionarCabecalho(texto) {
+      const cabecalho = document.createElement('p');
+      cabecalho.className = 'grade-checkboxes__cabecalho';
+      cabecalho.textContent = texto;
+      containerEl.appendChild(cabecalho);
+    }
+
+    function adicionarItens(itens) {
+      itens.forEach(function (servico) {
+        const linha = document.createElement('label');
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.style.marginTop = '0.3rem';
+        checkbox.style.minWidth = '20px';
+        checkbox.style.minHeight = '20px';
+        checkbox.checked = valoresSelecionados.includes(servico.id);
+        checkbox.addEventListener('change', function () {
+          const indice = valoresSelecionados.indexOf(servico.id);
+          if (checkbox.checked && indice === -1) {
+            valoresSelecionados.push(servico.id);
+          } else if (!checkbox.checked && indice !== -1) {
+            valoresSelecionados.splice(indice, 1);
+          }
+          aoMudar(servico, checkbox.checked);
+        });
+
+        const textoWrapper = document.createElement('span');
+        textoWrapper.textContent = servico.nome;
+        linha.appendChild(checkbox);
+        linha.appendChild(textoWrapper);
+        containerEl.appendChild(linha);
+      });
+    }
+
+    const outros = servicosOrdenados.filter((s) => s.nome === 'Outros');
+    const grupos = [
+      { rotulo: 'Geral', itens: servicosOrdenados.filter((s) => s.area !== 'infra' && s.nome !== 'Outros') },
+      { rotulo: 'Infra', itens: servicosOrdenados.filter((s) => s.area === 'infra') },
+    ];
+
+    grupos.forEach(function (grupo) {
+      if (grupo.itens.length === 0) return;
+      adicionarCabecalho(grupo.rotulo);
+      adicionarItens(grupo.itens);
+    });
+
+    if (outros.length > 0) {
+      adicionarItens(outros);
+    }
+  }
+
   const modalSobreServicos = document.getElementById('modal-sobre-servicos');
   const selectServicoExplicacao = document.getElementById('select-servico-explicacao');
   const textoExplicacaoServico = document.getElementById('texto-explicacao-servico');
@@ -828,9 +889,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
   }
 
-  renderizarListaCheckbox(
+  renderizarServicosAgrupados(
     listaServicosEl,
-    servicos.map((s) => ({ valor: s.id, rotulo: s.nome })),
+    servicos,
     rascunho.servicos,
     function () {
       atualizarVisibilidadeServicos();

@@ -487,6 +487,19 @@
     gap: 0.5rem;
     font-weight: 400;
   }
+  /* Cabecalho de subgrupo dentro de .grade-checkboxes (ex.: "Geral" /
+     "Infra" em Servicos Executados, 30/07/2026). grid-column: 1/-1
+     faz o texto ocupar a largura toda da grade, quebrando a linha
+     antes do proximo grupo de checkboxes. */
+  .grade-checkboxes__cabecalho {
+    grid-column: 1 / -1;
+    margin: 0.4rem 0 -0.2rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--cor-primaria);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
   /* Estilo "tag" compacto (retangular, cantos levemente arredondados)
      -- escolhido em vez da pilula, para caber mais opcoes por linha
      em Linha/Via/Equipes Envolvidas. */

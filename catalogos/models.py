@@ -116,7 +116,18 @@ class CatServico(models.Model):
     Ajudantes/Motorista sao comuns a todo servico que exige Terceiros;
     Op Maquina e Volume sao especificos de cada servico, controlados
     por terceiros_tem_op_maquina e terceiros_tem_volume.
+
+    area (30/07/2026): agrupamento puramente visual usado na tela de
+    preenchimento do RAD, para separar servicos "Geral" (via
+    permanente) dos servicos "Infra" (terceirizados: Recolhimento de
+    Lixo, Limpeza de Canaleta, Capina Quimica, Rocada/Poda). Nao afeta
+    nenhuma regra de negocio -- so a organizacao visual da lista.
     """
+
+    AREA_CHOICES = [
+        ('geral', 'Geral'),
+        ('infra', 'Infra'),
+    ]
 
     nome = models.CharField(max_length=100, unique=True)
     descricao = models.TextField(
@@ -137,6 +148,12 @@ class CatServico(models.Model):
     )
     terceiros_tem_volume = models.BooleanField(
         default=False, help_text='So relevante quando requer_terceiros=True.'
+    )
+    area = models.CharField(
+        max_length=10,
+        choices=AREA_CHOICES,
+        default='geral',
+        help_text='Agrupamento visual na tela de preenchimento (Geral ou Infra).',
     )
     ativo = models.BooleanField(default=True)
 

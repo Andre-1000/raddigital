@@ -45,8 +45,8 @@ class CatViaAdmin(admin.ModelAdmin):
 
 @admin.register(CatServico)
 class CatServicoAdmin(admin.ModelAdmin):
-    list_display = ('nome', 'requer_amv', 'requer_descricao', 'ativo')
-    list_filter = ('requer_amv', 'requer_descricao', 'ativo')
+    list_display = ('nome', 'area', 'requer_amv', 'requer_descricao', 'ativo')
+    list_filter = ('area', 'requer_amv', 'requer_descricao', 'ativo')
     search_fields = ('nome',)
 
 
