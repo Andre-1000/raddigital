@@ -2,8 +2,12 @@
 -- SEED: cat_equipes
 -- Sistema RAD — Equipes envolvidas na atividade
 -- Mudanca de negocio (17/07/2026)
+--
+-- IMPORTANTE (22/07/2026): UPSERT, NAO TRUNCATE. Roda a cada deploy
+-- (start.sh -> carregar_catalogos) -- TRUNCATE ... CASCADE aqui
+-- apagaria em cascata TODOS os RADs ja sincronizados (rad_equipes ->
+-- rad tem FK para cat_equipes).
 -- ============================================================
-TRUNCATE TABLE cat_equipes RESTART IDENTITY CASCADE;
 
 INSERT INTO cat_equipes (codigo, nome) VALUES
   ('RA', 'RA'),
@@ -11,6 +15,7 @@ INSERT INTO cat_equipes (codigo, nome) VALUES
   ('CIVIL', 'CIVIL'),
   ('RESTAB', 'RESTAB'),
   ('SINAL', 'SINAL'),
-  ('MRO', 'MRO');
+  ('MRO', 'MRO')
+ON CONFLICT (codigo) DO UPDATE SET nome = EXCLUDED.nome;
 
 -- Total: 6 registros

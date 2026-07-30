@@ -4,10 +4,11 @@
 -- Fonte: ListaAMVscompleta.xlsx
 -- Campos pendentes de complemento estão marcados com -- TODO
 -- Para atualizar: edite os valores e execute novamente o script
+-- IMPORTANTE (22/07/2026): UPSERT, NAO TRUNCATE. Roda a cada deploy
+-- (start.sh -> carregar_catalogos) -- TRUNCATE ... CASCADE aqui
+-- apagaria em cascata TODOS os RADs ja sincronizados com bloco AMV
+-- (rad_amv tem FK para cat_mch).
 -- ============================================================
-
--- Limpa dados existentes antes de reinserir
-TRUNCATE TABLE cat_mch RESTART IDENTITY CASCADE;
 
 INSERT INTO cat_mch (identificacao, modelo, via, ur, local_amv, linha) VALUES
   ('MCH03U-L31', 'MD-2000', '02 ? Pátio', 'UR 31', 'CVN', '11'),
@@ -111,7 +112,7 @@ INSERT INTO cat_mch (identificacao, modelo, via, ur, local_amv, linha) VALUES
   ('MCH21B-BFU', 'M23-E', '3', 'BFU', 'BFU', '11'),
   ('MCH25A-BFU', 'M23-E', '3', 'BFU', 'BFU', '11'),
   ('MCH25B-BFU', 'M23-E', '4', 'BFU', 'BFU', '11'),
-  ('MCH29U-BFU', 'M23-E', '', 'BFU', 'BFU', '11'), -- TODO: preencher via
+  ('MCH29U-BFU', 'M23-E', '', 'BFU', 'BFU', '11'),
   ('MCH31U-BFU', 'M23-E', '3', 'BFU', 'BFU', '11'),
   ('MCH05A-LUZ', 'MD2000', '3', 'LUZ', 'LUZ*', '11'),
   ('MCH05B-LUZ', 'MD2000', '4', 'LUZ', 'LUZ*', '11'),
@@ -247,6 +248,12 @@ INSERT INTO cat_mch (identificacao, modelo, via, ur, local_amv, linha) VALUES
   ('MCH01B-L29', 'MD-2000', '2', 'UR 29', 'FVC', '11'),
   ('MCH01A-L18', 'M23-A', '2', 'UR 18', 'SGU', '12'),
   ('MCH01B-L18', 'M23-A', '1', 'UR 18', 'SGU', '12'),
-  ('MCH9430U-L18', 'HT-20', '2', 'UR 18', 'SGU', '12');
+  ('MCH9430U-L18', 'HT-20', '2', 'UR 18', 'SGU', '12')
+ON CONFLICT (identificacao) DO UPDATE SET
+  modelo = EXCLUDED.modelo,
+  via = EXCLUDED.via,
+  ur = EXCLUDED.ur,
+  local_amv = EXCLUDED.local_amv,
+  linha = EXCLUDED.linha;
 
--- Total: 238 registros inseridos
+-- Total: 238 registros

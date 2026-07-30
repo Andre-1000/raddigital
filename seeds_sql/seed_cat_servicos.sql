@@ -1,26 +1,51 @@
 -- ============================================================
 -- SEED: cat_servicos
 -- Sistema RAD — Serviços executados (CAT-003)
--- Total: 13 serviços
+-- Total: 16 serviços (13 originais + 4 novos - 1 removido; ver nota)
 -- Coluna descricao: texto exibido no botão de ajuda (?)
 -- requer_amv: TRUE somente para Manutenção em AMV
 -- requer_descricao: TRUE somente para Outros
+-- requer_terceiros / terceiros_tem_op_maquina / terceiros_tem_volume
+--   (22/07/2026): abrem o bloco "Terceiros" no formulario
+--
+-- Mudancas de negocio 22/07/2026: "Limpeza" e "Controle de Vegetação"
+-- foram DESATIVADOS (ativo=FALSE) -- nao removidos, pois RadServico
+-- tem FK PROTECT contra CatServico e RADs antigos podem referencia-los.
+-- Adicionados: Recolhimento de Lixo, Limpeza de Canaleta,
+-- Capina Química, Roçada/Poda.
+--
+-- IMPORTANTE: este seed usa UPSERT (INSERT ... ON CONFLICT), NAO
+-- TRUNCATE. Este arquivo roda a cada deploy (start.sh ->
+-- carregar_catalogos) -- um TRUNCATE ... CASCADE aqui apagaria em
+-- cascata TODOS os RADs ja sincronizados, pois a tabela rad_servicos
+-- (e por tabela, rad) tem FK para cat_servicos.
 -- ============================================================
-TRUNCATE TABLE cat_servicos RESTART IDENTITY CASCADE;
 
-INSERT INTO cat_servicos (nome, descricao, requer_amv, requer_descricao, ativo) VALUES
-  ('Inspeção', 'Verificação visual, dimensional ou geométrica da via permanente, podendo ser realizada a pé ou com veículo. Inclui registro de anomalias, medição de desgaste, avaliação de condições dos componentes e monitoramento geral do estado da via.', FALSE, FALSE, TRUE),
-  ('Ajuste', 'Regulagem, reaperto e calibração de elementos da via permanente e de AMVs. Inclui aperto de fixações, ajuste de mecanismos de chave, regulagem de folgas e calibração de dispositivos.', FALSE, FALSE, TRUE),
-  ('Limpeza', 'Limpeza e desobstrução de componentes da via permanente. Inclui remoção de detritos, limpeza de canaletas, desobstrução de drenos, limpeza de mecanismos de AMV e remoção de resíduos que comprometam a operação.', FALSE, FALSE, TRUE),
-  ('Lubrificação', 'Aplicação de lubrificantes em juntas de trilho, elementos de fixação e partes móveis da via permanente. Executada conforme plano de manutenção ou necessidade identificada em inspeção.', FALSE, FALSE, TRUE),
-  ('Substituição', 'Troca parcial ou total de componentes da via permanente em estado degradado. Inclui substituição de trilhos, dormentes, fixações e placas de apoio.', FALSE, FALSE, TRUE),
-  ('Reparo', 'Recuperação e conserto de elementos estruturais danificados, sem substituição completa. Inclui correção de defeitos localizados, reparo de fixações e restauração de componentes com dano parcial.', FALSE, FALSE, TRUE),
-  ('Soldagem', 'Execução de soldas em trilhos e elementos estruturais da via. Inclui soldagem aluminotérmica, elétrica, reparo de soldas defeituosas e uniões de trilhos.', FALSE, FALSE, TRUE),
-  ('Esmerilhamento', 'Retificação da superfície de rolamento dos trilhos. Inclui remoção de ondulações, rebarbas e defeitos superficiais, acabamento de soldas e correção de irregularidades que afetam o conforto de marcha.', FALSE, FALSE, TRUE),
-  ('Alinhamento', 'Alinhamento e nivelamento geométrico da via permanente. Inclui correção de desvios horizontais e verticais e restabelecimento dos parâmetros geométricos dentro das tolerâncias operacionais.', FALSE, FALSE, TRUE),
-  ('Socaria', 'Socaria mecânica e compactação do lastro para recomposição do apoio dos dormentes. Inclui estabilização da camada de lastro e restauração da geometria da via após intervenções.', FALSE, FALSE, TRUE),
-  ('Controle de Vegetação', 'Roçada e poda de vegetação na faixa de domínio e área da via permanente. Inclui remoção de plantas invasoras, limpeza de drenos afetados por vegetação e manutenção da visibilidade operacional.', FALSE, FALSE, TRUE),
-  ('Manutenção em AMV', 'Manutenção, inspeção e intervenção em Aparelhos de Mudança de Via (AMV). Ao selecionar este serviço, o sistema exibe automaticamente o bloco AMV com campos adicionais: Identificação MCH, Modelo, Via, UR, Local, Linha, Tipo de Defeito e Ações.', TRUE, FALSE, TRUE),
-  ('Outros', 'Serviço não contemplado na lista padrão. Ao selecionar esta opção, o sistema exibe automaticamente um campo de texto para descrição do serviço.', FALSE, TRUE, TRUE);
+INSERT INTO cat_servicos (nome, descricao, requer_amv, requer_descricao, requer_terceiros, terceiros_tem_op_maquina, terceiros_tem_volume, ativo) VALUES
+  ('Inspeção', 'Verificação visual, dimensional ou geométrica da via permanente, podendo ser realizada a pé ou com veículo. Inclui registro de anomalias, medição de desgaste, avaliação de condições dos componentes e monitoramento geral do estado da via.', FALSE, FALSE, FALSE, FALSE, FALSE, TRUE),
+  ('Ajuste', 'Regulagem, reaperto e calibração de elementos da via permanente e de AMVs. Inclui aperto de fixações, ajuste de mecanismos de chave, regulagem de folgas e calibração de dispositivos.', FALSE, FALSE, FALSE, FALSE, FALSE, TRUE),
+  ('Limpeza', 'Limpeza e desobstrução de componentes da via permanente. Inclui remoção de detritos, limpeza de canaletas, desobstrução de drenos, limpeza de mecanismos de AMV e remoção de resíduos que comprometam a operação.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE),
+  ('Lubrificação', 'Aplicação de lubrificantes em juntas de trilho, elementos de fixação e partes móveis da via permanente. Executada conforme plano de manutenção ou necessidade identificada em inspeção.', FALSE, FALSE, FALSE, FALSE, FALSE, TRUE),
+  ('Substituição', 'Troca parcial ou total de componentes da via permanente em estado degradado. Inclui substituição de trilhos, dormentes, fixações e placas de apoio.', FALSE, FALSE, FALSE, FALSE, FALSE, TRUE),
+  ('Reparo', 'Recuperação e conserto de elementos estruturais danificados, sem substituição completa. Inclui correção de defeitos localizados, reparo de fixações e restauração de componentes com dano parcial.', FALSE, FALSE, FALSE, FALSE, FALSE, TRUE),
+  ('Soldagem', 'Execução de soldas em trilhos e elementos estruturais da via. Inclui soldagem aluminotérmica, elétrica, reparo de soldas defeituosas e uniões de trilhos.', FALSE, FALSE, FALSE, FALSE, FALSE, TRUE),
+  ('Esmerilhamento', 'Retificação da superfície de rolamento dos trilhos. Inclui remoção de ondulações, rebarbas e defeitos superficiais, acabamento de soldas e correção de irregularidades que afetam o conforto de marcha.', FALSE, FALSE, FALSE, FALSE, FALSE, TRUE),
+  ('Alinhamento', 'Alinhamento e nivelamento geométrico da via permanente. Inclui correção de desvios horizontais e verticais e restabelecimento dos parâmetros geométricos dentro das tolerâncias operacionais.', FALSE, FALSE, FALSE, FALSE, FALSE, TRUE),
+  ('Socaria', 'Socaria mecânica e compactação do lastro para recomposição do apoio dos dormentes. Inclui estabilização da camada de lastro e restauração da geometria da via após intervenções.', FALSE, FALSE, FALSE, FALSE, FALSE, TRUE),
+  ('Controle de Vegetação', 'Roçada e poda de vegetação na faixa de domínio e área da via permanente. Inclui remoção de plantas invasoras, limpeza de drenos afetados por vegetação e manutenção da visibilidade operacional.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE),
+  ('Manutenção em AMV', 'Manutenção, inspeção e intervenção em Aparelhos de Mudança de Via (AMV). Ao selecionar este serviço, o sistema exibe automaticamente o bloco AMV com campos adicionais: Identificação MCH, Modelo, Via, UR, Local, Linha, Tipo de Defeito e Ações.', TRUE, FALSE, FALSE, FALSE, FALSE, TRUE),
+  ('Recolhimento de Lixo', 'Recolhimento de lixo e resíduos na faixa de domínio, executado com mão de obra terceirizada. Ao selecionar, o sistema exibe o bloco Terceiros (Encarregados, Op Máquina, Ajudantes, Motorista, Volume).', FALSE, FALSE, TRUE, TRUE, TRUE, TRUE),
+  ('Limpeza de Canaleta', 'Limpeza de canaletas e drenos, executada com mão de obra terceirizada. Ao selecionar, o sistema exibe o bloco Terceiros (Encarregados, Ajudantes, Motorista, Volume).', FALSE, FALSE, TRUE, FALSE, TRUE, TRUE),
+  ('Capina Química', 'Aplicação de herbicida para controle de vegetação, executada com mão de obra terceirizada. Ao selecionar, o sistema exibe o bloco Terceiros (Encarregados, Op Máquina, Ajudantes, Motorista).', FALSE, FALSE, TRUE, TRUE, FALSE, TRUE),
+  ('Roçada/Poda', 'Roçada e poda de vegetação, executada com mão de obra terceirizada. Ao selecionar, o sistema exibe o bloco Terceiros (Encarregados, Op Máquina, Ajudantes, Motorista, Volume).', FALSE, FALSE, TRUE, TRUE, TRUE, TRUE),
+  ('Outros', 'Serviço não contemplado na lista padrão. Ao selecionar esta opção, o sistema exibe automaticamente um campo de texto para descrição do serviço.', FALSE, TRUE, FALSE, FALSE, FALSE, TRUE)
+ON CONFLICT (nome) DO UPDATE SET
+  descricao = EXCLUDED.descricao,
+  requer_amv = EXCLUDED.requer_amv,
+  requer_descricao = EXCLUDED.requer_descricao,
+  requer_terceiros = EXCLUDED.requer_terceiros,
+  terceiros_tem_op_maquina = EXCLUDED.terceiros_tem_op_maquina,
+  terceiros_tem_volume = EXCLUDED.terceiros_tem_volume,
+  ativo = EXCLUDED.ativo;
 
--- Total: 13 registros
+-- Total: 17 registros (2 inativos: Limpeza, Controle de Vegetação)
