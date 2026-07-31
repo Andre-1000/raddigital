@@ -400,6 +400,56 @@ _MAPA_CHAVE_CONFIG_PARA_CAMPO_PAYLOAD = {
 }
 
 
+def _servico_outros_selecionado(payload):
+    servicos_ids = payload.get('servicos') or []
+    if not servicos_ids:
+        return False
+    return CatServico.objects.filter(id__in=servicos_ids, nome=NOME_SERVICO_OUTROS).exists()
+
+
+def _motivo_atraso_e_outros(payload, campo_motivo):
+    id_motivo = payload.get(campo_motivo)
+    if not id_motivo:
+        return False
+    nome_motivo = CatMotivoAtraso.objects.filter(id=id_motivo).values_list(
+        'nome', flat=True
+    ).first()
+    return nome_motivo == NOME_MOTIVO_OUTROS
+
+
+# Bug real (30/07/2026): André marcou "N. Falha" como Obrigatório em
+# Configuracoes. Como N. Falha so aparece na tela quando Tipo de
+# Manutencao = Falha, a sincronizacao passou a travar mesmo em RADs
+# onde Tipo de Manutencao era outro (o campo fica oculto e vazio por
+# design, mas o toggle generico exigia preenchimento assim mesmo).
+#
+# Regra clara adotada: um campo condicional so pode ser forcado como
+# obrigatorio QUANDO a condicao que o exibe na tela for verdadeira.
+# Fora dessa condicao, o campo continua oculto e NUNCA bloqueia a
+# sincronizacao, mesmo com obrigatorio=True em Configuracoes -- e
+# equivalente a pedir "CPF do conjuge obrigatorio" so fazer sentido se
+# a pessoa marcou "casado"; sem isso, o campo nem existe pra ela.
+#
+# So precisa de entrada aqui um campo que e CONDICIONALMENTE exibido
+# (aparece/desaparece dependendo de outro campo). Campos sempre
+# visiveis (ex.: Km/Poste, Materiais Utilizados) nao precisam de
+# entrada -- ausencia no mapa = sempre relevante, como antes.
+_CONDICAO_VISIBILIDADE_CAMPO_CONFIG = {
+    'numero_falha': lambda payload: bool(payload.get('_tipo_manutencao_e_falha')),
+    'outros_servico_desc': _servico_outros_selecionado,
+    'id_motivo_atraso_inicio': lambda payload: bool(payload.get('atraso_inicio')),
+    'id_motivo_atraso_termino': lambda payload: bool(payload.get('atraso_termino')),
+    'desc_motivo_atraso_inicio': lambda payload: (
+        bool(payload.get('atraso_inicio'))
+        and _motivo_atraso_e_outros(payload, 'id_motivo_atraso_inicio')
+    ),
+    'desc_motivo_atraso_termino': lambda payload: (
+        bool(payload.get('atraso_termino'))
+        and _motivo_atraso_e_outros(payload, 'id_motivo_atraso_termino')
+    ),
+}
+
+
 def _aplicar_configuracao_obrigatoriedade(payload, erros):
     """
     22/07/2026: exclusivo do Administrador (tela de Configuracoes),
@@ -411,7 +461,11 @@ def _aplicar_configuracao_obrigatoriedade(payload, erros):
       campo (ex.: Responsavel Atividade pode ser tornado opcional).
     - obrigatorio=True no config: adiciona um erro generico se o campo
       estiver vazio, mesmo quando a regra fixa normalmente nao exigiria
-      (ex.: Km/Poste pode ser tornado obrigatorio).
+      (ex.: Km/Poste pode ser tornado obrigatorio) -- MAS somente se o
+      campo estiver visivel/relevante nesse RAD (ver
+      _CONDICAO_VISIBILIDADE_CAMPO_CONFIG e nota 30/07/2026 acima).
+      Campos sem condicao cadastrada sao sempre considerados visiveis
+      (comportamento antigo, inalterado).
 
     Roda por ULTIMO (depois de todas as validacoes fixas), para poder
     tanto adicionar quanto remover erros ja calculados. So considera
@@ -426,6 +480,9 @@ def _aplicar_configuracao_obrigatoriedade(payload, erros):
         if campo_payload is None:
             continue  # campo/funcionalidade nao suportado por este mecanismo generico
 
+        condicao_visibilidade = _CONDICAO_VISIBILIDADE_CAMPO_CONFIG.get(campo_payload)
+        campo_esta_visivel = condicao_visibilidade(payload) if condicao_visibilidade else True
+
         valor = payload.get(campo_payload)
         vazio = (
             valor is None
@@ -435,7 +492,7 @@ def _aplicar_configuracao_obrigatoriedade(payload, erros):
 
         if not config.obrigatorio:
             erros[:] = [e for e in erros if e['campo'] != campo_payload]
-        elif vazio and not any(e['campo'] == campo_payload for e in erros):
+        elif campo_esta_visivel and vazio and not any(e['campo'] == campo_payload for e in erros):
             erros.append(
                 _erro(
                     'VLD-CONFIG',
