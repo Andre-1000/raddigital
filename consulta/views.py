@@ -499,7 +499,16 @@ def detalhe_rad(request, numero_rad):
                 'terceiros_volume': rad.terceiros_volume,
                 'materiais_utilizados': rad.materiais_utilizados,
                 'responsavel_atividade': rad.responsavel_atividade,
-                'operador_ccm': rad.operador_ccm,
+                'operador_ccm_abertura_nome': rad.operador_ccm_abertura_nome,
+                'operador_ccm_abertura_hora': (
+                    rad.operador_ccm_abertura_hora.isoformat()
+                    if rad.operador_ccm_abertura_hora else None
+                ),
+                'operador_ccm_entrega_nome': rad.operador_ccm_entrega_nome,
+                'operador_ccm_entrega_hora': (
+                    rad.operador_ccm_entrega_hora.isoformat()
+                    if rad.operador_ccm_entrega_hora else None
+                ),
                 'descricao_tecnica_atividade': rad.descricao_tecnica_atividade,
                 'observacoes_gerais': rad.observacoes_gerais,
                 'colaboradores': _colaboradores_resumo(rad),

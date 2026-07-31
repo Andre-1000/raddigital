@@ -125,7 +125,10 @@ document.addEventListener('DOMContentLoaded', async function () {
         pdf: [],
       },
       responsavel_atividade: '',
-      operador_ccm: '',
+      operador_ccm_abertura_nome: '',
+      operador_ccm_abertura_hora: '00:00',
+      operador_ccm_entrega_nome: '',
+      operador_ccm_entrega_hora: '00:00',
       descricao_tecnica_atividade: '',
       materiais_utilizados: '',
       observacoes_gerais: '',
@@ -1231,7 +1234,49 @@ document.addEventListener('DOMContentLoaded', async function () {
     document.getElementById('resultados-responsavel-atividade'),
     'responsavel_atividade'
   );
-  ligarCampoTexto('campo-operador-ccm', 'operador_ccm');
+  // Operador CCM (30/07/2026): dois pares Nome+Hora -- Abertura e
+  // Entrega. Regra: o nome digitado na Abertura preenche
+  // automaticamente a Entrega, mas o usuario pode editar a Entrega
+  // depois -- a partir dai, o auto-preenchimento para (mesmo padrao
+  // ja usado para a data de termino em recalcularHorarios acima).
+  const campoCcmAberturaNome = document.getElementById('campo-operador-ccm-abertura-nome');
+  const campoCcmAberturaHora = document.getElementById('campo-operador-ccm-abertura-hora');
+  const campoCcmEntregaNome = document.getElementById('campo-operador-ccm-entrega-nome');
+  const campoCcmEntregaHora = document.getElementById('campo-operador-ccm-entrega-hora');
+
+  campoCcmAberturaNome.value = rascunho.operador_ccm_abertura_nome || '';
+  campoCcmAberturaHora.value = rascunho.operador_ccm_abertura_hora || '00:00';
+  campoCcmEntregaNome.value = rascunho.operador_ccm_entrega_nome || '';
+  campoCcmEntregaHora.value = rascunho.operador_ccm_entrega_hora || '00:00';
+
+  let ccmEntregaNomeEditadoManualmente = !!rascunho._operadorCcmEntregaNomeEditado;
+
+  campoCcmAberturaNome.addEventListener('input', function () {
+    rascunho.operador_ccm_abertura_nome = campoCcmAberturaNome.value;
+    if (!ccmEntregaNomeEditadoManualmente) {
+      rascunho.operador_ccm_entrega_nome = campoCcmAberturaNome.value;
+      campoCcmEntregaNome.value = campoCcmAberturaNome.value;
+    }
+    salvarRascunhoAgora();
+  });
+
+  campoCcmAberturaHora.addEventListener('change', function () {
+    rascunho.operador_ccm_abertura_hora = campoCcmAberturaHora.value || '00:00';
+    salvarRascunhoAgora();
+  });
+
+  campoCcmEntregaNome.addEventListener('input', function () {
+    ccmEntregaNomeEditadoManualmente = true;
+    rascunho._operadorCcmEntregaNomeEditado = true;
+    rascunho.operador_ccm_entrega_nome = campoCcmEntregaNome.value;
+    salvarRascunhoAgora();
+  });
+
+  campoCcmEntregaHora.addEventListener('change', function () {
+    rascunho.operador_ccm_entrega_hora = campoCcmEntregaHora.value || '00:00';
+    salvarRascunhoAgora();
+  });
+
   ligarCampoTexto('campo-descricao-tecnica', 'descricao_tecnica_atividade');
   ligarCampoTexto('campo-tipo-veiculo', 'tipo_veiculo');
   ligarCampoTexto('campo-operador', 'operador');
@@ -1384,7 +1429,10 @@ document.addEventListener('DOMContentLoaded', async function () {
       amv: rascunho.amv,
       colaboradores: rascunho.colaboradores,
       responsavel_atividade: rascunho.responsavel_atividade,
-      operador_ccm: rascunho.operador_ccm,
+      operador_ccm_abertura_nome: rascunho.operador_ccm_abertura_nome,
+      operador_ccm_abertura_hora: rascunho.operador_ccm_abertura_hora,
+      operador_ccm_entrega_nome: rascunho.operador_ccm_entrega_nome,
+      operador_ccm_entrega_hora: rascunho.operador_ccm_entrega_hora,
       descricao_tecnica_atividade: rascunho.descricao_tecnica_atividade,
       materiais_utilizados: rascunho.materiais_utilizados,
       observacoes_gerais: rascunho.observacoes_gerais,

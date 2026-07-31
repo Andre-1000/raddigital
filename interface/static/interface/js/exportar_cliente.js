@@ -65,6 +65,13 @@ const ExportarCliente = (function () {
     }
     const textoMotivoAtrasos = partesAtraso.length ? partesAtraso.join('; ') : NAO_APLICAVEL;
 
+    // 30/07/2026: Operador CCM agora e dois pares Nome+Hora
+    // (Abertura/Entrega). Sem nome, o par inteiro cai em N/A -- a hora
+    // sozinha (mesmo com o default 00:00) nao tem sentido sem nome.
+    function textoOperadorCcm(nome, hora) {
+      return nome ? `${nome} (${ouNA(hora)})` : NAO_APLICAVEL;
+    }
+
     return [
       ['servicos', 'Atividade', textoServicos],
       ['data_preenchimento', 'Data', formatarDataBr(rascunho.data_preenchimento)],
@@ -77,8 +84,6 @@ const ExportarCliente = (function () {
       ['vias', 'Via', listaOuNA(nomesVias)],
       ['equipes', 'Equipes Envolvidas', listaOuNA(nomesEquipes)],
       ['km_poste', 'Km/Poste', ouNA(rascunho.km_poste)],
-      ['tipo_veiculo', 'Tipo de Veículo', ouNA(rascunho.tipo_veiculo)],
-      ['operador', 'Operador', ouNA(rascunho.operador)],
       [
         'hora_prog_inicio', 'Horário programado',
         `${ouNA(rascunho.hora_prog_inicio)} a ${ouNA(rascunho.hora_prog_termino)}`,
@@ -95,7 +100,16 @@ const ExportarCliente = (function () {
       ['motivo_atraso_inicio', 'Motivo dos atrasos', textoMotivoAtrasos],
       ['colaboradores', 'Responsável', listaOuNA(nomesColaboradores)],
       ['responsavel_atividade', 'Responsável Atividade', ouNA(rascunho.responsavel_atividade)],
-      ['operador_ccm', 'Operador CCM', ouNA(rascunho.operador_ccm)],
+      ['tipo_veiculo', 'Tipo de Veículo', ouNA(rascunho.tipo_veiculo)],
+      ['operador', 'Operador', ouNA(rascunho.operador)],
+      [
+        'operador_ccm_abertura', 'Op CCM - Abertura',
+        textoOperadorCcm(rascunho.operador_ccm_abertura_nome, rascunho.operador_ccm_abertura_hora),
+      ],
+      [
+        'operador_ccm_entrega', 'Op CCM - Entrega',
+        textoOperadorCcm(rascunho.operador_ccm_entrega_nome, rascunho.operador_ccm_entrega_hora),
+      ],
       ['descricao_tecnica_atividade', 'Descrição Técnica da Atividade', ouNA(rascunho.descricao_tecnica_atividade)],
       ['observacoes_gerais', 'Observação Geral', ouNA(rascunho.observacoes_gerais)],
     ];

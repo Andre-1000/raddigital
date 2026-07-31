@@ -427,7 +427,14 @@ def processar_sincronizacao(payload, usuario, fotos_intervencao=None, fotos_acao
         'materiais_utilizados': payload.get('materiais_utilizados') or None,
         'observacoes_gerais': payload.get('observacoes_gerais') or None,
         'responsavel_atividade': payload.get('responsavel_atividade') or None,
-        'operador_ccm': payload.get('operador_ccm') or None,
+        # Operador CCM (30/07/2026): dois pares Nome+Hora. A hora chega
+        # do cliente sempre preenchida (default '00:00' aplicado em
+        # rad_form.js), mas o parse aqui e defensivo -- se vier vazia
+        # por algum motivo, grava None em vez de quebrar.
+        'operador_ccm_abertura_nome': payload.get('operador_ccm_abertura_nome') or None,
+        'operador_ccm_abertura_hora': parse_hora(payload.get('operador_ccm_abertura_hora')),
+        'operador_ccm_entrega_nome': payload.get('operador_ccm_entrega_nome') or None,
+        'operador_ccm_entrega_hora': parse_hora(payload.get('operador_ccm_entrega_hora')),
         'descricao_tecnica_atividade': payload.get('descricao_tecnica_atividade') or None,
         'usuario': usuario,
         'dispositivo': payload.get('dispositivo', Rad.DESCONHECIDO),

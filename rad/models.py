@@ -175,7 +175,15 @@ class Rad(models.Model):
         blank=True,
         help_text='Obrigatorio quando o campo estiver habilitado (VLD-029).',
     )
-    operador_ccm = models.CharField(max_length=25, null=True, blank=True)
+    # Operador CCM (30/07/2026): substituido de um unico campo texto
+    # por dois pares Nome+Hora -- Abertura e Entrega. A hora tem
+    # default '00:00' aplicado no cliente (rad_form.js), entao chega
+    # aqui preenchida na pratica; nullable no banco pelo mesmo motivo
+    # de responsavel_atividade acima (campo pode ser desabilitado).
+    operador_ccm_abertura_nome = models.CharField(max_length=50, null=True, blank=True)
+    operador_ccm_abertura_hora = models.TimeField(null=True, blank=True)
+    operador_ccm_entrega_nome = models.CharField(max_length=50, null=True, blank=True)
+    operador_ccm_entrega_hora = models.TimeField(null=True, blank=True)
     descricao_tecnica_atividade = models.TextField(
         null=True, blank=True, help_text='Sem limite de caracteres. Aceita qualquer caractere.'
     )

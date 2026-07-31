@@ -231,14 +231,20 @@ def _validar_responsavel_atividade(payload, erros):
 
 def _validar_operador_ccm(payload, erros):
     """
-    VLD-030: campo opcional (nao ha regra de obrigatoriedade
-    especificada), mas quando informado nao pode passar de 25 caracteres.
+    VLD-030 (30/07/2026, revisado): Operador CCM agora e dois pares
+    Nome+Hora -- Abertura e Entrega. Ambos os nomes sao opcionais (nao
+    ha regra de obrigatoriedade especificada), mas quando informados
+    nao podem passar de 50 caracteres cada.
     """
-    valor = payload.get('operador_ccm')
-    if valor and len(str(valor)) > 25:
-        erros.append(
-            _erro('VLD-030', 'operador_ccm', 'O Operador CCM deve ter no máximo 25 caracteres.')
-        )
+    for campo, rotulo in (
+        ('operador_ccm_abertura_nome', 'Op CCM - Abertura'),
+        ('operador_ccm_entrega_nome', 'Op CCM - Entrega'),
+    ):
+        valor = payload.get(campo)
+        if valor and len(str(valor)) > 50:
+            erros.append(
+                _erro('VLD-030', campo, f'O {rotulo} deve ter no máximo 50 caracteres.')
+            )
 
 
 def _validar_descricoes_foto_vpm001(payload, erros):
@@ -387,7 +393,8 @@ _MAPA_CHAVE_CONFIG_PARA_CAMPO_PAYLOAD = {
     'observacoes_gerais': 'observacoes_gerais',
     'colaboradores': 'colaboradores',
     'responsavel_atividade': 'responsavel_atividade',
-    'operador_ccm': 'operador_ccm',
+    'operador_ccm_abertura': 'operador_ccm_abertura_nome',
+    'operador_ccm_entrega': 'operador_ccm_entrega_nome',
     'descricao_tecnica_atividade': 'descricao_tecnica_atividade',
     'equipes': 'equipes',
 }

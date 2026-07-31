@@ -20,6 +20,16 @@ Fotografico".
 sistema agora (Word). O antigo layout simples (rad/exportacao.py) foi
 descontinuado -- ver consulta/views.py.
 
+30/07/2026: o campo Operador CCM deixou de ser um unico texto e passou
+a ser dois pares Nome+Hora (Abertura/Entrega). O molde .docx original
+so tem UM marcador de texto para isso ({{OPERADOR_CCM}}) -- editar o
+proprio arquivo .docx (binario) esta fora do escopo desta mudanca, entao
+os dois pares sao combinados num unico texto formatado e inseridos
+nesse mesmo marcador. Se no futuro o molde ganhar dois espacos
+separados, e so trocar {{OPERADOR_CCM}} por {{OPERADOR_CCM_ABERTURA}}
+e {{OPERADOR_CCM_ENTREGA}} no .docx e adicionar os dois tokens
+correspondentes no dicionario `substituicoes` abaixo.
+
 Limitacoes conhecidas (a resolver com o cliente):
 - "RESPONSAVEL RAD" e preenchido automaticamente com o nome de quem
   sincronizou o RAD (consulta.views.nome_de_quem_preencheu) -- decisao
@@ -228,6 +238,31 @@ def _inserir_foto_na_celula(celula, caminho_arquivo, largura_cm=7):
     run.add_picture(caminho_arquivo, width=Cm(largura_cm))
 
 
+def _operador_ccm_combinado(rad):
+    """
+    30/07/2026: combina os dois pares Nome+Hora do Operador CCM
+    (Abertura e Entrega) em um unico texto, para caber no marcador
+    {{OPERADOR_CCM}} unico que o molde .docx atual tem -- ver nota no
+    docstring do modulo.
+    """
+    def _par(nome, hora):
+        if not nome:
+            return None
+        return f'{nome} ({hora.strftime("%H:%M")})' if hora else nome
+
+    abertura = _par(rad.operador_ccm_abertura_nome, rad.operador_ccm_abertura_hora)
+    entrega = _par(rad.operador_ccm_entrega_nome, rad.operador_ccm_entrega_hora)
+
+    if not abertura and not entrega:
+        return 'N/A'
+    partes = []
+    if abertura:
+        partes.append(f'Abertura: {abertura}')
+    if entrega:
+        partes.append(f'Entrega: {entrega}')
+    return ' — '.join(partes)
+
+
 def gerar_docx_oficial_bytes(rad):
     """
     Gera o .docx no layout oficial da TRIVIA para um RAD ja
@@ -250,7 +285,7 @@ def gerar_docx_oficial_bytes(rad):
         '{{DATA}}': rad.data_preenchimento.strftime('%d/%m/%Y'),
         '{{SA}}': rad.numero_sa,
         '{{SOLICITANTE_SA}}': na(rad.solicitante_sa),
-        '{{OPERADOR_CCM}}': na(rad.operador_ccm),
+        '{{OPERADOR_CCM}}': _operador_ccm_combinado(rad),
         '{{RESPONSAVEL_RAD}}': nome_de_quem_preencheu(rad),
         '{{H_PROGRAMADO}}': f'{rad.hora_prog_inicio.strftime("%H:%M")} às {rad.hora_prog_termino.strftime("%H:%M")}',
         '{{H_EXECUTADO}}': f'{rad.hora_real_inicio.strftime("%H:%M")} às {rad.hora_real_termino.strftime("%H:%M")}',

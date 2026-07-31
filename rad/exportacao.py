@@ -67,6 +67,20 @@ def _responsaveis_texto(rad):
     return _lista_ou_na(rad.colaboradores.values_list('nome', flat=True))
 
 
+def _operador_ccm_texto(nome, hora):
+    """
+    30/07/2026: formata um par Nome+Hora do Operador CCM (Abertura ou
+    Entrega) como "NOME (HH:MM)". Se nao houver nome, cai em N/A --
+    a hora sozinha (mesmo com o default 00:00 do cliente) nao tem
+    sentido sem um nome associado.
+    """
+    if not nome or not str(nome).strip():
+        return NAO_APLICAVEL
+    if hora:
+        return f'{nome} ({hora:%H:%M})'
+    return str(nome)
+
+
 def _campos_do_relatorio(rad):
     """
     Lista ordenada (chave_campo, rotulo, valor) — fonte unica de
@@ -101,7 +115,16 @@ def _campos_do_relatorio(rad):
         ('motivo_atraso_inicio', 'Motivo dos atrasos', _motivo_atrasos_texto(rad)),
         ('colaboradores', 'Responsável', _responsaveis_texto(rad)),
         ('responsavel_atividade', 'Responsável Atividade', _ou_na(rad.responsavel_atividade)),
-        ('operador_ccm', 'Operador CCM', _ou_na(rad.operador_ccm)),
+        (
+            'operador_ccm_abertura',
+            'Op CCM - Abertura',
+            _operador_ccm_texto(rad.operador_ccm_abertura_nome, rad.operador_ccm_abertura_hora),
+        ),
+        (
+            'operador_ccm_entrega',
+            'Op CCM - Entrega',
+            _operador_ccm_texto(rad.operador_ccm_entrega_nome, rad.operador_ccm_entrega_hora),
+        ),
         (
             'descricao_tecnica_atividade',
             'Descrição Técnica da Atividade',

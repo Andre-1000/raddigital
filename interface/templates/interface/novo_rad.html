@@ -89,16 +89,6 @@
         <label for="campo-km-poste">Km / Poste <span class="texto-suave">(opcional)</span></label>
         <input type="text" id="campo-km-poste" inputmode="numeric" placeholder="XX/XX - XX/XX" maxlength="13">
       </div>
-
-      <div class="campo">
-        <label for="campo-tipo-veiculo">Tipo de Veículo <span class="texto-suave">(opcional)</span></label>
-        <input type="text" id="campo-tipo-veiculo">
-      </div>
-
-      <div class="campo">
-        <label for="campo-operador">Operador <span class="texto-suave">(opcional)</span></label>
-        <input type="text" id="campo-operador">
-      </div>
     </div>
 
     <div class="cartao" style="margin-top:1rem;">
@@ -364,8 +354,46 @@
       </div>
 
       <div class="campo">
-        <label for="campo-operador-ccm">Operador CCM <span class="texto-suave">(opcional)</span></label>
-        <input type="text" id="campo-operador-ccm" maxlength="25">
+        <label for="campo-tipo-veiculo">Tipo de Veículo <span class="texto-suave">(opcional)</span></label>
+        <input type="text" id="campo-tipo-veiculo">
+      </div>
+
+      <div class="campo">
+        <label for="campo-operador">Operador <span class="texto-suave">(opcional)</span></label>
+        <input type="text" id="campo-operador">
+      </div>
+
+      <!-- Operador CCM (30/07/2026): Abertura e Entrega, cada um com
+           Nome (texto, 50 caracteres) e Hora (padrao 00:00). O nome da
+           Entrega é preenchido automaticamente a partir da Abertura,
+           mas pode ser editado (ver rad_form.js). -->
+      <div class="campo">
+        <label>Op CCM - Abertura <span class="texto-suave">(opcional)</span></label>
+        <div class="duas-colunas">
+          <div>
+            <label for="campo-operador-ccm-abertura-nome" class="texto-suave" style="font-size:0.8rem;">Nome</label>
+            <input type="text" id="campo-operador-ccm-abertura-nome" maxlength="50">
+          </div>
+          <div>
+            <label for="campo-operador-ccm-abertura-hora" class="texto-suave" style="font-size:0.8rem;">Hora</label>
+            <input type="time" id="campo-operador-ccm-abertura-hora" value="00:00">
+          </div>
+        </div>
+      </div>
+
+      <div class="campo">
+        <label>Op CCM - Entrega <span class="texto-suave">(opcional)</span></label>
+        <div class="duas-colunas">
+          <div>
+            <label for="campo-operador-ccm-entrega-nome" class="texto-suave" style="font-size:0.8rem;">Nome</label>
+            <input type="text" id="campo-operador-ccm-entrega-nome" maxlength="50">
+          </div>
+          <div>
+            <label for="campo-operador-ccm-entrega-hora" class="texto-suave" style="font-size:0.8rem;">Hora</label>
+            <input type="time" id="campo-operador-ccm-entrega-hora" value="00:00">
+          </div>
+        </div>
+        <p class="campo__ajuda">O nome é preenchido automaticamente a partir da Abertura, mas pode ser editado.</p>
       </div>
 
       <div class="campo">
