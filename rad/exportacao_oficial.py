@@ -308,7 +308,10 @@ def gerar_docx_oficial_bytes(rad):
         substituicoes[f'{{{{CB_LINHA{codigo}}}}}'] = '[X]' if marcado else '[  ]'
 
     equipes_selecionadas = set(rad.equipes.values_list('equipe_id', flat=True))
-    for codigo, token in (('RA', 'CB_RA'), ('VP', 'CB_VP'), ('CIVIL', 'CB_CIVIL'), ('RESTAB', 'CB_RESTAB')):
+    for codigo, token in (
+        ('RA', 'CB_RA'), ('VP', 'CB_VP'), ('CIVIL', 'CB_CIVIL'), ('RESTAB', 'CB_RESTAB'),
+        ('MRO', 'CB_MRO'), ('SINAL', 'CB_SINAL'),
+    ):
         marcado = codigo in equipes_selecionadas
         substituicoes[f'{{{{{token}}}}}'] = '[X]' if marcado else '[  ]'
 
