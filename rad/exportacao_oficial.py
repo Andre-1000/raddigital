@@ -36,12 +36,19 @@ Limitacoes conhecidas (a resolver com o cliente):
   do cliente em 22/07/2026, substitui o antigo campo digitado
   manualmente "Equipe TRIVIA".
 - "Conclusao e Liberacao da Via" nao tem campo correspondente no RAD
-  Digital ainda -- fica com um aviso de pendencia no lugar do texto.
-- O molde tem espaco para 1 foto de "Intervencao Verificada" e 2 fotos
-  de "Acao Realizada" (herdado do documento original). O RAD Digital
-  permite ate 2 fotos por categoria -- a 2a foto de "Intervencao
-  Verificada", se houver, fica de fora deste layout especifico ate
-  o molde ganhar uma linha extra.
+  Digital ainda -- o molde atual tambem nao tem mais essa secao.
+- 30/07/2026: o molde ganhou os 4 espacos de foto (antes so 3 eram
+  aproveitados) -- ver mapeamento FOTO 1-4 em gerar_docx_oficial_bytes.
+- Operador CCM: o RAD Digital guarda 4 informacoes (nome/hora de
+  Abertura, nome/hora de Entrega), mas o molde so tem 1 campo, rotulado
+  "Op CCM - Abertura". Por isso so a Abertura aparece no Word oficial
+  (ver _operador_ccm_abertura_texto) -- a Entrega fica de fora ate o
+  molde ganhar um campo proprio para ela.
+- Descricoes de foto do VPM001 (Rad.desc_foto_1 a desc_foto_4) e os
+  nomes/matriculas dos Colaboradores nao tem espaco reservado no molde
+  atual -- os tokens {{NOMES_COLABORADORES}} e
+  {{MATRICULAS_COLABORADORES}} existem no codigo mas ficam ociosos ate
+  o molde ganhar as secoes correspondentes.
 """
 import io
 import os
@@ -184,22 +191,33 @@ def _reconstruir_checklist_servicos(doc, ids_servicos_selecionados):
         novas_linhas_xml.append(nova_linha_xml)
 
     # Remove as linhas antigas do checklist e insere as novas no
-    # mesmo lugar.
+    # mesmo lugar. IMPORTANTE (bug corrigido em 30/07/2026): o pai e a
+    # linha seguinte precisam ser capturados ANTES do loop de remocao
+    # -- linha_de_referencia e uma das linhas removidas, entao chamar
+    # .getparent() nela DEPOIS de remover sempre retorna None (o
+    # elemento fica orfao). O bug so nao aparecia porque esta funcao
+    # nunca tinha sido exercitada de ponta a ponta em producao.
     linha_de_referencia = linhas_xml[indice_primeira_linha_checklist]
+    elemento_pai = linha_de_referencia.getparent()
+    linha_seguinte = (
+        linhas_xml[indice_ultima_linha_checklist + 1]
+        if indice_ultima_linha_checklist + 1 < len(linhas_xml)
+        else None
+    )
+
     for indice in range(indice_ultima_linha_checklist, indice_primeira_linha_checklist - 1, -1):
         linhas_xml[indice].getparent().remove(linhas_xml[indice])
 
-    elemento_pai = linha_de_referencia.getparent()
-    ancora = None
-    for nova_linha in novas_linhas_xml:
-        if ancora is None:
-            # a linha de referencia ja foi removida; usa o proximo
-            # irmao remanescente como ponto de insercao, ou anexa no
-            # fim se nao houver mais linhas depois do checklist.
+    if linha_seguinte is not None:
+        # Insere logo ANTES do que sobrou depois do checklist (ex.: a
+        # linha "3. Equipes Envolvidas"), preservando a posicao visual
+        # correta em vez de jogar as linhas novas no fim da tabela.
+        for nova_linha in reversed(novas_linhas_xml):
+            linha_seguinte.addprevious(nova_linha)
+    else:
+        # Checklist era a ultima coisa da tabela -- so anexa no fim.
+        for nova_linha in novas_linhas_xml:
             elemento_pai.append(nova_linha)
-        else:
-            ancora.addnext(nova_linha)
-        ancora = nova_linha
 
 
 class _TrWrapper:
@@ -238,29 +256,19 @@ def _inserir_foto_na_celula(celula, caminho_arquivo, largura_cm=7):
     run.add_picture(caminho_arquivo, width=Cm(largura_cm))
 
 
-def _operador_ccm_combinado(rad):
+def _operador_ccm_abertura_texto(rad):
     """
-    30/07/2026: combina os dois pares Nome+Hora do Operador CCM
-    (Abertura e Entrega) em um unico texto, para caber no marcador
-    {{OPERADOR_CCM}} unico que o molde .docx atual tem -- ver nota no
-    docstring do modulo.
+    30/07/2026 (revisado): o campo do molde e literalmente "Op CCM -
+    Abertura" (rotulo no Word: "[Nome da Pessoa que abriu]") -- entao
+    mostra so o par Abertura (nome + hora), sem misturar com Entrega.
+    A Entrega nao tem campo correspondente no molde atual (ver nota no
+    docstring do modulo) -- fica de fora do Word oficial por enquanto.
     """
-    def _par(nome, hora):
-        if not nome:
-            return None
-        return f'{nome} ({hora.strftime("%H:%M")})' if hora else nome
-
-    abertura = _par(rad.operador_ccm_abertura_nome, rad.operador_ccm_abertura_hora)
-    entrega = _par(rad.operador_ccm_entrega_nome, rad.operador_ccm_entrega_hora)
-
-    if not abertura and not entrega:
+    nome = rad.operador_ccm_abertura_nome
+    hora = rad.operador_ccm_abertura_hora
+    if not nome:
         return 'N/A'
-    partes = []
-    if abertura:
-        partes.append(f'Abertura: {abertura}')
-    if entrega:
-        partes.append(f'Entrega: {entrega}')
-    return ' — '.join(partes)
+    return f'{nome} ({hora.strftime("%H:%M")})' if hora else nome
 
 
 def gerar_docx_oficial_bytes(rad):
@@ -285,7 +293,7 @@ def gerar_docx_oficial_bytes(rad):
         '{{DATA}}': rad.data_preenchimento.strftime('%d/%m/%Y'),
         '{{SA}}': rad.numero_sa,
         '{{SOLICITANTE_SA}}': na(rad.solicitante_sa),
-        '{{OPERADOR_CCM}}': _operador_ccm_combinado(rad),
+        '{{OPERADOR_CCM}}': _operador_ccm_abertura_texto(rad),
         '{{RESPONSAVEL_RAD}}': nome_de_quem_preencheu(rad),
         '{{H_PROGRAMADO}}': f'{rad.hora_prog_inicio.strftime("%H:%M")} às {rad.hora_prog_termino.strftime("%H:%M")}',
         '{{H_EXECUTADO}}': f'{rad.hora_real_inicio.strftime("%H:%M")} às {rad.hora_real_termino.strftime("%H:%M")}',
@@ -330,9 +338,11 @@ def gerar_docx_oficial_bytes(rad):
     ids_servicos_selecionados = set(rad.servicos.values_list('servico_id', flat=True))
     _reconstruir_checklist_servicos(doc, ids_servicos_selecionados)
 
-    # Fotos: mapeia para os 3 espacos que o molde original tem
-    # (1 Intervencao Verificada + 2 Acao Realizada -- ver limitacao no
-    # docstring do modulo).
+    # Fotos: 30/07/2026 -- o molde ganhou 4 espacos de verdade (antes
+    # so tinha 3 aproveitaveis). Mapeamento fixo, casa com o texto
+    # "Foto N" que ja vem escrito nas celulas do molde:
+    #   FOTO 1 = Intervencao Verificada 1   FOTO 2 = Acao Realizada 1
+    #   FOTO 3 = Intervencao Verificada 2   FOTO 4 = Acao Realizada 2
     anexos_intervencao = [a for a in rad.anexos.all() if a.categoria_foto == 'intervencao_verificada']
     anexos_acao = [a for a in rad.anexos.all() if a.categoria_foto == 'acao_realizada']
 
@@ -340,11 +350,14 @@ def gerar_docx_oficial_bytes(rad):
     for linha in tabela.rows:
         celulas = _celulas_unicas_da_linha(linha)
         for celula in celulas:
-            if 'FOTO 1' in celula.text and anexos_intervencao:
+            if 'FOTO 1' in celula.text and len(anexos_intervencao) > 0:
                 with default_storage.open(anexos_intervencao[0].caminho_servidor, 'rb') as arquivo:
                     _inserir_foto_temp(celula, arquivo)
-            elif 'FOTO 2' in celula.text and anexos_acao:
+            elif 'FOTO 2' in celula.text and len(anexos_acao) > 0:
                 with default_storage.open(anexos_acao[0].caminho_servidor, 'rb') as arquivo:
+                    _inserir_foto_temp(celula, arquivo)
+            elif 'FOTO 3' in celula.text and len(anexos_intervencao) > 1:
+                with default_storage.open(anexos_intervencao[1].caminho_servidor, 'rb') as arquivo:
                     _inserir_foto_temp(celula, arquivo)
             elif 'FOTO 4' in celula.text and len(anexos_acao) > 1:
                 with default_storage.open(anexos_acao[1].caminho_servidor, 'rb') as arquivo:
