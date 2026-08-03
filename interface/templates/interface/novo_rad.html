@@ -186,7 +186,7 @@
               style="width:auto; min-height:36px; padding:0 0.9rem; margin-bottom:0.9rem; font-size:0.85rem;">
         O que é cada serviço?
       </button>
-      <div class="grade-checkboxes" id="lista-servicos"></div>
+      <div class="lista-grupos-servicos" id="lista-servicos"></div>
 
       <div class="campo" id="campo-grupo-outros-servico" style="display:none; margin-top:0.8rem;">
         <label for="campo-outros-servico-desc">Descreva o serviço</label>
@@ -516,22 +516,31 @@
     font-weight: 400;
   }
   /* Blocos expansiveis de Servicos Executados (Geral/Infra/Corretiva/
-     Mecanizada, 30/07/2026) -- usa o elemento nativo <details>, que ja
-     vem com o triangulo de abrir/fechar do navegador; so estilizamos
-     a "capa" (summary) e o espacamento entre grupos. */
+     Mecanizada, 30/07/2026). Empilhados verticalmente -- cada grupo
+     ocupa a largura toda, sem grid de colunas, pra um grupo aberto
+     nunca "esticar" o vizinho fechado (bug real, corrigido: o
+     container tinha a classe de grid antiga, que forcava 2 colunas
+     com altura igual entre elas). */
+  .lista-grupos-servicos {
+    display: flex;
+    flex-direction: column;
+  }
   .grupo-servicos {
     border: 1px solid var(--cor-linha);
     border-radius: var(--raio-pequeno);
     padding: 0.6rem 0.8rem;
     margin-bottom: 0.6rem;
   }
+  /* Sem display:flex aqui de proposito -- <summary> usa display:
+     list-item nativamente pra desenhar o triangulo de abrir/fechar;
+     sobrescrever pra flex apaga esse triangulo (bug real, corrigido:
+     ficava sem nenhuma pista visual de que o bloco era clicavel). */
   .grupo-servicos__cabecalho {
     cursor: pointer;
     font-weight: 700;
     color: var(--cor-primaria);
     min-height: var(--alvo-toque);
-    display: flex;
-    align-items: center;
+    padding: 0.3rem 0;
   }
   .grupo-servicos__corpo {
     margin-top: 0.7rem;
