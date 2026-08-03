@@ -656,64 +656,102 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
   }
 
-  // 30/07/2026: variante de renderizarListaCheckbox especifica para
-  // Servicos Executados -- agrupa visualmente em "Geral" e "Infra"
-  // (usando o campo area vindo do catalogo), com "Outros" sempre por
-  // ultimo, fora dos grupos. So muda a apresentacao; a logica de
-  // selecao (checkbox marcado/desmarcado, callback aoMudar) e identica
-  // a renderizarListaCheckbox.
+  // 30/07/2026: Servicos Executados agora e organizado em blocos
+  // expansiveis (Geral, Infra, Corretiva, Mecanizada) -- cada grupo
+  // comeca fechado e o usuario clica pra expandir e ver os servicos
+  // daquele grupo. Usa o elemento nativo <details>/<summary> do HTML:
+  // ganha comportamento de clique/teclado de graca, sem precisar
+  // escrever logica de abrir/fechar na mao. "Outros" fica de fora dos
+  // grupos, sempre visivel no final (e um catch-all, nao uma
+  // categoria). Um grupo que ja tem servico selecionado comeca aberto
+  // (RG: nunca esconder uma selecao existente do usuario sem ele
+  // pedir), e o cabecalho mostra quantos estao marcados mesmo fechado.
+  const ROTULOS_GRUPO_SERVICO = {
+    geral: 'Geral',
+    infra: 'Infra',
+    corretiva: 'Corretiva',
+    mecanizada: 'Mecanizada',
+  };
+  const ORDEM_GRUPOS_SERVICO = ['geral', 'infra', 'corretiva', 'mecanizada'];
+
+  function criarLinhaCheckboxServico(servico, valoresSelecionados, aoMudar) {
+    const linha = document.createElement('label');
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.style.marginTop = '0.3rem';
+    checkbox.style.minWidth = '20px';
+    checkbox.style.minHeight = '20px';
+    checkbox.checked = valoresSelecionados.includes(servico.id);
+    checkbox.addEventListener('change', function () {
+      const indice = valoresSelecionados.indexOf(servico.id);
+      if (checkbox.checked && indice === -1) {
+        valoresSelecionados.push(servico.id);
+      } else if (!checkbox.checked && indice !== -1) {
+        valoresSelecionados.splice(indice, 1);
+      }
+      aoMudar(servico, checkbox.checked);
+    });
+
+    const textoWrapper = document.createElement('span');
+    textoWrapper.textContent = servico.nome;
+    linha.appendChild(checkbox);
+    linha.appendChild(textoWrapper);
+    return linha;
+  }
+
   function renderizarServicosAgrupados(containerEl, servicosOrdenados, valoresSelecionados, aoMudar) {
     containerEl.innerHTML = '';
 
-    function adicionarCabecalho(texto) {
-      const cabecalho = document.createElement('p');
-      cabecalho.className = 'grade-checkboxes__cabecalho';
-      cabecalho.textContent = texto;
-      containerEl.appendChild(cabecalho);
-    }
-
-    function adicionarItens(itens) {
-      itens.forEach(function (servico) {
-        const linha = document.createElement('label');
-
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.style.marginTop = '0.3rem';
-        checkbox.style.minWidth = '20px';
-        checkbox.style.minHeight = '20px';
-        checkbox.checked = valoresSelecionados.includes(servico.id);
-        checkbox.addEventListener('change', function () {
-          const indice = valoresSelecionados.indexOf(servico.id);
-          if (checkbox.checked && indice === -1) {
-            valoresSelecionados.push(servico.id);
-          } else if (!checkbox.checked && indice !== -1) {
-            valoresSelecionados.splice(indice, 1);
-          }
-          aoMudar(servico, checkbox.checked);
-        });
-
-        const textoWrapper = document.createElement('span');
-        textoWrapper.textContent = servico.nome;
-        linha.appendChild(checkbox);
-        linha.appendChild(textoWrapper);
-        containerEl.appendChild(linha);
-      });
-    }
-
     const outros = servicosOrdenados.filter((s) => s.nome === 'Outros');
-    const grupos = [
-      { rotulo: 'Geral', itens: servicosOrdenados.filter((s) => s.area !== 'infra' && s.nome !== 'Outros') },
-      { rotulo: 'Infra', itens: servicosOrdenados.filter((s) => s.area === 'infra') },
-    ];
 
-    grupos.forEach(function (grupo) {
-      if (grupo.itens.length === 0) return;
-      adicionarCabecalho(grupo.rotulo);
-      adicionarItens(grupo.itens);
+    ORDEM_GRUPOS_SERVICO.forEach(function (chaveGrupo) {
+      const itensDoGrupo = servicosOrdenados.filter(
+        (s) => (s.area || 'geral') === chaveGrupo && s.nome !== 'Outros'
+      );
+      if (itensDoGrupo.length === 0) return; // grupo sem nenhum servico ativo: nem aparece
+
+      const detalhes = document.createElement('details');
+      detalhes.className = 'grupo-servicos';
+
+      const resumo = document.createElement('summary');
+      resumo.className = 'grupo-servicos__cabecalho';
+      detalhes.appendChild(resumo);
+
+      const corpo = document.createElement('div');
+      corpo.className = 'grade-checkboxes grupo-servicos__corpo';
+      detalhes.appendChild(corpo);
+
+      function atualizarRotuloResumo() {
+        const quantidadeSelecionada = itensDoGrupo.filter((s) => valoresSelecionados.includes(s.id)).length;
+        resumo.textContent = quantidadeSelecionada > 0
+          ? `${ROTULOS_GRUPO_SERVICO[chaveGrupo]} (${quantidadeSelecionada} selecionado${quantidadeSelecionada > 1 ? 's' : ''})`
+          : ROTULOS_GRUPO_SERVICO[chaveGrupo];
+      }
+      atualizarRotuloResumo();
+
+      itensDoGrupo.forEach(function (servico) {
+        const linha = criarLinhaCheckboxServico(servico, valoresSelecionados, function (item, marcado) {
+          atualizarRotuloResumo();
+          aoMudar(item, marcado);
+        });
+        corpo.appendChild(linha);
+      });
+
+      // Comeca aberto se ja tem algo marcado -- nunca esconder uma
+      // selecao existente sem o usuario pedir.
+      detalhes.open = itensDoGrupo.some((s) => valoresSelecionados.includes(s.id));
+
+      containerEl.appendChild(detalhes);
     });
 
     if (outros.length > 0) {
-      adicionarItens(outros);
+      const corpoOutros = document.createElement('div');
+      corpoOutros.className = 'grade-checkboxes';
+      containerEl.appendChild(corpoOutros);
+      outros.forEach(function (servico) {
+        corpoOutros.appendChild(criarLinhaCheckboxServico(servico, valoresSelecionados, aoMudar));
+      });
     }
   }
 

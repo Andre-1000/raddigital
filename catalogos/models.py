@@ -117,16 +117,17 @@ class CatServico(models.Model):
     Op Maquina e Volume sao especificos de cada servico, controlados
     por terceiros_tem_op_maquina e terceiros_tem_volume.
 
-    area (30/07/2026): agrupamento puramente visual usado na tela de
-    preenchimento do RAD, para separar servicos "Geral" (via
-    permanente) dos servicos "Infra" (terceirizados: Recolhimento de
-    Lixo, Limpeza de Canaleta, Capina Quimica, Rocada/Poda). Nao afeta
+    area (30/07/2026): agrupamento visual usado na tela de
+    preenchimento do RAD, para separar os servicos em blocos
+    expansiveis (Geral, Infra, Corretiva, Mecanizada). Nao afeta
     nenhuma regra de negocio -- so a organizacao visual da lista.
     """
 
     AREA_CHOICES = [
         ('geral', 'Geral'),
         ('infra', 'Infra'),
+        ('corretiva', 'Corretiva'),
+        ('mecanizada', 'Mecanizada'),
     ]
 
     nome = models.CharField(max_length=100, unique=True)
