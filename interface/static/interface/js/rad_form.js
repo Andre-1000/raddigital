@@ -20,11 +20,18 @@ document.addEventListener('DOMContentLoaded', async function () {
       if (!(chave in rascunho)) rascunho[chave] = padrao[chave];
     }
   }
-  if (!rascunho.amv) {
-    rascunho.amv = { id_mch: null, tipos_defeito: [], acoes: [], desc_outros_tipo_defeito: '', desc_outros_acao: '' };
+  if (!rascunho.amv_blocos) {
+    // 30/07/2026: migracao defensiva de rascunhos antigos que ainda
+    // estejam salvos no formato singular (rascunho.amv) no
+    // IndexedDB de algum dispositivo -- converte pra lista, sem
+    // perder o que a pessoa ja tinha preenchido.
+    if (rascunho.amv && rascunho.amv.id_mch) {
+      rascunho.amv_blocos = [rascunho.amv];
+    } else {
+      rascunho.amv_blocos = [];
+    }
   }
-  if (!('desc_outros_tipo_defeito' in rascunho.amv)) rascunho.amv.desc_outros_tipo_defeito = '';
-  if (!('desc_outros_acao' in rascunho.amv)) rascunho.amv.desc_outros_acao = '';
+  delete rascunho.amv;
   if (!rascunho.anexos) {
     rascunho.anexos = { fotos_intervencao_verificada: [], fotos_acao_realizada: [], pdf: [] };
   }
@@ -117,7 +124,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       terceiros_num_ajudantes: '',
       terceiros_num_motorista: '',
       terceiros_volume: '',
-      amv: { id_mch: null, tipos_defeito: [], acoes: [], desc_outros_tipo_defeito: '', desc_outros_acao: '' },
+      amv_blocos: [],
       colaboradores: [],
       anexos: {
         fotos_intervencao_verificada: [],
@@ -671,8 +678,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     infra: 'Infra',
     corretiva: 'Corretiva',
     mecanizada: 'Mecanizada',
+    amv: 'AMV',
   };
-  const ORDEM_GRUPOS_SERVICO = ['geral', 'infra', 'corretiva', 'mecanizada'];
+  const ORDEM_GRUPOS_SERVICO = ['geral', 'infra', 'corretiva', 'mecanizada', 'amv'];
 
   function criarLinhaCheckboxServico(servico, valoresSelecionados, aoMudar) {
     const linha = document.createElement('label');
@@ -793,92 +801,218 @@ document.addEventListener('DOMContentLoaded', async function () {
     return servicos.some((s) => s[flag] && rascunho.servicos.includes(s.id));
   }
 
-  const campoMch = document.getElementById('campo-mch');
-  const listaMchEl = document.getElementById('lista-mch');
-  const detalhesMch = document.getElementById('detalhes-mch');
-  const mapaMchPorRotulo = new Map();
+  // 30/07/2026: Bloco AMV agora suporta varios blocos (um por MCH
+  // verificada nesse RAD, ate MAXIMO_BLOCOS_AMV). Nao ha mais campos
+  // fixos no HTML (campo-mch, lista-tipos-defeito etc.) -- cada bloco
+  // e criado inteiramente por JS dentro de #container-blocos-amv, com
+  // seus proprios elementos, independentes dos outros blocos.
+  const MAXIMO_BLOCOS_AMV = 16;
+  const containerBlocosAmv = document.getElementById('container-blocos-amv');
+  const botaoAdicionarMch = document.getElementById('botao-adicionar-mch');
+  const contadorBlocosAmv = document.getElementById('contador-blocos-amv');
 
-  mchs.forEach(function (mch) {
-    mapaMchPorRotulo.set(mch.identificacao, mch.id);
-    const opcao = document.createElement('option');
-    opcao.value = mch.identificacao;
-    listaMchEl.appendChild(opcao);
-  });
+  function criarBlocoAmvVazio() {
+    return { id_mch: null, tipos_defeito: [], acoes: [], desc_outros_tipo_defeito: '', desc_outros_acao: '' };
+  }
 
-  function preencherDetalhesMch(idMch) {
+  function montarDetalhesMchTexto(idMch) {
     const mch = mchs.find((m) => m.id === idMch);
-    if (!mch) {
-      detalhesMch.style.display = 'none';
-      return;
-    }
-    document.getElementById('valor-mch-modelo').textContent = mch.modelo || '—';
-    document.getElementById('valor-mch-via').textContent = mch.via || '—';
-    document.getElementById('valor-mch-ur').textContent = mch.ur || '—';
-    document.getElementById('valor-mch-local').textContent = mch.local_amv || '—';
-    document.getElementById('valor-mch-linha').textContent = mch.linha || '—';
-    detalhesMch.style.display = 'flex';
+    return {
+      modelo: mch ? mch.modelo || '—' : '—',
+      via: mch ? mch.via || '—' : '—',
+      ur: mch ? mch.ur || '—' : '—',
+      local: mch ? mch.local_amv || '—' : '—',
+      linha: mch ? mch.linha || '—' : '—',
+    };
   }
 
-  const campoGrupoOutrosDefeito = document.getElementById('campo-grupo-outros-defeito');
-  const campoDescOutrosDefeito = document.getElementById('campo-desc-outros-defeito');
-  const campoGrupoOutrosAcao = document.getElementById('campo-grupo-outros-acao');
-  const campoDescOutrosAcao = document.getElementById('campo-desc-outros-acao');
+  function renderizarBlocoAmvIndividual(bloco, indice) {
+    const cartao = document.createElement('div');
+    cartao.className = 'cartao bloco-amv';
 
-  campoDescOutrosDefeito.value = rascunho.amv.desc_outros_tipo_defeito || '';
-  campoDescOutrosDefeito.addEventListener('input', function () {
-    rascunho.amv.desc_outros_tipo_defeito = campoDescOutrosDefeito.value;
-    salvarRascunhoAgora();
-  });
-  campoDescOutrosAcao.value = rascunho.amv.desc_outros_acao || '';
-  campoDescOutrosAcao.addEventListener('input', function () {
-    rascunho.amv.desc_outros_acao = campoDescOutrosAcao.value;
-    salvarRascunhoAgora();
-  });
+    const cabecalho = document.createElement('div');
+    cabecalho.className = 'bloco-amv__cabecalho';
+    const titulo = document.createElement('p');
+    titulo.className = 'bloco-amv__titulo';
+    titulo.textContent = `Bloco AMV — ${indice + 1} de ${rascunho.amv_blocos.length}`;
+    cabecalho.appendChild(titulo);
 
-  function atualizarVisibilidadeOutrosAmv() {
-    const defeitoOutrosSelecionado = tiposDefeitoAmv.some(
-      (t) => t.requer_descricao && rascunho.amv.tipos_defeito.includes(t.id)
-    );
-    campoGrupoOutrosDefeito.style.display = defeitoOutrosSelecionado ? '' : 'none';
-    if (!defeitoOutrosSelecionado) {
-      rascunho.amv.desc_outros_tipo_defeito = '';
-      campoDescOutrosDefeito.value = '';
+    if (indice > 0) {
+      // O primeiro bloco nunca e removivel -- precisa de ao menos 1
+      // enquanto "Manutencao em AMV" estiver selecionado (VLD-020).
+      const botaoRemover = document.createElement('button');
+      botaoRemover.type = 'button';
+      botaoRemover.className = 'botao botao--perigo';
+      botaoRemover.style.width = 'auto';
+      botaoRemover.style.minHeight = '32px';
+      botaoRemover.style.padding = '0 0.8rem';
+      botaoRemover.style.fontSize = '0.8rem';
+      botaoRemover.textContent = 'Remover';
+      botaoRemover.addEventListener('click', function () {
+        rascunho.amv_blocos.splice(indice, 1);
+        renderizarBlocosAmv();
+        salvarRascunhoAgora();
+      });
+      cabecalho.appendChild(botaoRemover);
     }
+    cartao.appendChild(cabecalho);
 
-    const acaoOutrosSelecionada = acoesAmv.some(
-      (a) => a.requer_descricao && rascunho.amv.acoes.includes(a.id)
-    );
-    campoGrupoOutrosAcao.style.display = acaoOutrosSelecionada ? '' : 'none';
-    if (!acaoOutrosSelecionada) {
-      rascunho.amv.desc_outros_acao = '';
-      campoDescOutrosAcao.value = '';
+    // --- Identificacao MCH ---
+    const campoMchGrupo = document.createElement('div');
+    campoMchGrupo.className = 'campo';
+    const idListaMch = `lista-mch-${indice}`;
+    campoMchGrupo.innerHTML = `<label>Identificação MCH</label>`;
+    const inputMch = document.createElement('input');
+    inputMch.type = 'text';
+    inputMch.setAttribute('list', idListaMch);
+    inputMch.autocomplete = 'off';
+    inputMch.placeholder = 'Buscar MCH…';
+    const mchAtual = mchs.find((m) => m.id === bloco.id_mch);
+    inputMch.value = mchAtual ? mchAtual.identificacao : '';
+    campoMchGrupo.appendChild(inputMch);
+
+    const datalist = document.createElement('datalist');
+    datalist.id = idListaMch;
+    mchs.forEach(function (mch) {
+      const opcao = document.createElement('option');
+      opcao.value = mch.identificacao;
+      datalist.appendChild(opcao);
+    });
+    campoMchGrupo.appendChild(datalist);
+
+    const detalhesMchEl = document.createElement('div');
+    detalhesMchEl.className = 'bloco-amv__detalhes-mch';
+
+    function atualizarDetalhesMch() {
+      if (!bloco.id_mch) {
+        detalhesMchEl.style.display = 'none';
+        return;
+      }
+      const detalhes = montarDetalhesMchTexto(bloco.id_mch);
+      detalhesMchEl.innerHTML = `
+        <div><span class="texto-suave" style="font-size:0.8rem;">Modelo</span><br><strong>${detalhes.modelo}</strong></div>
+        <div><span class="texto-suave" style="font-size:0.8rem;">Via</span><br><strong>${detalhes.via}</strong></div>
+        <div><span class="texto-suave" style="font-size:0.8rem;">UR</span><br><strong>${detalhes.ur}</strong></div>
+        <div><span class="texto-suave" style="font-size:0.8rem;">Local</span><br><strong>${detalhes.local}</strong></div>
+        <div><span class="texto-suave" style="font-size:0.8rem;">Linha</span><br><strong>${detalhes.linha}</strong></div>
+      `;
+      detalhesMchEl.style.display = 'flex';
     }
-  }
+    atualizarDetalhesMch();
+    campoMchGrupo.appendChild(detalhesMchEl);
 
-  function renderizarBlocoAmv() {
-    campoMch.value = rascunho.amv.id_mch ? (mchs.find((m) => m.id === rascunho.amv.id_mch) || {}).identificacao || '' : '';
-    preencherDetalhesMch(rascunho.amv.id_mch);
+    inputMch.addEventListener('change', function () {
+      const mchEncontrada = mchs.find((m) => m.identificacao === inputMch.value.trim());
+      bloco.id_mch = mchEncontrada ? mchEncontrada.id : null;
+      atualizarDetalhesMch();
+      salvarRascunhoAgora();
+    });
+    cartao.appendChild(campoMchGrupo);
 
+    // --- Tipo de Defeito ---
+    const grupoDefeito = document.createElement('div');
+    grupoDefeito.className = 'campo';
+    grupoDefeito.innerHTML = '<label>Tipo de Defeito</label>';
+    const listaDefeitoEl = document.createElement('div');
+    listaDefeitoEl.className = 'pilha';
+    grupoDefeito.appendChild(listaDefeitoEl);
+
+    const grupoOutrosDefeito = document.createElement('div');
+    grupoOutrosDefeito.style.marginTop = '0.6rem';
+    grupoOutrosDefeito.innerHTML = '<label>Descreva o tipo de defeito</label>';
+    const campoOutrosDefeito = document.createElement('textarea');
+    campoOutrosDefeito.maxLength = 500;
+    campoOutrosDefeito.value = bloco.desc_outros_tipo_defeito || '';
+    campoOutrosDefeito.addEventListener('input', function () {
+      bloco.desc_outros_tipo_defeito = campoOutrosDefeito.value;
+      salvarRascunhoAgora();
+    });
+    grupoOutrosDefeito.appendChild(campoOutrosDefeito);
+    grupoDefeito.appendChild(grupoOutrosDefeito);
+
+    function atualizarVisibilidadeOutrosDefeito() {
+      const outrosSelecionado = tiposDefeitoAmv.some(
+        (t) => t.requer_descricao && bloco.tipos_defeito.includes(t.id)
+      );
+      grupoOutrosDefeito.style.display = outrosSelecionado ? '' : 'none';
+      if (!outrosSelecionado) {
+        bloco.desc_outros_tipo_defeito = '';
+        campoOutrosDefeito.value = '';
+      }
+    }
     renderizarListaCheckbox(
-      document.getElementById('lista-tipos-defeito'),
+      listaDefeitoEl,
       tiposDefeitoAmv.map((t) => ({ valor: t.id, rotulo: t.nome })),
-      rascunho.amv.tipos_defeito,
+      bloco.tipos_defeito,
       function () {
-        atualizarVisibilidadeOutrosAmv();
+        atualizarVisibilidadeOutrosDefeito();
         salvarRascunhoAgora();
       }
     );
+    atualizarVisibilidadeOutrosDefeito();
+    cartao.appendChild(grupoDefeito);
+
+    // --- Acoes ---
+    const grupoAcoes = document.createElement('div');
+    grupoAcoes.className = 'campo';
+    grupoAcoes.innerHTML = '<label>Ações</label>';
+    const listaAcoesEl = document.createElement('div');
+    listaAcoesEl.className = 'pilha';
+    grupoAcoes.appendChild(listaAcoesEl);
+
+    const grupoOutrosAcao = document.createElement('div');
+    grupoOutrosAcao.style.marginTop = '0.6rem';
+    grupoOutrosAcao.innerHTML = '<label>Descreva a ação</label>';
+    const campoOutrosAcao = document.createElement('textarea');
+    campoOutrosAcao.maxLength = 500;
+    campoOutrosAcao.value = bloco.desc_outros_acao || '';
+    campoOutrosAcao.addEventListener('input', function () {
+      bloco.desc_outros_acao = campoOutrosAcao.value;
+      salvarRascunhoAgora();
+    });
+    grupoOutrosAcao.appendChild(campoOutrosAcao);
+    grupoAcoes.appendChild(grupoOutrosAcao);
+
+    function atualizarVisibilidadeOutrosAcao() {
+      const outrosSelecionada = acoesAmv.some(
+        (a) => a.requer_descricao && bloco.acoes.includes(a.id)
+      );
+      grupoOutrosAcao.style.display = outrosSelecionada ? '' : 'none';
+      if (!outrosSelecionada) {
+        bloco.desc_outros_acao = '';
+        campoOutrosAcao.value = '';
+      }
+    }
     renderizarListaCheckbox(
-      document.getElementById('lista-acoes-amv'),
+      listaAcoesEl,
       acoesAmv.map((a) => ({ valor: a.id, rotulo: a.nome })),
-      rascunho.amv.acoes,
+      bloco.acoes,
       function () {
-        atualizarVisibilidadeOutrosAmv();
+        atualizarVisibilidadeOutrosAcao();
         salvarRascunhoAgora();
       }
     );
-    atualizarVisibilidadeOutrosAmv();
+    atualizarVisibilidadeOutrosAcao();
+    cartao.appendChild(grupoAcoes);
+
+    return cartao;
   }
+
+  function renderizarBlocosAmv() {
+    containerBlocosAmv.innerHTML = '';
+    rascunho.amv_blocos.forEach(function (bloco, indice) {
+      containerBlocosAmv.appendChild(renderizarBlocoAmvIndividual(bloco, indice));
+    });
+    contadorBlocosAmv.textContent = `${rascunho.amv_blocos.length} de ${MAXIMO_BLOCOS_AMV} blocos usados`;
+    botaoAdicionarMch.style.display = rascunho.amv_blocos.length >= MAXIMO_BLOCOS_AMV ? 'none' : '';
+  }
+
+  botaoAdicionarMch.addEventListener('click', function () {
+    if (rascunho.amv_blocos.length >= MAXIMO_BLOCOS_AMV) return;
+    rascunho.amv_blocos.push(criarBlocoAmvVazio());
+    renderizarBlocosAmv();
+    salvarRascunhoAgora();
+  });
 
   const blocoTerceiros = document.getElementById('bloco-terceiros');
   const campoGrupoTerceirosOpMaquina = document.getElementById('campo-grupo-terceiros-op-maquina');
@@ -898,16 +1032,14 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     if (servicoRequerAmvSelecionado()) {
       blocoAmv.style.display = '';
-      renderizarBlocoAmv();
+      if (rascunho.amv_blocos.length === 0) {
+        rascunho.amv_blocos.push(criarBlocoAmvVazio());
+      }
+      renderizarBlocosAmv();
     } else {
       blocoAmv.style.display = 'none';
-      rascunho.amv.id_mch = null;
-      rascunho.amv.tipos_defeito.length = 0;
-      rascunho.amv.acoes.length = 0;
-      rascunho.amv.desc_outros_tipo_defeito = '';
-      rascunho.amv.desc_outros_acao = '';
-      campoMch.value = '';
-      detalhesMch.style.display = 'none';
+      rascunho.amv_blocos.length = 0;
+      containerBlocosAmv.innerHTML = '';
     }
 
     if (servicoRequerTerceirosSelecionado()) {
@@ -961,13 +1093,6 @@ document.addEventListener('DOMContentLoaded', async function () {
   ligarCampoNumericoTerceiros('campo-terceiros-ajudantes', 'terceiros_num_ajudantes');
   ligarCampoNumericoTerceiros('campo-terceiros-motorista', 'terceiros_num_motorista');
   ligarCampoNumericoTerceiros('campo-terceiros-volume', 'terceiros_volume');
-
-  campoMch.addEventListener('change', function () {
-    const idMch = mapaMchPorRotulo.get(campoMch.value.trim());
-    rascunho.amv.id_mch = idMch || null;
-    preencherDetalhesMch(idMch);
-    salvarRascunhoAgora();
-  });
 
   const colaboradoresCadastro = await RadDB.obterCatalogo('colaboradores_cadastro');
 
@@ -1464,7 +1589,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       terceiros_num_ajudantes: rascunho.terceiros_num_ajudantes ? Number(rascunho.terceiros_num_ajudantes) : null,
       terceiros_num_motorista: rascunho.terceiros_num_motorista ? Number(rascunho.terceiros_num_motorista) : null,
       terceiros_volume: rascunho.terceiros_volume ? Number(rascunho.terceiros_volume) : null,
-      amv: rascunho.amv,
+      amv_blocos: rascunho.amv_blocos,
       colaboradores: rascunho.colaboradores,
       responsavel_atividade: rascunho.responsavel_atividade,
       operador_ccm_abertura_nome: rascunho.operador_ccm_abertura_nome,

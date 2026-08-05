@@ -339,13 +339,15 @@ class RadServico(models.Model):
 
 class RadAmv(models.Model):
     """
-    Bloco AMV. No maximo um registro por RAD (id_rad UNIQUE). Criado
-    quando "Manutencao em AMV" e selecionada em EFD-020.
-    UR e Linha nao sao editaveis pelo usuario; Modelo, Via e Local sao.
+    Bloco AMV. 30/07/2026: deixou de ser 1-para-1 com o RAD -- um RAD
+    pode ter varios blocos AMV (ate 16), um por MCH verificada no dia
+    (RG: o mesmo tecnico pode verificar mais de uma MCH na mesma
+    atividade, cada uma com seu proprio defeito/acao). UR e Linha nao
+    sao editaveis pelo usuario; Modelo, Via e Local sao.
     """
 
-    rad = models.OneToOneField(
-        Rad, on_delete=models.CASCADE, related_name='amv', db_column='id_rad'
+    rad = models.ForeignKey(
+        Rad, on_delete=models.CASCADE, related_name='amv_blocos', db_column='id_rad'
     )
     mch = models.ForeignKey(CatMch, on_delete=models.PROTECT, db_column='id_mch')
     modelo_mch = models.CharField(max_length=100)
@@ -356,6 +358,8 @@ class RadAmv(models.Model):
     # 22/07/2026: preenchidos so quando "Outros" e selecionado em Tipo
     # de Defeito / Acoes (ver catalogos.models.CatTipoDefeitoAmv/
     # CatAcaoAmv.requer_descricao) -- mesmo padrao de outros_servico_desc.
+    # Cada bloco AMV tem sua propria descricao, independente dos demais
+    # blocos do mesmo RAD.
     desc_outros_tipo_defeito = models.TextField(null=True, blank=True)
     desc_outros_acao = models.TextField(null=True, blank=True)
 
@@ -363,19 +367,22 @@ class RadAmv(models.Model):
         db_table = 'rad_amv'
         verbose_name = 'Bloco AMV'
         verbose_name_plural = 'Blocos AMV'
+        ordering = ['id']
 
     def __str__(self):
         return f'AMV de {self.rad.numero_rad} ({self.mch.identificacao})'
 
 
 class RadAmvDefeito(models.Model):
-    """Tipos de defeito selecionados no bloco AMV (EFD-020-B)."""
+    """
+    Tipos de defeito selecionados num bloco AMV especifico (EFD-020-B).
+    30/07/2026: passou a apontar para o bloco (RadAmv), nao mais
+    diretamente para o RAD -- necessario para nao misturar defeitos de
+    MCHs diferentes no mesmo RAD.
+    """
 
-    rad = models.ForeignKey(
-        Rad,
-        on_delete=models.CASCADE,
-        related_name='amv_defeitos',
-        db_column='id_rad',
+    amv = models.ForeignKey(
+        RadAmv, on_delete=models.CASCADE, related_name='defeitos', db_column='id_amv'
     )
     tipo_defeito = models.ForeignKey(
         CatTipoDefeitoAmv, on_delete=models.PROTECT, db_column='id_tipo_defeito'
@@ -387,16 +394,20 @@ class RadAmvDefeito(models.Model):
         verbose_name_plural = 'Defeitos AMV do RAD'
         constraints = [
             models.UniqueConstraint(
-                fields=['rad', 'tipo_defeito'], name='uniq_rad_amv_defeito'
+                fields=['amv', 'tipo_defeito'], name='uniq_amv_defeito'
             )
         ]
 
 
 class RadAmvAcao(models.Model):
-    """Acoes selecionadas no bloco AMV (EFD-020-C)."""
+    """
+    Acoes selecionadas num bloco AMV especifico (EFD-020-C). 30/07/2026:
+    mesma mudanca de RadAmvDefeito -- aponta para o bloco (RadAmv), nao
+    mais diretamente para o RAD.
+    """
 
-    rad = models.ForeignKey(
-        Rad, on_delete=models.CASCADE, related_name='amv_acoes', db_column='id_rad'
+    amv = models.ForeignKey(
+        RadAmv, on_delete=models.CASCADE, related_name='acoes', db_column='id_amv'
     )
     acao = models.ForeignKey(
         CatAcaoAmv, on_delete=models.PROTECT, db_column='id_acao'
@@ -407,7 +418,7 @@ class RadAmvAcao(models.Model):
         verbose_name = 'Acao AMV do RAD'
         verbose_name_plural = 'Acoes AMV do RAD'
         constraints = [
-            models.UniqueConstraint(fields=['rad', 'acao'], name='uniq_rad_amv_acao')
+            models.UniqueConstraint(fields=['amv', 'acao'], name='uniq_amv_acao')
         ]
 
 

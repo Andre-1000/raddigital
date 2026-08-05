@@ -322,8 +322,18 @@ def _validar_colaboradores_sem_registro_duplicado(payload, erros):
         )
 
 
+LIMITE_BLOCOS_AMV = 16  # 1 bloco inicial + 15 adicionais (regra de negocio 30/07/2026)
+
+
 def _validar_bloco_amv(payload, erros):
-    """VLD-020/VLD-021/VLD-022: exigidos somente quando Manutencao em AMV foi selecionada."""
+    """
+    VLD-020/VLD-021/VLD-022, revisado 30/07/2026: exigidos somente
+    quando Manutencao em AMV foi selecionada. Agora valida uma LISTA
+    de blocos (amv_blocos), um por MCH -- um tecnico pode verificar
+    mais de uma MCH no mesmo RAD, cada uma com seu proprio defeito e
+    acao. Exige ao menos 1 bloco completo, no maximo
+    LIMITE_BLOCOS_AMV.
+    """
     servicos_ids = payload.get('servicos') or []
     amv_selecionado = CatServico.objects.filter(
         id__in=servicos_ids, requer_amv=True
@@ -331,13 +341,35 @@ def _validar_bloco_amv(payload, erros):
     if not amv_selecionado:
         return
 
-    amv = payload.get('amv') or {}
-    if not amv.get('id_mch'):
-        erros.append(_erro('VLD-020', 'amv.id_mch', 'Selecione a Identificacao MCH.'))
-    if not amv.get('tipos_defeito'):
-        erros.append(_erro('VLD-021', 'amv.tipos_defeito', 'Selecione ao menos um Tipo de Defeito.'))
-    if not amv.get('acoes'):
-        erros.append(_erro('VLD-022', 'amv.acoes', 'Selecione ao menos uma Acao.'))
+    blocos = payload.get('amv_blocos') or []
+    if not blocos:
+        erros.append(
+            _erro('VLD-020', 'amv_blocos', 'Adicione ao menos um bloco AMV com a Identificação MCH.')
+        )
+        return
+
+    if len(blocos) > LIMITE_BLOCOS_AMV:
+        erros.append(
+            _erro(
+                'VLD-020', 'amv_blocos',
+                f'No máximo {LIMITE_BLOCOS_AMV} blocos AMV por RAD.',
+            )
+        )
+
+    for indice, bloco in enumerate(blocos):
+        prefixo = f'amv_blocos[{indice}]'
+        if not bloco.get('id_mch'):
+            erros.append(
+                _erro('VLD-020', f'{prefixo}.id_mch', f'Selecione a Identificação MCH no bloco {indice + 1}.')
+            )
+        if not bloco.get('tipos_defeito'):
+            erros.append(
+                _erro('VLD-021', f'{prefixo}.tipos_defeito', f'Selecione ao menos um Tipo de Defeito no bloco {indice + 1}.')
+            )
+        if not bloco.get('acoes'):
+            erros.append(
+                _erro('VLD-022', f'{prefixo}.acoes', f'Selecione ao menos uma Ação no bloco {indice + 1}.')
+            )
 
 
 def _remover_erros_de_campos_desabilitados(erros):

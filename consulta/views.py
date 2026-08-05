@@ -102,6 +102,8 @@ def _aplicar_filtros(queryset, params):
 
 def _linha_resumo(rad):
     """Monta uma linha da lista de resultados (PRM-034/035)."""
+    blocos_amv = list(rad.amv_blocos.all())
+    primeiro_amv = blocos_amv[0] if blocos_amv else None
     return {
         'numero_rad': rad.numero_rad,
         'numero_os': rad.numero_os,
@@ -112,8 +114,13 @@ def _linha_resumo(rad):
         'local_final': rad.local_final.sigla,
         'tipo_manutencao': rad.tipo_manutencao.nome,
         'numero_falha': rad.numero_falha,
-        'identificacao_mch': rad.amv.mch.identificacao if hasattr(rad, 'amv') else None,
-        'linha_mch': rad.amv.linha_mch if hasattr(rad, 'amv') else None,
+        # 30/07/2026: pode haver mais de um bloco AMV (uma MCH por
+        # bloco) -- a listagem mostra so o primeiro, com a contagem
+        # total pra sinalizar que tem mais. O detalhe do RAD mostra
+        # todos.
+        'identificacao_mch': primeiro_amv.mch.identificacao if primeiro_amv else None,
+        'linha_mch': primeiro_amv.linha_mch if primeiro_amv else None,
+        'total_blocos_amv': len(blocos_amv),
         'login_usuario': rad.usuario.login,
         'hora_prog_inicio': rad.hora_prog_inicio.isoformat(),
         'hora_real_inicio': rad.hora_real_inicio.isoformat(),
@@ -130,7 +137,7 @@ def listar_rads(request):
     """
     queryset = Rad.objects.select_related(
         'local_inicial', 'local_final', 'tipo_manutencao', 'usuario'
-    ).prefetch_related('amv__mch').order_by('-data_sincronizacao')
+    ).prefetch_related('amv_blocos__mch').order_by('-data_sincronizacao')
 
     queryset = _aplicar_filtros(queryset, request.GET)
 
@@ -172,7 +179,9 @@ def listar_meus_rads(request):
     """
     queryset = Rad.objects.select_related(
         'local_inicial', 'local_final', 'tipo_manutencao', 'usuario'
-    ).filter(usuario_id=request.usuario_rad.login).order_by('-data_sincronizacao')
+    ).prefetch_related('amv_blocos__mch').filter(
+        usuario_id=request.usuario_rad.login
+    ).order_by('-data_sincronizacao')
 
     numero_pagina = request.GET.get('pagina') or 1
     paginador = Paginator(queryset, RADS_POR_PAGINA)
@@ -217,21 +226,27 @@ def _anexos_resumo(rad):
 
 
 def _amv_resumo(rad):
-    if not hasattr(rad, 'amv'):
-        return None
-    amv = rad.amv
-    return {
-        'identificacao_mch': amv.mch.identificacao,
-        'modelo_mch': amv.modelo_mch,
-        'via_mch': amv.via_mch,
-        'ur_mch': amv.ur_mch,
-        'local_mch': amv.local_mch,
-        'linha_mch': amv.linha_mch,
-        'tipos_defeito': list(rad.amv_defeitos.values_list('tipo_defeito__nome', flat=True)),
-        'acoes': list(rad.amv_acoes.values_list('acao__nome', flat=True)),
-        'desc_outros_tipo_defeito': amv.desc_outros_tipo_defeito,
-        'desc_outros_acao': amv.desc_outros_acao,
-    }
+    """
+    30/07/2026: um RAD pode ter varios blocos AMV (um por MCH
+    verificada) -- retorna uma LISTA, nao mais um unico objeto.
+    """
+    blocos = []
+    for amv in rad.amv_blocos.all():
+        blocos.append(
+            {
+                'identificacao_mch': amv.mch.identificacao,
+                'modelo_mch': amv.modelo_mch,
+                'via_mch': amv.via_mch,
+                'ur_mch': amv.ur_mch,
+                'local_mch': amv.local_mch,
+                'linha_mch': amv.linha_mch,
+                'tipos_defeito': list(amv.defeitos.values_list('tipo_defeito__nome', flat=True)),
+                'acoes': list(amv.acoes.values_list('acao__nome', flat=True)),
+                'desc_outros_tipo_defeito': amv.desc_outros_tipo_defeito,
+                'desc_outros_acao': amv.desc_outros_acao,
+            }
+        )
+    return blocos
 
 
 def nome_de_quem_preencheu(rad):

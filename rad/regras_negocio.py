@@ -233,10 +233,16 @@ def _criar_relacionamentos(rad, payload):
             tipo=colaborador['tipo'],
         )
 
-    amv = payload.get('amv')
-    if amv and amv.get('id_mch'):
-        mch = CatMch.objects.get(id=amv['id_mch'])
-        RadAmv.objects.create(
+    # 30/07/2026: amv_blocos e uma LISTA -- um bloco por MCH verificada
+    # nesse RAD (ate LIMITE_BLOCOS_AMV, ver rad/validadores.py). Cada
+    # bloco vira um RadAmv proprio, com seus RadAmvDefeito/RadAmvAcao
+    # apontando so pra ELE (nao mais pro Rad direto), pra nao misturar
+    # defeitos/acoes de MCHs diferentes no mesmo RAD.
+    for bloco in payload.get('amv_blocos') or []:
+        if not bloco.get('id_mch'):
+            continue
+        mch = CatMch.objects.get(id=bloco['id_mch'])
+        amv = RadAmv.objects.create(
             rad=rad,
             mch=mch,
             modelo_mch=mch.modelo,
@@ -244,19 +250,17 @@ def _criar_relacionamentos(rad, payload):
             ur_mch=mch.ur,
             local_mch=mch.local_amv,
             linha_mch=mch.linha,
-            # 22/07/2026: descricao livre quando "Outros" e selecionado
-            # em Tipo de Defeito / Acoes (mesmo padrao de outros_servico_desc).
-            desc_outros_tipo_defeito=amv.get('desc_outros_tipo_defeito') or None,
-            desc_outros_acao=amv.get('desc_outros_acao') or None,
+            desc_outros_tipo_defeito=bloco.get('desc_outros_tipo_defeito') or None,
+            desc_outros_acao=bloco.get('desc_outros_acao') or None,
         )
         RadAmvDefeito.objects.bulk_create(
             [
-                RadAmvDefeito(rad=rad, tipo_defeito_id=id_defeito)
-                for id_defeito in amv.get('tipos_defeito', [])
+                RadAmvDefeito(amv=amv, tipo_defeito_id=id_defeito)
+                for id_defeito in bloco.get('tipos_defeito', [])
             ]
         )
         RadAmvAcao.objects.bulk_create(
-            [RadAmvAcao(rad=rad, acao_id=id_acao) for id_acao in amv.get('acoes', [])]
+            [RadAmvAcao(amv=amv, acao_id=id_acao) for id_acao in bloco.get('acoes', [])]
         )
 
 

@@ -231,39 +231,16 @@
 
     <div class="cartao" id="bloco-amv" style="margin-top:1rem; display:none;">
       <h2 style="font-size:1rem;">Bloco AMV</h2>
+      <p class="campo__ajuda" style="margin-top:-0.4rem;">
+        Um bloco por MCH verificada. Use "Adicionar MCH" se mais de uma máquina de chave foi verificada nesta atividade.
+      </p>
 
-      <div class="campo">
-        <label for="campo-mch">Identificação MCH</label>
-        <input type="text" id="campo-mch" list="lista-mch" autocomplete="off" placeholder="Buscar MCH…">
-      </div>
-      <datalist id="lista-mch"></datalist>
+      <div id="container-blocos-amv"></div>
 
-      <div class="campo" id="detalhes-mch" style="display:flex; gap:1rem; flex-wrap:wrap; display:none;">
-        <div><span class="texto-suave" style="font-size:0.8rem;">Modelo</span><br><strong id="valor-mch-modelo">—</strong></div>
-        <div><span class="texto-suave" style="font-size:0.8rem;">Via</span><br><strong id="valor-mch-via">—</strong></div>
-        <div><span class="texto-suave" style="font-size:0.8rem;">UR</span><br><strong id="valor-mch-ur">—</strong></div>
-        <div><span class="texto-suave" style="font-size:0.8rem;">Local</span><br><strong id="valor-mch-local">—</strong></div>
-        <div><span class="texto-suave" style="font-size:0.8rem;">Linha</span><br><strong id="valor-mch-linha">—</strong></div>
-      </div>
-      <p class="campo__ajuda">Modelo, Via, UR, Local e Linha vêm automaticamente do cadastro da MCH.</p>
-
-      <div class="campo">
-        <label>Tipo de Defeito</label>
-        <div class="pilha" id="lista-tipos-defeito"></div>
-        <div id="campo-grupo-outros-defeito" style="display:none; margin-top:0.6rem;">
-          <label for="campo-desc-outros-defeito">Descreva o tipo de defeito</label>
-          <textarea id="campo-desc-outros-defeito" maxlength="500"></textarea>
-        </div>
-      </div>
-
-      <div class="campo">
-        <label>Ações</label>
-        <div class="pilha" id="lista-acoes-amv"></div>
-        <div id="campo-grupo-outros-acao" style="display:none; margin-top:0.6rem;">
-          <label for="campo-desc-outros-acao">Descreva a ação</label>
-          <textarea id="campo-desc-outros-acao" maxlength="500"></textarea>
-        </div>
-      </div>
+      <button type="button" class="botao botao--secundaria" id="botao-adicionar-mch">
+        + Adicionar MCH
+      </button>
+      <p class="texto-suave centro" id="contador-blocos-amv" style="font-size:0.8rem; margin-top:0.4rem;"></p>
     </div>
 
     <div class="cartao" style="margin-top:1rem;">
@@ -577,6 +554,29 @@
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 0 1rem;
+  }
+
+  /* Blocos AMV dinamicos (30/07/2026) -- cada bloco e um cartao com
+     espacamento entre eles; cabecalho com titulo + botao Remover
+     lado a lado (exceto no primeiro bloco, que nunca e removivel). */
+  .bloco-amv {
+    margin-bottom: 0.75rem;
+  }
+  .bloco-amv__cabecalho {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.6rem;
+  }
+  .bloco-amv__titulo {
+    font-weight: 700;
+    margin: 0;
+  }
+  .bloco-amv__detalhes-mch {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
   }
 </style>
 {% endblock %}

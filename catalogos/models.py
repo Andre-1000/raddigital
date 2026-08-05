@@ -128,6 +128,7 @@ class CatServico(models.Model):
         ('infra', 'Infra'),
         ('corretiva', 'Corretiva'),
         ('mecanizada', 'Mecanizada'),
+        ('amv', 'AMV'),
     ]
 
     nome = models.CharField(max_length=100, unique=True)
@@ -154,7 +155,7 @@ class CatServico(models.Model):
         max_length=10,
         choices=AREA_CHOICES,
         default='geral',
-        help_text='Agrupamento visual na tela de preenchimento (Geral ou Infra).',
+        help_text='Agrupamento visual na tela de preenchimento (Geral, Infra, Corretiva, Mecanizada ou AMV).',
     )
     ativo = models.BooleanField(default=True)
 
