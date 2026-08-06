@@ -3,8 +3,7 @@ Validacao de anexos (fotos e PDF) — EFD secao 3.11 (RG-ANX) e secao
 3.12 "Validacoes de Anexos" (VLD-023/024).
 
 RG-ANX-002: apenas foto e documento PDF sao permitidos.
-As fotos sao divididas em dois grupos com tema proprio, no maximo 3 cada
-(6 no total, mas nunca misturados sem identificacao): "Intervencao
+As fotos sao divididas em dois grupos com tema proprio: "Intervencao
 verificada" e "Acao realizada". RG-ANX-004: no maximo 1 PDF.
 RG-ANX-005: 10MB por arquivo.
 VLD-023/024: arquivo corrompido ou em formato invalido bloqueia o envio
@@ -15,11 +14,21 @@ VLD-032 (22/07/2026): ao menos 1 foto (de qualquer uma das duas
 categorias) passou a ser OBRIGATORIA. Isso substitui a regra antiga
 VLD-026 ("RAD sem nenhum anexo e permitido") -- PDF continua opcional,
 so foto virou obrigatoria.
+
+30/07/2026: o limite por categoria deixou de ser um numero fixo -- e
+configuravel pelo Administrador (configuracoes.models.LimiteFotos) e
+varia conforme a area do(s) servico(s) selecionado(s) no RAD (Infra
+permite mais fotos que o padrao). Por isso os limites agora chegam
+como PARAMETROS explicitos (limite_intervencao/limite_acao), calculados
+por quem chama esta funcao (rad/regras_negocio.py), em vez de virem de
+uma constante fixa aqui dentro.
 """
 from django.conf import settings
 from PIL import Image, UnidentifiedImageError
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
+
+LIMITE_PADRAO_FOTOS_POR_CATEGORIA = 2  # usado so se o chamador nao passar limite explicito
 
 
 def _erro(codigo, campo, mensagem):
@@ -85,9 +94,8 @@ def _validar_pdf_individual(arquivo):
     return None
 
 
-def _validar_grupo_fotos(fotos, campo, codigo_limite, mensagem_limite):
+def _validar_grupo_fotos(fotos, campo, codigo_limite, limite, mensagem_limite):
     erros = []
-    limite = getattr(settings, 'LIMITE_FOTOS_POR_CATEGORIA', 2)
     if len(fotos) > limite:
         erros.append(_erro(codigo_limite, campo, mensagem_limite))
     for foto in fotos:
@@ -112,23 +120,32 @@ def _validar_foto_obrigatoria(fotos_intervencao, fotos_acao, erros):
         )
 
 
-def validar_anexos(fotos_intervencao, fotos_acao, pdfs):
+def validar_anexos(
+    fotos_intervencao,
+    fotos_acao,
+    pdfs,
+    limite_intervencao=LIMITE_PADRAO_FOTOS_POR_CATEGORIA,
+    limite_acao=LIMITE_PADRAO_FOTOS_POR_CATEGORIA,
+):
     """
     fotos_intervencao: lista de UploadedFile do grupo "Intervencao
     verificada" (request.FILES.getlist('fotos_intervencao_verificada')).
     fotos_acao: lista de UploadedFile do grupo "Acao realizada"
     (request.FILES.getlist('fotos_acao_realizada')).
     pdfs: lista de UploadedFile (normalmente 0 ou 1 item).
+    limite_intervencao / limite_acao: quantidade maxima permitida em
+    cada categoria (30/07/2026: calculado pelo chamador conforme a
+    area do RAD -- Infra permite mais fotos que o padrao. Ver
+    rad/regras_negocio.py).
 
     Os dois grupos de foto sao limitados e validados de forma
-    independente -- um RAD pode ter 2 fotos de intervencao e 0 de acao,
+    independente -- um RAD pode ter fotos de intervencao e 0 de acao,
     por exemplo, sem afetar o limite do outro grupo. Mas pelo menos 1
     foto no total e obrigatoria (VLD-032).
 
     Retorna a lista completa de erros (RG-VLD-002: nunca para no
     primeiro).
     """
-    limite = getattr(settings, 'LIMITE_FOTOS_POR_CATEGORIA', 2)
     erros = []
 
     _validar_foto_obrigatoria(fotos_intervencao, fotos_acao, erros)
@@ -137,13 +154,15 @@ def validar_anexos(fotos_intervencao, fotos_acao, pdfs):
         fotos_intervencao,
         'fotos_intervencao_verificada',
         'ANX-003',
-        f'No maximo {limite} fotos de "Intervenção verificada" sao permitidas por RAD.',
+        limite_intervencao,
+        f'No maximo {limite_intervencao} fotos de "Intervenção verificada" sao permitidas por RAD.',
     )
     erros += _validar_grupo_fotos(
         fotos_acao,
         'fotos_acao_realizada',
         'ANX-003',
-        f'No maximo {limite} fotos de "Ação realizada" sao permitidas por RAD.',
+        limite_acao,
+        f'No maximo {limite_acao} fotos de "Ação realizada" sao permitidas por RAD.',
     )
 
     if len(pdfs) > getattr(settings, 'LIMITE_PDF_POR_RAD', 1):

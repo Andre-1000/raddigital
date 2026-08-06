@@ -309,6 +309,39 @@ def _salvar_anexos(rad, fotos_intervencao, fotos_acao, pdfs):
         )
 
 
+def _limites_de_foto_do_payload(payload):
+    """
+    30/07/2026: retorna (limite_intervencao, limite_acao) conforme a
+    area do(s) servico(s) selecionado(s) no RAD. Se qualquer servico
+    selecionado for da area 'infra', usa os limites configurados para
+    'infra' (maiores); senao usa os limites 'padrao'. Configuravel pelo
+    Administrador em Configuracoes -- ver configuracoes.models.LimiteFotos.
+
+    Se a tabela de configuracao estiver vazia por algum motivo (banco
+    recem-criado sem rodar a migration de dados, por exemplo), cai no
+    valor padrao de rad/validadores_arquivos.py (2) em vez de quebrar.
+    """
+    from catalogos.models import CatServico
+    from configuracoes.models import LimiteFotos
+    from .validadores_arquivos import LIMITE_PADRAO_FOTOS_POR_CATEGORIA
+
+    servicos_ids = payload.get('servicos') or []
+    tem_servico_infra = CatServico.objects.filter(id__in=servicos_ids, area='infra').exists()
+    area = 'infra' if tem_servico_infra else 'padrao'
+
+    limite_intervencao = LimiteFotos.objects.filter(
+        categoria='intervencao_verificada', area=area
+    ).values_list('limite', flat=True).first()
+    limite_acao = LimiteFotos.objects.filter(
+        categoria='acao_realizada', area=area
+    ).values_list('limite', flat=True).first()
+
+    return (
+        limite_intervencao or LIMITE_PADRAO_FOTOS_POR_CATEGORIA,
+        limite_acao or LIMITE_PADRAO_FOTOS_POR_CATEGORIA,
+    )
+
+
 @transaction.atomic
 def processar_sincronizacao(payload, usuario, fotos_intervencao=None, fotos_acao=None, pdfs=None):
     """
@@ -368,7 +401,8 @@ def processar_sincronizacao(payload, usuario, fotos_intervencao=None, fotos_acao
     erros = validar_payload_sincronizacao(
         payload_validacao, hoje=timezone.localdate()
     )
-    erros += validar_anexos(fotos_intervencao, fotos_acao, pdfs)
+    limite_intervencao, limite_acao = _limites_de_foto_do_payload(payload)
+    erros += validar_anexos(fotos_intervencao, fotos_acao, pdfs, limite_intervencao, limite_acao)
     if erros:
         return None, erros
 

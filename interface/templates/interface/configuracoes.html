@@ -31,6 +31,20 @@
   .selo-obrigatorio { background: var(--cor-atencao-fundo); color: #8a3608; }
   .selo-opcional { background: var(--cor-fundo-suave); color: var(--cor-tinta-suave); }
   .selo-desabilitado { background: var(--cor-perigo-fundo); color: var(--cor-perigo); }
+
+  /* 30/07/2026: linha de edicao de limite de fotos -- rotulo + campo
+     numerico + botao Salvar, tudo numa linha (colapsa em telas
+     estreitas por causa do flex-wrap ja usado em .linha-campo). */
+  .linha-limite-foto input[type="number"] {
+    width: 80px;
+    min-height: 40px;
+    text-align: center;
+  }
+  .linha-limite-foto__controles {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
 </style>
 {% endblock %}
 
@@ -79,6 +93,19 @@
   <div class="cartao" style="margin-top:1rem;">
     <h2 style="font-size:1rem;">Todos os campos</h2>
     <div id="lista-todos-campos" class="pilha" style="margin-top:0.5rem;"></div>
+  </div>
+
+  <!-- 30/07/2026: limites de foto por categoria/area, editaveis sem
+       precisar de deploy -- ver configuracoes.models.LimiteFotos. -->
+  <div class="cartao" style="margin-top:1rem;">
+    <h2 style="font-size:1rem;">Limites de Fotos</h2>
+    <p class="texto-suave" style="font-size:0.85rem; margin-top:-0.4rem;">
+      Quantidade máxima de fotos por categoria. "Infra" vale quando o RAD tem algum serviço da área Infra
+      selecionado (Recolhimento de Lixo, Limpeza de Canaleta, Capina Química, Roçada/Poda); "Padrão" vale
+      para os demais.
+    </p>
+    <div id="aviso-limites-fotos"></div>
+    <div id="lista-limites-fotos" class="pilha" style="margin-top:0.5rem;"></div>
   </div>
 </div>
 {% endblock %}
@@ -214,6 +241,93 @@
     });
 
     await carregarCampos();
+
+    // ---- Limites de Fotos (30/07/2026) ---------------------------------
+
+    const avisoLimitesFotos = document.getElementById('aviso-limites-fotos');
+    const listaLimitesFotos = document.getElementById('lista-limites-fotos');
+
+    async function carregarLimitesFotos() {
+      avisoLimitesFotos.innerHTML = '';
+      try {
+        const resposta = await RadAuth.requisicaoAutenticada('/configuracoes/limites-fotos/');
+        if (!resposta.ok) {
+          avisoLimitesFotos.innerHTML = '<div class="aviso aviso--erro">Não foi possível carregar os limites de fotos.</div>';
+          return;
+        }
+        const dados = await resposta.json();
+        renderizarLimitesFotos(dados.limites);
+      } catch (erro) {
+        avisoLimitesFotos.innerHTML = '<div class="aviso aviso--erro">Erro de conexão ao carregar os limites de fotos.</div>';
+      }
+    }
+
+    function renderizarLimitesFotos(limites) {
+      listaLimitesFotos.innerHTML = '';
+      limites.forEach(function (item) {
+        const linha = document.createElement('div');
+        linha.className = 'linha-campo linha-limite-foto';
+
+        const rotulo = document.createElement('span');
+        rotulo.textContent = `${item.categoria_rotulo} — ${item.area_rotulo}`;
+        linha.appendChild(rotulo);
+
+        const controles = document.createElement('div');
+        controles.className = 'linha-limite-foto__controles';
+
+        const inputLimite = document.createElement('input');
+        inputLimite.type = 'number';
+        inputLimite.min = '1';
+        inputLimite.max = '50';
+        inputLimite.value = item.limite;
+
+        const botaoSalvar = document.createElement('button');
+        botaoSalvar.type = 'button';
+        botaoSalvar.className = 'botao botao--secundaria';
+        botaoSalvar.style.width = 'auto';
+        botaoSalvar.style.minHeight = '40px';
+        botaoSalvar.style.padding = '0 0.9rem';
+        botaoSalvar.style.fontSize = '0.82rem';
+        botaoSalvar.textContent = 'Salvar';
+
+        botaoSalvar.addEventListener('click', async function () {
+          const novoValor = parseInt(inputLimite.value, 10);
+          if (!novoValor || novoValor < 1) {
+            avisoLimitesFotos.innerHTML = '<div class="aviso aviso--erro">Informe um número de pelo menos 1.</div>';
+            return;
+          }
+          avisoLimitesFotos.innerHTML = '';
+          botaoSalvar.disabled = true;
+          try {
+            const resposta = await RadAuth.requisicaoAutenticada(
+              `/configuracoes/limites-fotos/${item.id}/atualizar/`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ limite: novoValor }),
+              }
+            );
+            if (!resposta.ok) {
+              const corpo = await resposta.json().catch(() => ({}));
+              avisoLimitesFotos.innerHTML = `<div class="aviso aviso--erro">${corpo.erro || 'Não foi possível salvar.'}</div>`;
+              return;
+            }
+            avisoLimitesFotos.innerHTML = '<div class="aviso aviso--sucesso">Limite atualizado.</div>';
+          } catch (erro) {
+            avisoLimitesFotos.innerHTML = '<div class="aviso aviso--erro">Erro de conexão ao salvar.</div>';
+          } finally {
+            botaoSalvar.disabled = false;
+          }
+        });
+
+        controles.appendChild(inputLimite);
+        controles.appendChild(botaoSalvar);
+        linha.appendChild(controles);
+        listaLimitesFotos.appendChild(linha);
+      });
+    }
+
+    await carregarLimitesFotos();
   });
 </script>
 {% endblock %}

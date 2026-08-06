@@ -620,6 +620,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   const mchs = await RadDB.obterCatalogo('mch');
   const tiposDefeitoAmv = await RadDB.obterCatalogo('tipos_defeito_amv');
   const acoesAmv = await RadDB.obterCatalogo('acoes_amv');
+  const limitesFotos = await RadDB.obterCatalogo('limites_fotos');
 
   function ordenarComOutrosPorUltimo(lista) {
     const semOutros = lista.filter((item) => item.nome !== 'Outros');
@@ -799,6 +800,47 @@ document.addEventListener('DOMContentLoaded', async function () {
   }
   function algumServicoSelecionadoTem(flag) {
     return servicos.some((s) => s[flag] && rascunho.servicos.includes(s.id));
+  }
+
+  // 30/07/2026: limite de fotos configuravel (Configuracoes -> Limites
+  // de Fotos), e varia conforme a area do(s) servico(s) selecionado(s)
+  // -- Infra permite mais fotos que o padrao (Geral e demais areas).
+  // limitesFotos vem do mesmo pacote offline dos demais catalogos
+  // (RadDB.obterCatalogo), entao funciona sem conexao tambem.
+  function servicoInfraSelecionado() {
+    return servicos.some((s) => s.area === 'infra' && rascunho.servicos.includes(s.id));
+  }
+
+  function limiteFotoAtual(categoria) {
+    const area = servicoInfraSelecionado() ? 'infra' : 'padrao';
+    const item = limitesFotos.find((l) => l.categoria === categoria && l.area === area);
+    return item ? item.limite : ValidadoresArquivos.LIMITE_FOTOS_POR_CATEGORIA;
+  }
+
+  // Declarados aqui (antes de atualizarVisibilidadeServicos, que ja e
+  // chamada mais abaixo) para que a primeira chamada nao quebre por
+  // referenciar algo ainda nao declarado. atualizadoresLimiteFoto
+  // comeca vazio e e populado depois, quando os grupos de anexo forem
+  // configurados (configurarGrupoAnexo) -- chamar .forEach nele antes
+  // disso e inofensivo (so nao faz nada ainda).
+  const atualizadoresLimiteFoto = [];
+  const rotuloLimiteIntervencao = document.getElementById('rotulo-limite-intervencao');
+  const rotuloLimiteAcao = document.getElementById('rotulo-limite-acao');
+
+  function atualizarRotulosLimiteFoto() {
+    if (rotuloLimiteIntervencao) {
+      rotuloLimiteIntervencao.textContent = `(até ${limiteFotoAtual('intervencao_verificada')})`;
+    }
+    if (rotuloLimiteAcao) {
+      rotuloLimiteAcao.textContent = `(até ${limiteFotoAtual('acao_realizada')})`;
+    }
+  }
+
+  function atualizarLimitesDeFotoNaTela() {
+    atualizarRotulosLimiteFoto();
+    atualizadoresLimiteFoto.forEach(function (atualizar) {
+      atualizar();
+    });
   }
 
   // 30/07/2026: Bloco AMV agora suporta varios blocos (um por MCH
@@ -1060,6 +1102,11 @@ document.addEventListener('DOMContentLoaded', async function () {
       limparCampoTerceiros('campo-terceiros-motorista', 'terceiros_num_motorista');
       limparCampoTerceiros('campo-terceiros-volume', 'terceiros_volume');
     }
+
+    // 30/07/2026: a area do(s) servico(s) selecionado(s) pode mudar o
+    // limite de fotos (Infra permite mais) -- reflete isso na tela
+    // toda vez que a selecao de servicos mudar.
+    atualizarLimitesDeFotoNaTela();
   }
 
   renderizarServicosAgrupados(
@@ -1228,9 +1275,16 @@ document.addEventListener('DOMContentLoaded', async function () {
     blocoNovoParticipante.style.display = 'none';
   });
 
+  // 30/07/2026: registra os "atualizadores" de cada grupo de anexo com
+  // limite dinamico, pra poder chama-los de novo quando a selecao de
+  // servicos mudar (ex.: usuario marca um servico Infra depois de ja
+  // ter aberto a tela -- o limite precisa refletir isso na hora).
+  // (atualizadoresLimiteFoto, rotulos e funcoes ja declarados mais
+  // acima, antes de atualizarVisibilidadeServicos.)
+
   function configurarGrupoAnexo(opcoes) {
     const {
-      chave, inputEl, containerMiniaturasEl, avisoEl, limite, validar, ehFoto,
+      chave, inputEl, containerMiniaturasEl, avisoEl, obterLimite, validar, ehFoto,
     } = opcoes;
 
     function renderizarMiniaturas() {
@@ -1282,7 +1336,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
 
     function atualizarEstadoInput() {
-      const atingiuLimite = rascunho.anexos[chave].length >= limite;
+      const atingiuLimite = rascunho.anexos[chave].length >= obterLimite();
       inputEl.style.display = atingiuLimite ? 'none' : '';
     }
 
@@ -1293,8 +1347,9 @@ document.addEventListener('DOMContentLoaded', async function () {
 
       avisoEl.innerHTML = '';
 
-      if (rascunho.anexos[chave].length >= limite) {
-        avisoEl.innerHTML = `<div class="aviso aviso--erro">Limite de ${limite} atingido.</div>`;
+      const limiteAtual = obterLimite();
+      if (rascunho.anexos[chave].length >= limiteAtual) {
+        avisoEl.innerHTML = `<div class="aviso aviso--erro">Limite de ${limiteAtual} atingido.</div>`;
         return;
       }
 
@@ -1312,6 +1367,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     renderizarMiniaturas();
     atualizarEstadoInput();
+    atualizadoresLimiteFoto.push(atualizarEstadoInput);
   }
 
   configurarGrupoAnexo({
@@ -1319,7 +1375,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     inputEl: document.getElementById('campo-foto-intervencao'),
     containerMiniaturasEl: document.getElementById('miniaturas-fotos-intervencao'),
     avisoEl: document.getElementById('aviso-fotos-intervencao'),
-    limite: ValidadoresArquivos.LIMITE_FOTOS_POR_CATEGORIA,
+    obterLimite: function () { return limiteFotoAtual('intervencao_verificada'); },
     validar: ValidadoresArquivos.validarFoto,
     ehFoto: true,
   });
@@ -1329,17 +1385,19 @@ document.addEventListener('DOMContentLoaded', async function () {
     inputEl: document.getElementById('campo-foto-acao'),
     containerMiniaturasEl: document.getElementById('miniaturas-fotos-acao'),
     avisoEl: document.getElementById('aviso-fotos-acao'),
-    limite: ValidadoresArquivos.LIMITE_FOTOS_POR_CATEGORIA,
+    obterLimite: function () { return limiteFotoAtual('acao_realizada'); },
     validar: ValidadoresArquivos.validarFoto,
     ehFoto: true,
   });
+
+  atualizarRotulosLimiteFoto();
 
   configurarGrupoAnexo({
     chave: 'pdf',
     inputEl: document.getElementById('campo-pdf'),
     containerMiniaturasEl: document.getElementById('miniatura-pdf'),
     avisoEl: document.getElementById('aviso-pdf'),
-    limite: ValidadoresArquivos.LIMITE_PDF,
+    obterLimite: function () { return ValidadoresArquivos.LIMITE_PDF; },
     validar: ValidadoresArquivos.validarPdf,
     ehFoto: false,
   });
