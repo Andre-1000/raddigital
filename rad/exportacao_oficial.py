@@ -137,15 +137,23 @@ def _reconstruir_checklist_servicos(doc, ids_servicos_selecionados):
     """
     Localiza a tabela de "Atividades Executadas" (unica tabela do
     documento) e substitui as linhas de checklist originais (lista
-    fixa de 19 itens que nao existe no RAD Digital) pela lista real de
-    Servicos do catalogo, marcando [X] nos que foram selecionados
-    neste RAD.
+    fixa de 19 itens que nao existe no RAD Digital) pelos SERVICOS
+    SELECIONADOS NESSE RAD.
+
+    30/07/2026 (revisado): antes esta funcao listava TODOS os servicos
+    do catalogo, marcando "[X]" nos selecionados e "[  ]" nos demais.
+    Agora, a pedido do cliente, so os servicos selecionados aparecem
+    no documento -- as celulas alem da quantidade selecionada ficam em
+    branco, sem lista de "nao selecionados" nenhuma.
     """
     from catalogos.models import CatServico
 
-    servicos = list(CatServico.objects.filter(ativo=True).order_by('nome'))
-    sem_outros = [s for s in servicos if s.nome != 'Outros']
-    outros = [s for s in servicos if s.nome == 'Outros']
+    servicos_selecionados = list(
+        CatServico.objects.filter(id__in=ids_servicos_selecionados).order_by('nome')
+    )
+    # "Outros" por ultimo, mesmo criterio usado na tela de preenchimento
+    sem_outros = [s for s in servicos_selecionados if s.nome != 'Outros']
+    outros = [s for s in servicos_selecionados if s.nome == 'Outros']
     servicos_ordenados = sem_outros + outros
 
     tabela = doc.tables[0]
@@ -173,19 +181,21 @@ def _reconstruir_checklist_servicos(doc, ids_servicos_selecionados):
 
     linha_modelo_xml = linhas_xml[indice_primeira_linha_checklist]
 
-    # Gera as novas linhas (clones da linha-modelo, so trocando o
-    # texto de cada uma das 4 celulas unicas).
+    # Sempre gera ao menos 1 linha (mesmo com poucos servicos
+    # selecionados), pra manter a secao visivel no documento -- as
+    # celulas sobrando na linha ficam em branco.
+    quantidade_linhas = max(1, -(-len(servicos_ordenados) // ITENS_POR_LINHA_CHECKLIST))  # ceil
+
     novas_linhas_xml = []
-    for inicio in range(0, len(servicos_ordenados), ITENS_POR_LINHA_CHECKLIST):
+    for indice_linha in range(quantidade_linhas):
+        inicio = indice_linha * ITENS_POR_LINHA_CHECKLIST
         grupo = servicos_ordenados[inicio:inicio + ITENS_POR_LINHA_CHECKLIST]
         nova_linha_xml = copy_element(linha_modelo_xml)
         tabela_temp_row = _TrWrapper(nova_linha_xml, tabela)
         celulas = _celulas_unicas_da_linha(tabela_temp_row)
         for posicao, celula in enumerate(celulas):
             if posicao < len(grupo):
-                servico = grupo[posicao]
-                marca = 'X' if servico.id in ids_servicos_selecionados else ' '
-                _limpar_texto_celula(celula, f'[{marca}] {servico.nome}')
+                _limpar_texto_celula(celula, grupo[posicao].nome)
             else:
                 _limpar_texto_celula(celula, '')
         novas_linhas_xml.append(nova_linha_xml)

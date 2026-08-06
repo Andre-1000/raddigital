@@ -249,17 +249,38 @@ def _validar_operador_ccm(payload, erros):
 
 def _validar_descricoes_foto_vpm001(payload, erros):
     """
-    VLD-033 (22/07/2026): descricoes de foto do VPM001, ate 1000
-    caracteres cada. Opcionais (o usuario pode nao escrever nada), so
-    validamos o tamanho maximo quando preenchidas.
+    VLD-033 (revisado 30/07/2026): os 4 campos de comentario de foto
+    (desc_foto_1..4) sao os MESMOS campos usados desde 22/07/2026 --
+    so a apresentacao na tela mudou (de exibicao automatica sob
+    VPM001, para 4 botoes "Foto 1..4" sempre disponiveis no bloco de
+    Anexos). A obrigatoriedade agora depende do Tipo de Manutencao:
+
+    - VPM001 selecionado: os 4 campos sao OBRIGATORIOS (todos, nao so
+      os que o usuario abriu pelo botao).
+    - Qualquer outro Tipo de Manutencao: os 4 continuam OPCIONAIS,
+      igual antes -- so valida o tamanho maximo quando preenchidos.
+
+    As duas situacoes nunca se misturam (por definicao, so existe um
+    Tipo de Manutencao selecionado por vez), entao nao ha conflito de
+    "qual regra vale" -- ver payload['_tipo_manutencao_e_vpm001'],
+    calculado em rad/regras_negocio.py.
     """
-    for campo in ('desc_foto_1', 'desc_foto_2', 'desc_foto_3', 'desc_foto_4'):
+    eh_vpm001 = bool(payload.get('_tipo_manutencao_e_vpm001'))
+
+    for indice, campo in enumerate(('desc_foto_1', 'desc_foto_2', 'desc_foto_3', 'desc_foto_4'), start=1):
         valor = payload.get(campo)
+        if eh_vpm001 and not valor:
+            erros.append(
+                _erro(
+                    'VLD-033', campo,
+                    f'A descrição da foto {indice} é obrigatória quando o Tipo de Manutenção é VPM001.',
+                )
+            )
         if valor and len(str(valor)) > 1000:
             erros.append(
                 _erro(
                     'VLD-033', campo,
-                    f'A descrição da foto (campo {campo}) deve ter no máximo 1000 caracteres.',
+                    f'A descrição da foto {indice} deve ter no máximo 1000 caracteres.',
                 )
             )
 

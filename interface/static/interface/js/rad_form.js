@@ -349,47 +349,21 @@ document.addEventListener('DOMContentLoaded', async function () {
   }
   atualizarVisibilidadeNumeroFalha();
 
-  // 22/07/2026: VPM001 abre 4 caixas de descricao de foto (1000
-  // caracteres cada), 2 abaixo de cada grupo de fotos (Intervencao
-  // Verificada: 1/2, Acao Realizada: 3/4).
-  const blocoDescFotosIntervencao = document.getElementById('bloco-desc-fotos-intervencao');
-  const blocoDescFotosAcao = document.getElementById('bloco-desc-fotos-acao');
-  const camposDescFoto = {
-    desc_foto_1: document.getElementById('campo-desc-foto-1'),
-    desc_foto_2: document.getElementById('campo-desc-foto-2'),
-    desc_foto_3: document.getElementById('campo-desc-foto-3'),
-    desc_foto_4: document.getElementById('campo-desc-foto-4'),
-  };
-  Object.keys(camposDescFoto).forEach(function (chave) {
-    const elemento = camposDescFoto[chave];
-    elemento.value = rascunho[chave] || '';
-    elemento.addEventListener('input', function () {
-      rascunho[chave] = elemento.value;
-      salvarRascunhoAgora();
-    });
-  });
-
+  // 30/07/2026: os campos de comentario de foto (desc_foto_1..4)
+  // deixaram de ter caixas fixas aqui -- agora moram no bloco Anexos,
+  // acionados por botao (ver atualizarComentariosFotos, mais abaixo,
+  // e a secao "Comentarios das fotos"). ehVpm001Selecionado()
+  // continua aqui porque tambem e usada por atualizarVisibilidadeNumeroFalha
+  // (nao, so por comentarios -- mas fica perto do resto da logica de
+  // Tipo de Manutencao por clareza).
   function ehVpm001Selecionado() {
     return nomeDoTipoSelecionado() === 'VPM001';
   }
 
-  function atualizarVisibilidadeDescFotos() {
-    const mostrar = ehVpm001Selecionado();
-    blocoDescFotosIntervencao.style.display = mostrar ? '' : 'none';
-    blocoDescFotosAcao.style.display = mostrar ? '' : 'none';
-    if (!mostrar) {
-      Object.keys(camposDescFoto).forEach(function (chave) {
-        rascunho[chave] = '';
-        camposDescFoto[chave].value = '';
-      });
-    }
-  }
-  atualizarVisibilidadeDescFotos();
-
   campoTipoManutencao.addEventListener('change', function () {
     rascunho.id_tipo_manutencao = campoTipoManutencao.value ? Number(campoTipoManutencao.value) : null;
     atualizarVisibilidadeNumeroFalha();
-    atualizarVisibilidadeDescFotos();
+    atualizarComentariosFotos();
     salvarRascunhoAgora();
   });
 
@@ -1401,6 +1375,84 @@ document.addEventListener('DOMContentLoaded', async function () {
     validar: ValidadoresArquivos.validarPdf,
     ehFoto: false,
   });
+
+  // 30/07/2026: Comentarios das fotos -- 4 botoes ("Foto 1".."Foto 4"),
+  // cada um abre/fecha uma caixa de texto propria (desc_foto_1..4).
+  // Mesmos campos que ja existiam so para VPM001 (22/07/2026) -- agora
+  // sempre disponiveis, com obrigatoriedade condicional:
+  //   - VPM001 selecionado: os 4 ficam sempre abertos e obrigatorios,
+  //     sem poder fechar (a exigencia e imposta no backend por
+  //     VLD-033, mas a tela ja deixa isso visualmente claro).
+  //   - Qualquer outro Tipo de Manutencao: cada botao liga/desliga sua
+  //     caixa independentemente, tudo opcional.
+  const ROTULOS_COMENTARIO_FOTO = {
+    desc_foto_1: 'Foto 1',
+    desc_foto_2: 'Foto 2',
+    desc_foto_3: 'Foto 3',
+    desc_foto_4: 'Foto 4',
+  };
+  const botoesComentariosFotos = document.getElementById('botoes-comentarios-fotos');
+  const camposComentariosFotos = document.getElementById('campos-comentarios-fotos');
+  const rotuloComentariosObrigatorio = document.getElementById('rotulo-comentarios-fotos-obrigatorio');
+
+  // Estado de "aberto/fechado" de cada caixa, independente de ter
+  // texto -- assim reabrir a tela mantem visivel um campo que a
+  // pessoa abriu mas ainda nao escreveu nada.
+  const comentarioFotoAberto = {
+    desc_foto_1: !!rascunho.desc_foto_1,
+    desc_foto_2: !!rascunho.desc_foto_2,
+    desc_foto_3: !!rascunho.desc_foto_3,
+    desc_foto_4: !!rascunho.desc_foto_4,
+  };
+
+  function atualizarComentariosFotos() {
+    const obrigatorio = ehVpm001Selecionado();
+    rotuloComentariosObrigatorio.textContent = obrigatorio ? '(obrigatório — Tipo de Manutenção VPM001)' : '(opcional)';
+    rotuloComentariosObrigatorio.className = obrigatorio ? 'obrigatorio' : 'texto-suave';
+
+    botoesComentariosFotos.innerHTML = '';
+    camposComentariosFotos.innerHTML = '';
+
+    Object.keys(ROTULOS_COMENTARIO_FOTO).forEach(function (chave) {
+      const aberto = obrigatorio ? true : comentarioFotoAberto[chave];
+
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'chip';
+      chip.textContent = ROTULOS_COMENTARIO_FOTO[chave];
+      chip.setAttribute('aria-pressed', aberto ? 'true' : 'false');
+      if (obrigatorio) chip.disabled = true; // nao da pra fechar um campo obrigatorio
+      chip.addEventListener('click', function () {
+        if (obrigatorio) return;
+        comentarioFotoAberto[chave] = !comentarioFotoAberto[chave];
+        if (!comentarioFotoAberto[chave]) {
+          rascunho[chave] = '';
+          salvarRascunhoAgora();
+        }
+        atualizarComentariosFotos();
+      });
+      botoesComentariosFotos.appendChild(chip);
+
+      if (aberto) {
+        const grupoCampo = document.createElement('div');
+        grupoCampo.style.marginTop = '0.5rem';
+        const rotulo = document.createElement('label');
+        rotulo.textContent = `Comentário — ${ROTULOS_COMENTARIO_FOTO[chave]}`;
+        rotulo.style.fontSize = '0.85rem';
+        const textarea = document.createElement('textarea');
+        textarea.maxLength = 1000;
+        textarea.value = rascunho[chave] || '';
+        textarea.addEventListener('input', function () {
+          rascunho[chave] = textarea.value;
+          salvarRascunhoAgora();
+        });
+        grupoCampo.appendChild(rotulo);
+        grupoCampo.appendChild(textarea);
+        camposComentariosFotos.appendChild(grupoCampo);
+      }
+    });
+  }
+  atualizarComentariosFotos();
 
   function ligarCampoTexto(elementoId, chaveRascunho) {
     const elemento = document.getElementById(elementoId);

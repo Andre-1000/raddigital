@@ -38,11 +38,13 @@ INSERT INTO cat_servicos (nome, descricao, requer_amv, requer_descricao, requer_
   ('Socaria', 'Socaria mecânica e compactação do lastro para recomposição do apoio dos dormentes. Inclui estabilização da camada de lastro e restauração da geometria da via após intervenções.', FALSE, FALSE, FALSE, FALSE, FALSE, 'geral', FALSE),
   ('Controle de Vegetação', 'Roçada e poda de vegetação na faixa de domínio e área da via permanente. Inclui remoção de plantas invasoras, limpeza de drenos afetados por vegetação e manutenção da visibilidade operacional.', FALSE, FALSE, FALSE, FALSE, FALSE, 'geral', FALSE),
   ('Manutenção em AMV', 'Manutenção, inspeção e intervenção em Aparelhos de Mudança de Via (AMV). Ao selecionar este serviço, o sistema exibe o bloco AMV, com a possibilidade de adicionar até 16 blocos (uma MCH por bloco): Identificação MCH, Modelo, Via, UR, Local, Linha, Tipo de Defeito e Ações.', TRUE, FALSE, FALSE, FALSE, FALSE, 'amv', TRUE),
-  ('Recolhimento de Lixo', 'Recolhimento de lixo e resíduos na faixa de domínio, executado com mão de obra terceirizada. Ao selecionar, o sistema exibe o bloco Terceiros (Encarregados, Op Máquina, Ajudantes, Motorista, Volume).', FALSE, FALSE, TRUE, TRUE, TRUE, 'infra', TRUE),
+  ('Inspeção AMV', 'Inspeção de Aparelho de Mudança de Via, sem intervenção corretiva.', FALSE, FALSE, FALSE, FALSE, FALSE, 'amv', TRUE),
+  ('Recolhimento de Descartes', 'Recolhimento de lixo e resíduos na faixa de domínio, executado com mão de obra terceirizada. Ao selecionar, o sistema exibe o bloco Terceiros (Encarregados, Op Máquina, Ajudantes, Motorista, Volume).', FALSE, FALSE, TRUE, TRUE, TRUE, 'infra', TRUE),
   ('Limpeza de Canaleta', 'Limpeza de canaletas e drenos, executada com mão de obra terceirizada. Ao selecionar, o sistema exibe o bloco Terceiros (Encarregados, Ajudantes, Motorista, Volume).', FALSE, FALSE, TRUE, FALSE, TRUE, 'infra', TRUE),
   ('Capina Química', 'Aplicação de herbicida para controle de vegetação, executada com mão de obra terceirizada. Ao selecionar, o sistema exibe o bloco Terceiros (Encarregados, Op Máquina, Ajudantes, Motorista).', FALSE, FALSE, TRUE, TRUE, FALSE, 'infra', TRUE),
   ('Roçada/Poda', 'Roçada e poda de vegetação, executada com mão de obra terceirizada. Ao selecionar, o sistema exibe o bloco Terceiros (Encarregados, Op Máquina, Ajudantes, Motorista, Volume).', FALSE, FALSE, TRUE, TRUE, TRUE, 'infra', TRUE),
   ('Topografia', 'Serviço do grupo Corretiva.', FALSE, FALSE, FALSE, FALSE, FALSE, 'corretiva', TRUE),
+  ('Inspeção Corretiva', 'Serviço do grupo Corretiva.', FALSE, FALSE, FALSE, FALSE, FALSE, 'corretiva', TRUE),
   ('Esmerilhadora', 'Serviço do grupo Mecanizada.', FALSE, FALSE, FALSE, FALSE, FALSE, 'mecanizada', TRUE),
   ('Desguarnecedora', 'Serviço do grupo Mecanizada.', FALSE, FALSE, FALSE, FALSE, FALSE, 'mecanizada', TRUE),
   ('Descarga de lastro', 'Serviço do grupo Mecanizada.', FALSE, FALSE, FALSE, FALSE, FALSE, 'mecanizada', TRUE),
@@ -58,5 +60,5 @@ ON CONFLICT (nome) DO UPDATE SET
   area = EXCLUDED.area,
   ativo = EXCLUDED.ativo;
 
--- Total: 22 registros (6 inativos: Ajuste, Limpeza, Lubrificação,
+-- Total: 24 registros (6 inativos: Ajuste, Limpeza, Lubrificação,
 -- Esmerilhamento, Socaria, Controle de Vegetação)

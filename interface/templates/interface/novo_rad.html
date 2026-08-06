@@ -290,13 +290,6 @@
         <div class="pilha" id="miniaturas-fotos-intervencao"></div>
         <div id="aviso-fotos-intervencao"></div>
         <input type="file" id="campo-foto-intervencao" accept="image/*" style="margin-top:0.5rem;">
-        <!-- 22/07/2026: so aparece quando Tipo de Manutencao = VPM001 -->
-        <div id="bloco-desc-fotos-intervencao" style="display:none; margin-top:0.75rem;">
-          <label for="campo-desc-foto-1">Descrição foto 1 <span class="texto-suave">(opcional, até 1000 caracteres)</span></label>
-          <textarea id="campo-desc-foto-1" maxlength="1000"></textarea>
-          <label for="campo-desc-foto-2" style="margin-top:0.6rem;">Descrição foto 2 <span class="texto-suave">(opcional, até 1000 caracteres)</span></label>
-          <textarea id="campo-desc-foto-2" maxlength="1000"></textarea>
-        </div>
       </div>
 
       <div class="campo">
@@ -304,13 +297,6 @@
         <div class="pilha" id="miniaturas-fotos-acao"></div>
         <div id="aviso-fotos-acao"></div>
         <input type="file" id="campo-foto-acao" accept="image/*" style="margin-top:0.5rem;">
-        <!-- 22/07/2026: so aparece quando Tipo de Manutencao = VPM001 -->
-        <div id="bloco-desc-fotos-acao" style="display:none; margin-top:0.75rem;">
-          <label for="campo-desc-foto-3">Descrição foto 3 <span class="texto-suave">(opcional, até 1000 caracteres)</span></label>
-          <textarea id="campo-desc-foto-3" maxlength="1000"></textarea>
-          <label for="campo-desc-foto-4" style="margin-top:0.6rem;">Descrição foto 4 <span class="texto-suave">(opcional, até 1000 caracteres)</span></label>
-          <textarea id="campo-desc-foto-4" maxlength="1000"></textarea>
-        </div>
       </div>
 
       <div class="campo">
@@ -318,6 +304,19 @@
         <div class="pilha" id="miniatura-pdf"></div>
         <div id="aviso-pdf"></div>
         <input type="file" id="campo-pdf" accept="application/pdf" style="margin-top:0.5rem;">
+      </div>
+
+      <!-- 30/07/2026: Comentarios das fotos -- mesmos 4 campos
+           (desc_foto_1..4) que ja existiam so pra VPM001, agora
+           sempre disponiveis via botao. Obrigatoriedade condicional
+           ao VPM001 e tratada em JS (ver rad_form.js). -->
+      <div class="campo" id="grupo-comentarios-fotos">
+        <label>Comentários das fotos <span class="texto-suave" id="rotulo-comentarios-fotos-obrigatorio">(opcional)</span></label>
+        <p class="campo__ajuda" style="margin-top:-0.2rem;">
+          Os comentários são opcionais e servem para detalhar o evento registrado em foto.
+        </p>
+        <div class="grupo-chips" id="botoes-comentarios-fotos"></div>
+        <div id="campos-comentarios-fotos" style="margin-top:0.75rem;"></div>
       </div>
     </div>
 

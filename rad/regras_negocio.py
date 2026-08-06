@@ -396,6 +396,12 @@ def processar_sincronizacao(payload, usuario, fotos_intervencao=None, fotos_acao
         '_tipo_manutencao_e_falha': bool(
             tipo_manutencao and tipo_manutencao.nome == 'Falha'
         ),
+        # 30/07/2026: usado por VLD-033 -- comentarios de foto
+        # (desc_foto_1..4) viram obrigatorios quando o Tipo de
+        # Manutencao e VPM001.
+        '_tipo_manutencao_e_vpm001': bool(
+            tipo_manutencao and tipo_manutencao.nome == 'VPM001'
+        ),
     }
 
     erros = validar_payload_sincronizacao(
