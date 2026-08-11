@@ -64,6 +64,25 @@ def tela_novo_rad(request):
     return render(request, 'interface/novo_rad.html')
 
 
+def tela_redefinir_senha(request):
+    """
+    Pagina PUBLICA (sem autenticacao, 30/07/2026) -- destino do link de
+    e-mail do fluxo "Esqueci minha senha". O token vem via query string
+    (?token=...) e e lido pelo JS da propria pagina, nao pelo Django --
+    esta view so serve o shell HTML, igual as demais telas.
+    """
+    return render(request, 'interface/redefinir_senha.html')
+
+
+def tela_trocar_senha(request):
+    """
+    30/07/2026. Qualquer usuario autenticado troca a propria senha
+    aqui. O guard de sessao e checado no JS da propria tela (mesmo
+    padrao das demais paginas protegidas).
+    """
+    return render(request, 'interface/trocar_senha.html')
+
+
 def service_worker(request):
     caminho = Path(__file__).resolve().parent / 'service_worker_src.js'
     return HttpResponse(caminho.read_text(), content_type='application/javascript')

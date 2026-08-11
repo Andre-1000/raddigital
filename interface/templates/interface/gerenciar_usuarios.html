@@ -31,6 +31,11 @@
         <span class="campo__ajuda">Vira o login automaticamente.</span>
       </div>
       <div class="campo">
+        <label for="campo-novo-email">E-mail <span class="texto-suave">(opcional)</span></label>
+        <input type="email" id="campo-novo-email" maxlength="254">
+        <span class="campo__ajuda">Necessário para a pessoa usar "Esqueci minha senha" — pode ser preenchido depois.</span>
+      </div>
+      <div class="campo">
         <label>Perfis <span class="texto-suave" style="font-size:0.8rem; font-weight:400;">(até 2)</span></label>
         <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-top:0.4rem;">
           <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; min-height:44px;">
@@ -99,6 +104,7 @@
           <th>Nome</th>
           <th>Matrícula / Login</th>
           <th>Perfis</th>
+          <th>Senha</th>
           <th>Status</th>
           <th>Ações</th>
         </tr>
@@ -121,7 +127,9 @@
       Faça uma lista em Excel com 2 colunas, sendo coluna 1 = Matrícula,
       coluna 2 = Nome; grave em .CSV e importe.
       A partir do momento que está cadastrado, o usuário/colaborador pode
-      ser usado em RAD automaticamente.
+      ser usado em RAD automaticamente. O e-mail (necessário para "Esqueci
+      minha senha") precisa ser preenchido depois, individualmente, em
+      "Editar perfis".
     </p>
     <button type="button" class="botao botao--secundaria" id="botao-fechar-como-importar" style="margin-top:1rem;">
       Entendi
@@ -129,13 +137,19 @@
   </div>
 </div>
 
-<!-- Modal: editar perfis -->
+<!-- Modal: editar perfis e e-mail -->
 <div id="modal-editar-perfis"
      style="display:none; position:fixed; inset:0; background:rgba(28,31,30,0.5);
             z-index:30; align-items:center; justify-content:center; padding:1rem;">
   <div class="cartao" style="max-width:420px; width:100%;">
-    <h2 style="font-size:1.05rem;">Editar perfis — <span id="nome-pessoa-editar"></span></h2>
+    <h2 style="font-size:1.05rem;">Editar — <span id="nome-pessoa-editar"></span></h2>
     <div id="aviso-editar-perfis"></div>
+
+    <div class="campo">
+      <label for="campo-email-editar">E-mail <span class="texto-suave">(opcional, necessário para "Esqueci minha senha")</span></label>
+      <input type="email" id="campo-email-editar" maxlength="254">
+    </div>
+
     <div style="display:flex; gap:1rem; flex-wrap:wrap; margin:0.75rem 0;">
       <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; min-height:44px;">
         <input type="checkbox" id="perfil-editar-usuario" value="usuario"> Usuário

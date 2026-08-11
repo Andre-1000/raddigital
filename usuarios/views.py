@@ -1,22 +1,29 @@
 """
 Views do app usuarios.
 
-Login sem senha (RG-AUTH-001/003). Gestao de usuarios (EFD secao 4.4).
+Login com senha (30/07/2026 -- ver nota em models.py e CLAUDE.md sobre
+o achado de seguranca corrigido). Gestao de usuarios (EFD secao 4.4).
 Supervisor gerencia Usuarios e Supervisores (PRM-015 a PRM-020).
 Administrador gerencia todos (PRM-021 a PRM-024).
 """
 import json
 import re
+from datetime import timedelta
 
+from django.conf import settings
 from django.db import transaction
 from django.http import JsonResponse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_http_methods
 
 from .decorators import requer_perfil, requer_token
-from .models import Token, Usuario, UsuarioPerfil
+from .models import Token, TokenRedefinicaoSenha, Usuario, UsuarioPerfil
+from .servicos_email import enviar_email_redefinicao_senha
+from .validadores_senha import validar_senha
 
 REGEX_LOGIN = re.compile(r'^[a-zA-Z0-9_.@-]{3,100}$')
+REGEX_EMAIL_SIMPLES = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 
 
 # ---------------------------------------------------------------------------
@@ -28,7 +35,20 @@ REGEX_LOGIN = re.compile(r'^[a-zA-Z0-9_.@-]{3,100}$')
 def login(request):
     """
     POST /usuarios/login/
-    Body: {"login": "joao.silva", "dispositivo": "opcional"}
+    Body: {"login": "joao.silva", "senha": "...", "dispositivo": "opcional"}
+
+    30/07/2026: login com senha real, substituindo o login "so pelo
+    login" (achado critico de seguranca, auditoria informal contra
+    OWASP Top 10:2025 -- ver CLAUDE.md). Mudancas:
+    - Exige senha, verificada por hash (nunca texto plano armazenado).
+    - Bloqueio temporario apos MAXIMO_TENTATIVAS_LOGIN tentativas erradas
+      seguidas (rate limit contra forca bruta).
+    - Mensagem de erro generica ("login ou senha incorretos") tanto pra
+      login inexistente quanto senha errada -- nao da pra descobrir se
+      um login existe so pela resposta (evita enumeracao de contas).
+    - Usuario legado sem senha definida (senha_hash vazio) recebe erro
+      especifico apontando pra "Esqueci minha senha", que funciona tambem
+      como fluxo de "definir minha primeira senha".
     """
     try:
         dados = json.loads(request.body or '{}')
@@ -36,16 +56,50 @@ def login(request):
         return JsonResponse({'erro': 'Corpo da requisicao invalido.'}, status=400)
 
     login_informado = (dados.get('login') or '').strip()
-    if not login_informado:
-        return JsonResponse({'erro': 'Informe o login.'}, status=400)
+    senha_informada = dados.get('senha') or ''
 
-    try:
-        usuario = Usuario.objects.get(login=login_informado)
-    except Usuario.DoesNotExist:
-        return JsonResponse({'erro': 'Login nao encontrado.'}, status=401)
+    if not login_informado or not senha_informada:
+        return JsonResponse({'erro': 'Informe login e senha.'}, status=400)
+
+    usuario = Usuario.objects.filter(login=login_informado).first()
+    mensagem_erro_generica = 'Login ou senha incorretos.'
+
+    if usuario is None:
+        return JsonResponse({'erro': mensagem_erro_generica}, status=401)
 
     if not usuario.ativo:
         return JsonResponse({'erro': 'Usuario inativo.'}, status=401)
+
+    maximo_tentativas = getattr(settings, 'MAXIMO_TENTATIVAS_LOGIN', 5)
+    bloqueio_minutos = getattr(settings, 'BLOQUEIO_LOGIN_MINUTOS', 15)
+
+    if usuario.bloqueado_ate and timezone.now() < usuario.bloqueado_ate:
+        minutos_restantes = max(1, int((usuario.bloqueado_ate - timezone.now()).total_seconds() // 60) + 1)
+        return JsonResponse(
+            {'erro': f'Muitas tentativas incorretas. Tente novamente em {minutos_restantes} minuto(s).'},
+            status=429,
+        )
+
+    if not usuario.senha_hash:
+        return JsonResponse(
+            {
+                'erro': 'Esta conta ainda não tem senha definida. Use "Esqueci minha senha" para criar a primeira senha.',
+                'senha_nao_definida': True,
+            },
+            status=401,
+        )
+
+    if not usuario.verificar_senha(senha_informada):
+        usuario.tentativas_login_falhas += 1
+        if usuario.tentativas_login_falhas >= maximo_tentativas:
+            usuario.bloqueado_ate = timezone.now() + timedelta(minutes=bloqueio_minutos)
+        usuario.save(update_fields=['tentativas_login_falhas', 'bloqueado_ate'])
+        return JsonResponse({'erro': mensagem_erro_generica}, status=401)
+
+    if usuario.tentativas_login_falhas or usuario.bloqueado_ate:
+        usuario.tentativas_login_falhas = 0
+        usuario.bloqueado_ate = None
+        usuario.save(update_fields=['tentativas_login_falhas', 'bloqueado_ate'])
 
     token = Token.gerar_para(usuario, dispositivo=dados.get('dispositivo'))
 
@@ -75,6 +129,140 @@ def validar_token(request):
     )
 
 
+@csrf_exempt
+@require_POST
+@requer_token
+def trocar_senha(request):
+    """
+    POST /usuarios/trocar-senha/
+    Body: {"senha_atual": "...", "nova_senha": "..."}
+    30/07/2026. Qualquer usuario autenticado troca a propria senha.
+    Exige a senha atual correta -- mesmo com o dispositivo ja logado, um
+    valor errado em senha_atual bloqueia a troca (protege contra alguem
+    pegar o celular destravado de outra pessoa e trocar a senha dela).
+    Excecao: se o usuario ainda nao tem senha definida (legado), nao ha
+    "senha atual" pra conferir -- esse caso deveria passar pelo fluxo de
+    "Esqueci minha senha" em vez deste endpoint, mas por seguranca ainda
+    assim permitimos definir aqui sem exigir uma senha_atual que nunca
+    existiu.
+    """
+    usuario = request.usuario_rad
+    try:
+        dados = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'erro': 'Corpo da requisicao invalido.'}, status=400)
+
+    senha_atual = dados.get('senha_atual') or ''
+    nova_senha = dados.get('nova_senha') or ''
+
+    if usuario.senha_hash and not usuario.verificar_senha(senha_atual):
+        return JsonResponse({'erro': 'Senha atual incorreta.'}, status=401)
+
+    erros_senha = validar_senha(nova_senha, login=usuario.login)
+    if erros_senha:
+        return JsonResponse(
+            {'erros': [{'campo': 'nova_senha', 'mensagem': m} for m in erros_senha]}, status=422
+        )
+
+    usuario.definir_senha(nova_senha)
+    usuario.save(update_fields=['senha_hash'])
+
+    return JsonResponse({'sucesso': True})
+
+
+@csrf_exempt
+@require_POST
+def solicitar_redefinicao_senha(request):
+    """
+    POST /usuarios/esqueci-senha/
+    Body: {"email": "..."}
+    30/07/2026. Publico (sem token) -- por definicao quem esqueceu a
+    senha nao esta autenticado. Sempre retorna a MESMA resposta de
+    sucesso, exista ou nao o e-mail no cadastro -- evita que alguem
+    descubra quais e-mails/usuarios existem testando este endpoint
+    (enumeracao de contas).
+    """
+    try:
+        dados = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'erro': 'Corpo da requisicao invalido.'}, status=400)
+
+    email_informado = (dados.get('email') or '').strip().lower()
+
+    resposta_generica = JsonResponse({
+        'mensagem': 'Se este e-mail estiver cadastrado, enviamos um link de redefinição de senha.',
+    })
+
+    if not email_informado or not REGEX_EMAIL_SIMPLES.match(email_informado):
+        return resposta_generica
+
+    usuario = Usuario.objects.filter(email__iexact=email_informado, ativo=True).first()
+    if usuario is None:
+        return resposta_generica
+
+    token = TokenRedefinicaoSenha.gerar_para(usuario)
+    try:
+        enviar_email_redefinicao_senha(usuario, token.token)
+    except Exception:
+        # Nao revela falha de envio pro cliente (evita enumeracao e nao
+        # expoe detalhe de infraestrutura de e-mail) -- so nao quebra a
+        # resposta. Se o e-mail nao chegar, checar credenciais SMTP
+        # (settings EMAIL_*) e os logs do Render.
+        pass
+
+    return resposta_generica
+
+
+@csrf_exempt
+@require_POST
+def confirmar_redefinicao_senha(request):
+    """
+    POST /usuarios/redefinir-senha/confirmar/
+    Body: {"token": "...", "nova_senha": "..."}
+    30/07/2026. Publico -- o token de redefinicao (vindo do e-mail) e a
+    propria prova de identidade aqui, nao precisa de token de sessao.
+    """
+    try:
+        dados = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        return JsonResponse({'erro': 'Corpo da requisicao invalido.'}, status=400)
+
+    valor_token = (dados.get('token') or '').strip()
+    nova_senha = dados.get('nova_senha') or ''
+
+    if not valor_token:
+        return JsonResponse({'erro': 'Link inválido.'}, status=400)
+
+    token = TokenRedefinicaoSenha.objects.select_related('usuario').filter(token=valor_token).first()
+    if token is None or not token.valido:
+        return JsonResponse(
+            {'erro': 'Este link é inválido ou já expirou. Solicite um novo em "Esqueci minha senha".'},
+            status=400,
+        )
+
+    erros_senha = validar_senha(nova_senha, login=token.usuario.login)
+    if erros_senha:
+        return JsonResponse(
+            {'erros': [{'campo': 'nova_senha', 'mensagem': m} for m in erros_senha]}, status=422
+        )
+
+    usuario = token.usuario
+    usuario.definir_senha(nova_senha)
+    usuario.tentativas_login_falhas = 0
+    usuario.bloqueado_ate = None
+    usuario.save(update_fields=['senha_hash', 'tentativas_login_falhas', 'bloqueado_ate'])
+
+    token.usado = True
+    token.save(update_fields=['usado'])
+
+    # Invalida qualquer outro token de redefinicao pendente do mesmo
+    # usuario -- evita que um link antigo continue valido depois que a
+    # senha ja foi trocada por outro caminho.
+    TokenRedefinicaoSenha.objects.filter(usuario=usuario, usado=False).exclude(id=token.id).update(usado=True)
+
+    return JsonResponse({'sucesso': True})
+
+
 # ---------------------------------------------------------------------------
 # Gestao de usuarios (EFD secao 4.4)
 # ---------------------------------------------------------------------------
@@ -94,9 +282,14 @@ def _serializar_usuario(usuario, usuario_solicitante=None):
     dados = {
         'id': usuario.id,
         'login': usuario.login,
+        'email': usuario.email,
         'ativo': usuario.ativo,
         'perfis': usuario.lista_perfis,
         'data_criacao': usuario.data_criacao.strftime('%d/%m/%Y'),
+        # 30/07/2026: o cliente usa isso pra avisar o Administrador que
+        # a pessoa ainda nao consegue entrar no sistema (precisa de
+        # e-mail cadastrado + passar pelo fluxo de "Esqueci minha senha").
+        'senha_definida': bool(usuario.senha_hash),
     }
     if usuario_solicitante is not None:
         dados['pode_gerenciar'] = _pode_gerenciar(usuario, usuario_solicitante)
@@ -126,7 +319,7 @@ def listar(request):
 def criar(request):
     """
     POST /usuarios/administrar/criar/
-    Body: {"login": "joao.silva", "perfis": ["usuario"]}
+    Body: {"login": "joao.silva", "perfis": ["usuario"], "email": "opcional"}
     """
     try:
         dados = json.loads(request.body or '{}')
@@ -134,6 +327,7 @@ def criar(request):
         return JsonResponse({'erro': 'Corpo da requisicao invalido.'}, status=400)
 
     login_novo = (dados.get('login') or '').strip()
+    email_novo = (dados.get('email') or '').strip().lower()
     perfis_solicitados = list(set(dados.get('perfis') or []))
     solicitante = request.usuario_rad
 
@@ -146,6 +340,12 @@ def criar(request):
     elif Usuario.objects.filter(login=login_novo).exists():
         erros.append({'campo': 'login', 'mensagem': 'Este login ja esta em uso.'})
 
+    if email_novo:
+        if not REGEX_EMAIL_SIMPLES.match(email_novo):
+            erros.append({'campo': 'email', 'mensagem': 'E-mail invalido.'})
+        elif Usuario.objects.filter(email__iexact=email_novo).exists():
+            erros.append({'campo': 'email', 'mensagem': 'Este e-mail ja esta em uso por outro usuario.'})
+
     erros_perfil, perfis_validos = _validar_perfis(perfis_solicitados, solicitante)
     erros.extend(erros_perfil)
 
@@ -153,7 +353,7 @@ def criar(request):
         return JsonResponse({'erros': erros}, status=422)
 
     with transaction.atomic():
-        usuario = Usuario.objects.create(login=login_novo)
+        usuario = Usuario.objects.create(login=login_novo, email=email_novo or None)
         for p in perfis_validos:
             UsuarioPerfil.objects.create(usuario=usuario, perfil=p)
 
@@ -167,9 +367,11 @@ def criar(request):
 def editar(request, id_usuario):
     """
     POST /usuarios/administrar/<id>/editar/
-    Body: {"perfis": [...], "ativo": true}
+    Body: {"perfis": [...], "ativo": true, "email": "opcional"}
     Login nao e editavel apos a criacao -- e o identificador de
     autenticacao e alterar causaria confusao operacional.
+    30/07/2026: email agora e editavel aqui tambem -- e o que habilita
+    a pessoa a usar "Esqueci minha senha" pela primeira vez.
     """
     try:
         usuario = Usuario.objects.prefetch_related('perfis').get(id=id_usuario)
@@ -188,8 +390,20 @@ def editar(request, id_usuario):
     except json.JSONDecodeError:
         return JsonResponse({'erro': 'Corpo da requisicao invalido.'}, status=400)
 
+    erros = []
+
+    email_novo = None
+    if 'email' in dados:
+        email_novo = (dados.get('email') or '').strip().lower()
+        if email_novo:
+            if not REGEX_EMAIL_SIMPLES.match(email_novo):
+                erros.append({'campo': 'email', 'mensagem': 'E-mail invalido.'})
+            elif Usuario.objects.filter(email__iexact=email_novo).exclude(id=usuario.id).exists():
+                erros.append({'campo': 'email', 'mensagem': 'Este e-mail ja esta em uso por outro usuario.'})
+
     perfis_solicitados = list(set(dados.get('perfis', usuario.lista_perfis)))
-    erros, perfis_validos = _validar_perfis(perfis_solicitados, solicitante)
+    erros_perfil, perfis_validos = _validar_perfis(perfis_solicitados, solicitante)
+    erros.extend(erros_perfil)
 
     if erros:
         return JsonResponse({'erros': erros}, status=422)
@@ -198,6 +412,9 @@ def editar(request, id_usuario):
         if 'ativo' in dados:
             usuario.ativo = bool(dados['ativo'])
             usuario.save(update_fields=['ativo'])
+        if 'email' in dados:
+            usuario.email = email_novo or None
+            usuario.save(update_fields=['email'])
         usuario.perfis.all().delete()
         for p in perfis_validos:
             UsuarioPerfil.objects.create(usuario=usuario, perfil=p)

@@ -31,6 +31,18 @@
       align-items: center;
       gap: 0.3rem;
     }
+    .barra-topo__usuario {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .barra-topo__link-senha {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-decoration: none;
+      color: inherit;
+      opacity: 0.85;
+    }
   </style>
   {% block cabecalho_extra %}{% endblock %}
 </head>
@@ -59,6 +71,10 @@
   <div class="barra-topo__usuario">
     <span id="indicador-conexao" class="selo selo--online">Online</span>
     <span id="usuario-logado"></span>
+    <!-- 30/07/2026: so aparece quando ha sessao valida (ver JS abaixo) -->
+    <a id="link-trocar-senha" class="barra-topo__link-senha" href="{% url 'interface:trocar_senha' %}" style="display:none;">
+      Trocar senha
+    </a>
   </div>
 </header>
 {% endblock %}
@@ -91,8 +107,10 @@
   document.addEventListener('DOMContentLoaded', function () {
     const info = RadAuth.obterSessao();
     const rotuloUsuario = document.getElementById('usuario-logado');
+    const linkTrocarSenha = document.getElementById('link-trocar-senha');
     if (info && rotuloUsuario) {
       rotuloUsuario.textContent = info.login;
+      if (linkTrocarSenha) linkTrocarSenha.style.display = '';
     }
 
     // Botao "Voltar": usa o historico do navegador quando ha para onde

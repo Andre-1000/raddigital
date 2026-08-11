@@ -65,6 +65,12 @@ def _serializar(colaborador):
         'ativo': colaborador.ativo,
         'usuario_id': usuario.id if usuario else None,
         'login': usuario.login if usuario else None,
+        # 30/07/2026: e-mail e status de senha, pra tela de Gestao de
+        # Usuarios mostrar quem ainda nao consegue entrar no sistema
+        # (sem senha definida) e permitir editar o e-mail necessario
+        # pro fluxo de "Esqueci minha senha".
+        'email': usuario.email if usuario else None,
+        'senha_definida': bool(usuario.senha_hash) if usuario else False,
         'perfis': usuario.lista_perfis if usuario else [],
         'usuario_ativo': usuario.ativo if usuario else None,
     }

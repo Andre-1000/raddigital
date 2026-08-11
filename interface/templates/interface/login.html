@@ -18,7 +18,7 @@
 {% block conteudo %}
 <div class="cartao" style="max-width:380px; margin:2.5rem auto 0;">
   <h1 style="font-size:1.3rem;">Entrar</h1>
-  <p class="texto-suave" style="margin-top:-0.25rem;">Informe sua matrícula para continuar. Sem senha.</p>
+  <p class="texto-suave" style="margin-top:-0.25rem;">Informe seu login e senha para continuar.</p>
 
   <div id="aviso-login"></div>
 
@@ -27,8 +27,38 @@
       <label for="campo-login">Login</label>
       <input type="text" id="campo-login" name="login" autocomplete="username" autocapitalize="off" required>
     </div>
+    <div class="campo">
+      <label for="campo-senha">Senha</label>
+      <input type="password" id="campo-senha" name="senha" autocomplete="current-password" required>
+    </div>
     <button type="submit" class="botao botao--primaria" id="botao-entrar">Entrar</button>
   </form>
+
+  <button type="button" id="botao-esqueci-senha"
+          style="background:none; border:none; color:var(--cor-primaria); font-size:0.85rem;
+                 font-weight:600; cursor:pointer; margin-top:0.9rem; padding:0.4rem 0; min-height:var(--alvo-toque);">
+    Esqueci minha senha
+  </button>
+</div>
+
+<!-- Modal: Esqueci minha senha (30/07/2026) -->
+<div id="modal-esqueci-senha" style="display:none; position:fixed; inset:0; background:rgba(28,31,30,0.5); z-index:30; align-items:center; justify-content:center; padding:1rem;">
+  <div class="cartao" style="max-width:400px;">
+    <h2 style="font-size:1.05rem;">Esqueci minha senha</h2>
+    <p class="texto-suave" style="font-size:0.85rem;">
+      Informe o e-mail cadastrado na sua conta. Se ele estiver correto, enviaremos um
+      link para você criar uma nova senha.
+    </p>
+    <div id="aviso-esqueci-senha"></div>
+    <div class="campo">
+      <label for="campo-email-esqueci-senha">E-mail</label>
+      <input type="email" id="campo-email-esqueci-senha" autocomplete="email">
+    </div>
+    <div class="pilha">
+      <button type="button" class="botao botao--primaria" id="botao-enviar-link-redefinicao">Enviar link</button>
+      <button type="button" class="botao botao--secundaria" id="botao-fechar-esqueci-senha">Cancelar</button>
+    </div>
+  </div>
 </div>
 {% endblock %}
 
@@ -54,8 +84,9 @@
       aviso.innerHTML = '';
 
       const login = document.getElementById('campo-login').value.trim();
-      if (!login) {
-        mostrarErro('Informe seu login.');
+      const senha = document.getElementById('campo-senha').value;
+      if (!login || !senha) {
+        mostrarErro('Informe login e senha.');
         return;
       }
 
@@ -71,12 +102,17 @@
         const resposta = await fetch('/usuarios/login/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ login: login, dispositivo: navigator.userAgent.slice(0, 100) }),
+          body: JSON.stringify({ login: login, senha: senha, dispositivo: navigator.userAgent.slice(0, 100) }),
         });
 
         if (!resposta.ok) {
           const corpo = await resposta.json().catch(() => ({}));
-          mostrarErro(corpo.erro || 'Não foi possível entrar. Confira o login e tente novamente.');
+          if (corpo.senha_nao_definida) {
+            aviso.innerHTML = `<div class="aviso aviso--atencao">${corpo.erro} <button type="button" id="botao-ir-para-esqueci-senha" style="background:none;border:none;color:var(--cor-primaria);font-weight:700;text-decoration:underline;cursor:pointer;padding:0;">Clique aqui.</button></div>`;
+            document.getElementById('botao-ir-para-esqueci-senha').addEventListener('click', abrirModalEsqueciSenha);
+          } else {
+            mostrarErro(corpo.erro || 'Não foi possível entrar. Confira o login e a senha e tente novamente.');
+          }
           return;
         }
 
@@ -105,6 +141,51 @@
       } finally {
         botao.disabled = false;
         botao.textContent = 'Entrar';
+      }
+    });
+
+    // ---- Esqueci minha senha ----------------------------------------
+    const modalEsqueciSenha = document.getElementById('modal-esqueci-senha');
+    const avisoEsqueciSenha = document.getElementById('aviso-esqueci-senha');
+    const campoEmailEsqueciSenha = document.getElementById('campo-email-esqueci-senha');
+
+    function abrirModalEsqueciSenha() {
+      avisoEsqueciSenha.innerHTML = '';
+      campoEmailEsqueciSenha.value = '';
+      modalEsqueciSenha.style.display = 'flex';
+    }
+
+    document.getElementById('botao-esqueci-senha').addEventListener('click', abrirModalEsqueciSenha);
+    document.getElementById('botao-fechar-esqueci-senha').addEventListener('click', function () {
+      modalEsqueciSenha.style.display = 'none';
+    });
+
+    document.getElementById('botao-enviar-link-redefinicao').addEventListener('click', async function () {
+      avisoEsqueciSenha.innerHTML = '';
+      const email = campoEmailEsqueciSenha.value.trim();
+      if (!email) {
+        avisoEsqueciSenha.innerHTML = '<div class="aviso aviso--erro">Informe o e-mail.</div>';
+        return;
+      }
+      if (!navigator.onLine) {
+        avisoEsqueciSenha.innerHTML = '<div class="aviso aviso--erro">Sem conexão. Tente novamente quando estiver online.</div>';
+        return;
+      }
+
+      const botaoEnviar = document.getElementById('botao-enviar-link-redefinicao');
+      botaoEnviar.disabled = true;
+      try {
+        const resposta = await fetch('/usuarios/esqueci-senha/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email }),
+        });
+        const dados = await resposta.json().catch(() => ({}));
+        avisoEsqueciSenha.innerHTML = `<div class="aviso aviso--sucesso">${dados.mensagem || 'Se este e-mail estiver cadastrado, enviamos um link de redefinição de senha.'}</div>`;
+      } catch (erro) {
+        avisoEsqueciSenha.innerHTML = '<div class="aviso aviso--erro">Erro de conexão. Tente novamente.</div>';
+      } finally {
+        botaoEnviar.disabled = false;
       }
     });
   });

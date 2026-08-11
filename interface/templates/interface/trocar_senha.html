@@ -1,0 +1,89 @@
+{% extends "interface/base.html" %}
+{% load static %}
+{% block titulo %}Trocar senha — Sistema RAD{% endblock %}
+
+{% block conteudo %}
+<div id="conteudo-protegido" style="display:none;">
+  <div class="cartao" style="max-width:400px; margin:1.5rem auto 0;">
+    <h1 style="font-size:1.3rem;">Trocar senha</h1>
+    <p class="texto-suave" style="margin-top:-0.25rem; font-size:0.85rem;">
+      A nova senha deve ter no mínimo 8 caracteres.
+    </p>
+
+    <div id="aviso-trocar-senha"></div>
+
+    <form id="form-trocar-senha" novalidate>
+      <div class="campo">
+        <label for="campo-senha-atual">Senha atual</label>
+        <input type="password" id="campo-senha-atual" autocomplete="current-password">
+        <p class="campo__ajuda" id="ajuda-senha-atual" style="display:none;">
+          Sua conta ainda não tem senha definida — deixe este campo em branco.
+        </p>
+      </div>
+      <div class="campo">
+        <label for="campo-nova-senha-troca">Nova senha</label>
+        <input type="password" id="campo-nova-senha-troca" autocomplete="new-password" required>
+      </div>
+      <div class="campo">
+        <label for="campo-confirmar-senha-troca">Confirme a nova senha</label>
+        <input type="password" id="campo-confirmar-senha-troca" autocomplete="new-password" required>
+      </div>
+      <button type="submit" class="botao botao--primaria" id="botao-salvar-senha-troca">Salvar nova senha</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block script_extra %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!RadAuth.exigirSessao()) return;
+    document.getElementById('conteudo-protegido').style.display = '';
+
+    const aviso = document.getElementById('aviso-trocar-senha');
+    const form = document.getElementById('form-trocar-senha');
+    const botao = document.getElementById('botao-salvar-senha-troca');
+
+    form.addEventListener('submit', async function (evento) {
+      evento.preventDefault();
+      aviso.innerHTML = '';
+
+      const senhaAtual = document.getElementById('campo-senha-atual').value;
+      const novaSenha = document.getElementById('campo-nova-senha-troca').value;
+      const confirmarSenha = document.getElementById('campo-confirmar-senha-troca').value;
+
+      if (novaSenha !== confirmarSenha) {
+        aviso.innerHTML = '<div class="aviso aviso--erro">As senhas não coincidem.</div>';
+        return;
+      }
+
+      botao.disabled = true;
+      botao.textContent = 'Salvando…';
+
+      try {
+        const resposta = await RadAuth.requisicaoAutenticada('/usuarios/trocar-senha/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ senha_atual: senhaAtual, nova_senha: novaSenha }),
+        });
+
+        const dados = await resposta.json().catch(() => ({}));
+
+        if (!resposta.ok) {
+          const mensagens = (dados.erros || []).map((e) => e.mensagem);
+          aviso.innerHTML = `<div class="aviso aviso--erro">${mensagens.join(' ') || dados.erro || 'Não foi possível trocar a senha.'}</div>`;
+          return;
+        }
+
+        aviso.innerHTML = '<div class="aviso aviso--sucesso">Senha alterada com sucesso.</div>';
+        form.reset();
+      } catch (erro) {
+        aviso.innerHTML = '<div class="aviso aviso--erro">Erro de conexão. Tente novamente.</div>';
+      } finally {
+        botao.disabled = false;
+        botao.textContent = 'Salvar nova senha';
+      }
+    });
+  });
+</script>
+{% endblock %}

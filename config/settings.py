@@ -70,6 +70,38 @@ INSTALLED_APPS = [
 VALIDADE_TOKEN_DIAS = int(os.getenv('VALIDADE_TOKEN_DIAS', 7))
 LOGS_ATIVOS = os.getenv('LOGS_ATIVOS', 'False') == 'True'
 
+# 30/07/2026: rate limit de login -- protege contra tentativa de forca
+# bruta agora que o login exige senha (ver usuarios/views.py::login e
+# CLAUDE.md, achado de seguranca corrigido). Apos MAXIMO_TENTATIVAS_LOGIN
+# erros seguidos, a conta fica bloqueada por BLOQUEIO_LOGIN_MINUTOS --
+# contador zera a cada login correto.
+MAXIMO_TENTATIVAS_LOGIN = int(os.getenv('MAXIMO_TENTATIVAS_LOGIN', 5))
+BLOQUEIO_LOGIN_MINUTOS = int(os.getenv('BLOQUEIO_LOGIN_MINUTOS', 15))
+
+# 30/07/2026: URL publica do site, usada pra montar o link do e-mail de
+# redefinicao de senha (usuarios/servicos_email.py). Sem barra no final.
+URL_BASE_SITE = os.getenv('URL_BASE_SITE', 'https://raddigital.onrender.com')
+
+# 30/07/2026: envio de e-mail (redefinicao de senha). Sem as variaveis
+# EMAIL_* no .env, cai no backend "console" -- imprime o e-mail no log
+# em vez de enviar de verdade. Isso vale MESMO EM PRODUCAO ate Andre
+# configurar uma conta SMTP real (Gmail com senha de app, ou um servico
+# tipo Resend/SendGrid). Variaveis esperadas:
+#   EMAIL_HOST, EMAIL_PORT, EMAIL_HOST_USER, EMAIL_HOST_PASSWORD,
+#   EMAIL_USE_TLS (True/False), DEFAULT_FROM_EMAIL
+EMAIL_BACKEND = os.getenv(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.smtp.EmailBackend'
+    if os.getenv('EMAIL_HOST')
+    else 'django.core.mail.backends.console.EmailBackend',
+)
+EMAIL_HOST = os.getenv('EMAIL_HOST', '')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'nao-responda@raddigital.onrender.com')
+
 # Armazenamento de anexos (RG-ANX-007/008): o banco guarda so a
 # referencia (caminho) ao arquivo, nao o arquivo em si.
 #
@@ -173,6 +205,12 @@ else:
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
+#
+# 30/07/2026: estes validators sao usados so pelo /admin/ do Django
+# (superuser criado via createsuperuser). O login de usuario final do
+# Sistema RAD usa validacao propria (usuarios/validadores_senha.py),
+# porque o model Usuario nao implementa a interface do
+# django.contrib.auth.User que alguns destes validators esperam.
 
 AUTH_PASSWORD_VALIDATORS = [
     {

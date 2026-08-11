@@ -3,10 +3,11 @@
  * separadas "Gerenciar Usuários" e "Gerenciar Colaboradores".
  *
  * Usa os endpoints do app colaboradores como fonte principal (cada
- * colaborador já traz login/perfis/status do usuário vinculado, ver
- * colaboradores/views.py::_serializar). Editar perfis usa o endpoint
- * de usuarios (usuarios/administrar/<id>/editar/), porque perfil e'
- * um dado do Usuario, nao do Colaborador.
+ * colaborador já traz login/perfis/status/e-mail/senha_definida do
+ * usuário vinculado, ver colaboradores/views.py::_serializar). Editar
+ * perfis e e-mail usa o endpoint de usuarios
+ * (usuarios/administrar/<id>/editar/), porque sao dados do Usuario,
+ * nao do Colaborador.
  */
 document.addEventListener('DOMContentLoaded', function () {
   if (!RadAuth.exigirSessao()) return;
@@ -72,6 +73,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const nome = document.getElementById('campo-novo-nome').value.trim();
     const matricula = document.getElementById('campo-novo-matricula').value.trim();
+    const email = document.getElementById('campo-novo-email').value.trim();
     const perfis = [];
     if (document.getElementById('perfil-novo-usuario').checked) perfis.push('usuario');
     if (document.getElementById('perfil-novo-supervisor').checked) perfis.push('supervisor');
@@ -102,19 +104,26 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
       }
 
-      // 2) se pediram perfis alem do padrao (Usuario), atualiza
+      // 2) se pediram perfis alem do padrao (Usuario) ou informaram
+      //    e-mail, atualiza numa segunda chamada (perfil/e-mail sao
+      //    dados do Usuario, nao do Colaborador -- ver docstring do
+      //    modulo).
       const perfisDiferentesDoPadrao = perfis.length !== 1 || perfis[0] !== 'usuario';
-      if (perfisDiferentesDoPadrao && dados.usuario_id) {
+      if ((perfisDiferentesDoPadrao || email) && dados.usuario_id) {
+        const corpoEdicao = {};
+        if (perfisDiferentesDoPadrao) corpoEdicao.perfis = perfis;
+        if (email) corpoEdicao.email = email;
         await RadAuth.requisicaoAutenticada(`/usuarios/administrar/${dados.usuario_id}/editar/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ perfis }),
+          body: JSON.stringify(corpoEdicao),
         });
       }
 
       mostrarAviso(avisoCriar, `${nome} cadastrado com sucesso.`, 'sucesso');
       document.getElementById('campo-novo-nome').value = '';
       document.getElementById('campo-novo-matricula').value = '';
+      document.getElementById('campo-novo-email').value = '';
       document.getElementById('perfil-novo-usuario').checked = true;
       document.getElementById('perfil-novo-supervisor').checked = false;
       document.getElementById('perfil-novo-administrador').checked = false;
@@ -182,6 +191,12 @@ document.addEventListener('DOMContentLoaded', function () {
       : '<span class="selo selo--offline">Inativo</span>';
   }
 
+  function seloSenha(senhaDefinida) {
+    return senhaDefinida
+      ? '<span class="selo selo--online">Definida</span>'
+      : '<span class="selo selo--offline" title="Precisa de e-mail cadastrado + Esqueci minha senha">Pendente</span>';
+  }
+
   function seloPerfil(perfil) {
     const rotulos = { usuario: 'Usuário', supervisor: 'Supervisor', administrador: 'Administrador' };
     return `<span class="selo selo--online" style="margin-right:0.3rem;">${rotulos[perfil] || perfil}</span>`;
@@ -210,8 +225,9 @@ document.addEventListener('DOMContentLoaded', function () {
         <button type="button" class="botao botao--secundaria botao-editar-perfis"
                 data-id="${pessoa.id}" data-usuario-id="${pessoa.usuario_id ?? ''}"
                 data-nome="${escapar(pessoa.nome)}" data-perfis="${pessoa.perfis.join(',')}"
+                data-email="${escapar(pessoa.email || '')}"
                 style="width:auto; min-height:36px; padding:0 0.75rem; font-size:0.85rem;">
-          Editar perfis
+          Editar
         </button>
         <button type="button" class="botao botao--secundaria botao-alternar-status"
                 data-id="${pessoa.id}" data-ativo="${pessoa.ativo}"
@@ -230,6 +246,7 @@ document.addEventListener('DOMContentLoaded', function () {
         <td>${escapar(pessoa.nome)}</td>
         <td>${escapar(pessoa.registro_empresa)}</td>
         <td>${perfisHtml}</td>
+        <td>${seloSenha(pessoa.senha_definida)}</td>
         <td>${seloStatus(pessoa.ativo)}</td>
         <td><div style="display:flex; gap:0.4rem; flex-wrap:wrap;">${botoesAcao}</div></td>
       </tr>`;
@@ -296,7 +313,7 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   // -------------------------------------------------------------
-  // Editar perfis
+  // Editar perfis e e-mail
   // -------------------------------------------------------------
   const modalEditarPerfis = document.getElementById('modal-editar-perfis');
   const avisoEditarPerfis = document.getElementById('aviso-editar-perfis');
@@ -309,6 +326,8 @@ document.addEventListener('DOMContentLoaded', function () {
     pessoaEmEdicao = { id: dataset.id, usuarioId: dataset.usuarioId, nome: dataset.nome };
     document.getElementById('nome-pessoa-editar').textContent = dataset.nome;
     limparAviso(avisoEditarPerfis);
+
+    document.getElementById('campo-email-editar').value = dataset.email || '';
 
     const perfisAtuais = dataset.perfis ? dataset.perfis.split(',') : [];
     document.getElementById('perfil-editar-usuario').checked = perfisAtuais.includes('usuario');
@@ -339,6 +358,8 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
 
+    const email = document.getElementById('campo-email-editar').value.trim();
+
     const botao = document.getElementById('botao-salvar-perfis');
     botao.disabled = true;
     try {
@@ -347,7 +368,7 @@ document.addEventListener('DOMContentLoaded', function () {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ perfis }),
+          body: JSON.stringify({ perfis, email }),
         }
       );
       const dados = await resposta.json();
