@@ -356,19 +356,28 @@ h1, h2, h3 {
 .aviso--atencao { background: var(--cor-atencao-fundo); color: #8a3608; }
 .aviso--sucesso { background: var(--cor-sucesso-fundo); color: var(--cor-primaria-escura); }
 
+/* 30/07/2026: trocado de pilula preenchida para "ponto + texto" (opcao
+   D escolhida entre 5 alternativas mostradas). O ponto colorido vem
+   via ::before -- assim nenhum HTML/JS que ja gera <span class="selo
+   selo--online">texto</span> precisa mudar, só a aparência muda. */
 .selo {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
 }
-.selo--offline { background: var(--cor-atencao-fundo); color: #8a3608; }
-.selo--online { background: var(--cor-sucesso-fundo); color: var(--cor-primaria-escura); }
+.selo::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.selo--offline { color: #8a3608; }
+.selo--offline::before { background: var(--cor-atencao); }
+.selo--online { color: var(--cor-primaria-escura); }
+.selo--online::before { background: var(--cor-primaria); }
 
 /* Ação fixa no rodapé (mobile) -- cor de texto explícita pelo mesmo
    motivo do .cartao: fundo branco fixo, independente do fundo escuro

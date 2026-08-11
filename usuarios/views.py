@@ -35,7 +35,7 @@ REGEX_EMAIL_SIMPLES = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 def login(request):
     """
     POST /usuarios/login/
-    Body: {"login": "joao.silva", "senha": "...", "dispositivo": "opcional"}
+    Body: {"login": "joao.silva ou joao@email.com", "senha": "...", "dispositivo": "opcional"}
 
     30/07/2026: login com senha real, substituindo o login "so pelo
     login" (achado critico de seguranca, auditoria informal contra
@@ -49,19 +49,30 @@ def login(request):
     - Usuario legado sem senha definida (senha_hash vazio) recebe erro
       especifico apontando pra "Esqueci minha senha", que funciona tambem
       como fluxo de "definir minha primeira senha".
+
+    30/07/2026 (revisado): o campo "login" do payload aceita tanto a
+    matricula/login de sempre QUANTO o e-mail cadastrado -- a pessoa
+    pode entrar com qualquer um dos dois, sem campo separado na tela.
+    Distincao simples: se o valor contem "@", busca por e-mail; senao,
+    busca por login. Email e' unique no model Usuario, entao nao ha
+    risco de ambiguidade.
     """
     try:
         dados = json.loads(request.body or '{}')
     except json.JSONDecodeError:
         return JsonResponse({'erro': 'Corpo da requisicao invalido.'}, status=400)
 
-    login_informado = (dados.get('login') or '').strip()
+    identificador = (dados.get('login') or '').strip()
     senha_informada = dados.get('senha') or ''
 
-    if not login_informado or not senha_informada:
+    if not identificador or not senha_informada:
         return JsonResponse({'erro': 'Informe login e senha.'}, status=400)
 
-    usuario = Usuario.objects.filter(login=login_informado).first()
+    if '@' in identificador:
+        usuario = Usuario.objects.filter(email__iexact=identificador).first()
+    else:
+        usuario = Usuario.objects.filter(login=identificador).first()
+
     mensagem_erro_generica = 'Login ou senha incorretos.'
 
     if usuario is None:
