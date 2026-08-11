@@ -36,6 +36,15 @@
   assim funciona tanto dentro de um cartão branco (fica cinza-navy)
   quanto direto no fundo escuro da página (fica branco-acinzentado) --
   sem precisar de duas classes diferentes.
+
+  Atualização (30/07/2026): input[type="password"] e type="email"
+  estavam FORA da lista de tipos estilizados abaixo -- ficavam com a
+  aparência crua do navegador (bem menor que os campos de texto ao
+  lado). Bug real, notado no campo Senha da tela de login (mesma caixa
+  visual de Login, mas renderizando bem menor) -- afetava tambem todo
+  campo de e-mail adicionado nesta mesma leva (Gerenciar Usuarios,
+  Esqueci minha senha, Trocar senha). Corrigido incluindo os dois tipos
+  na mesma regra dos demais.
 */
 
 :root {
@@ -273,6 +282,8 @@ h1, h2, h3 {
 }
 
 .campo input[type="text"],
+.campo input[type="password"],
+.campo input[type="email"],
 .campo input[type="number"],
 .campo input[type="date"],
 .campo input[type="time"],
