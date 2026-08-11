@@ -214,12 +214,14 @@ def solicitar_redefinicao_senha(request):
     token = TokenRedefinicaoSenha.gerar_para(usuario)
     try:
         enviar_email_redefinicao_senha(usuario, token.token)
-    except Exception:
-        # Nao revela falha de envio pro cliente (evita enumeracao e nao
-        # expoe detalhe de infraestrutura de e-mail) -- so nao quebra a
-        # resposta. Se o e-mail nao chegar, checar credenciais SMTP
-        # (settings EMAIL_*) e os logs do Render.
-        pass
+    except Exception as erro:
+        # 30/07/2026: a resposta pro CLIENTE continua generica de
+        # proposito (evita enumeracao de contas) -- mas o erro real
+        # precisa aparecer no log do Render pra dar pra debugar
+        # problema de SMTP (credencial errada, porta bloqueada, etc.).
+        # print() garante que aparece no log mesmo sem LOGGING
+        # configurado em settings.py.
+        print(f'[ERRO] Falha ao enviar e-mail de redefinicao de senha para {usuario.email!r}: {erro!r}')
 
     return resposta_generica
 
