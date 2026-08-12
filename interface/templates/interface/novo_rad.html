@@ -28,9 +28,23 @@
 
   <form id="form-rad" novalidate>
 
+    <!-- 30/07/2026: no computador, os cartoes de contexto/identificacao
+         (esquerda) e os de execucao do servico (direita) ficam lado a
+         lado -- "auto-fit, minmax(320px,1fr)" colapsa sozinho pra 1
+         coluna quando a tela nao tem largura pra 2 (mesma tecnica ja
+         usada em Gerenciar Usuarios), entao o celular continua
+         empilhado como sempre foi, sem precisar de media query
+         separada. Colaboradores/Anexos/Responsaveis/Observacoes ficam
+         DE FORA dessa grade, sempre largura total -- sao conteudo
+         "largo" (fotos, listas dinamicas, texto longo) que fica
+         apertado demais dividido ao meio. -->
+    <div class="duas-colunas-formulario">
+    <div class="coluna-formulario">
+
     <div class="cartao">
       <h2 style="font-size:1rem;">Identificação</h2>
 
+      <div class="grade-campos grade-campos--compacta">
       <div class="campo">
         <label for="campo-numero-os">OS <span class="obrigatorio">*</span></label>
         <input type="number" id="campo-numero-os" inputmode="numeric" min="1" max="9999999" required>
@@ -49,6 +63,7 @@
       <div class="campo">
         <label for="campo-data">Data <span class="obrigatorio">*</span></label>
         <input type="date" id="campo-data" required>
+      </div>
       </div>
     </div>
 
@@ -180,7 +195,10 @@
       </div>
     </div>
 
-    <div class="cartao" style="margin-top:1rem;">
+    </div>
+    <div class="coluna-formulario">
+
+    <div class="cartao">
       <h2 style="font-size:1rem;">Serviços Executados <span class="obrigatorio">*</span></h2>
       <button type="button" class="botao botao--secundaria" id="botao-sobre-servicos"
               style="width:auto; min-height:36px; padding:0 0.9rem; margin-bottom:0.9rem; font-size:0.85rem;">
@@ -200,7 +218,7 @@
          "N Op Maquina" e "Volume" so aparecem quando algum servico
          selecionado exige aquele campo especificamente -- os demais
          (Encarregados, Ajudantes, Motorista) sao comuns aos quatro. -->
-    <div class="cartao" id="bloco-terceiros" style="margin-top:1rem; display:none;">
+    <div class="cartao" id="bloco-terceiros" style="display:none;">
       <h2 style="font-size:1rem;">Terceiros</h2>
 
       <div class="campo">
@@ -229,7 +247,7 @@
       </div>
     </div>
 
-    <div class="cartao" id="bloco-amv" style="margin-top:1rem; display:none;">
+    <div class="cartao" id="bloco-amv" style="display:none;">
       <h2 style="font-size:1rem;">Bloco AMV</h2>
       <p class="campo__ajuda" style="margin-top:-0.4rem;">
         Um bloco por MCH verificada. Use "Adicionar MCH" se mais de uma máquina de chave foi verificada nesta atividade.
@@ -242,6 +260,11 @@
       </button>
       <p class="texto-suave centro" id="contador-blocos-amv" style="font-size:0.8rem; margin-top:0.4rem;"></p>
     </div>
+
+    </div>
+    </div>
+    <!-- fim da grade de 2 colunas -- Colaboradores/Anexos/Responsaveis/
+         Observacoes ficam sempre em largura total dai pra baixo. -->
 
     <div class="cartao" style="margin-top:1rem;">
       <h2 style="font-size:1rem;">Colaboradores e Participantes</h2>
@@ -474,6 +497,25 @@
 
 {% block cabecalho_extra %}
 <style>
+  /* 30/07/2026: Novo RAD ganha mais largura no computador pra caber 2
+     colunas de cartao lado a lado -- em telas estreitas isso nao
+     muda nada visualmente (o container so nao "estica" alem do
+     necessario, e a propria grade abaixo colapsa pra 1 coluna). */
+  .container-app { max-width: 980px; }
+
+  .duas-colunas-formulario {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1rem;
+    align-items: start;
+  }
+  .coluna-formulario {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0; /* evita que campo largo (ex.: select) estoure a coluna */
+  }
+
   .grupo-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 
   /* Lista de servicos (e outras listas de checkbox longas) em colunas,

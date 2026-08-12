@@ -223,9 +223,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const botoesAcao = podeGerenciarAdmin
       ? html`
         <button type="button" class="botao botao--secundaria botao-icone botao-editar-perfis"
-                title="Editar perfis e e-mail"
+                title="Editar"
                 data-id="${pessoa.id}" data-usuario-id="${pessoa.usuario_id ?? ''}"
-                data-nome="${escapar(pessoa.nome)}" data-perfis="${pessoa.perfis.join(',')}"
+                data-nome="${escapar(pessoa.nome)}" data-registro-empresa="${escapar(pessoa.registro_empresa)}"
+                data-perfis="${pessoa.perfis.join(',')}"
                 data-email="${escapar(pessoa.email || '')}">
           ${ICONE_EDITAR}
         </button>
@@ -338,6 +339,8 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('nome-pessoa-editar').textContent = dataset.nome;
     limparAviso(avisoEditarPerfis);
 
+    document.getElementById('campo-nome-editar').value = dataset.nome || '';
+    document.getElementById('campo-matricula-editar').value = dataset.registroEmpresa || '';
     document.getElementById('campo-email-editar').value = dataset.email || '';
 
     const perfisAtuais = dataset.perfis ? dataset.perfis.split(',') : [];
@@ -357,6 +360,9 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!pessoaEmEdicao) return;
     limparAviso(avisoEditarPerfis);
 
+    const nome = document.getElementById('campo-nome-editar').value.trim();
+    const matricula = document.getElementById('campo-matricula-editar').value.trim();
+    const email = document.getElementById('campo-email-editar').value.trim();
     const perfis = [];
     if (document.getElementById('perfil-editar-usuario').checked) perfis.push('usuario');
     if (document.getElementById('perfil-editar-supervisor').checked) perfis.push('supervisor');
@@ -364,30 +370,57 @@ document.addEventListener('DOMContentLoaded', function () {
       perfis.push('administrador');
     }
 
+    if (!nome || !matricula) {
+      mostrarAviso(avisoEditarPerfis, 'Preencha nome e matrícula.', 'erro');
+      return;
+    }
     if (perfis.length === 0) {
       mostrarAviso(avisoEditarPerfis, 'Selecione ao menos 1 perfil.', 'erro');
       return;
     }
 
-    const email = document.getElementById('campo-email-editar').value.trim();
-
     const botao = document.getElementById('botao-salvar-perfis');
     botao.disabled = true;
     try {
-      const resposta = await RadAuth.requisicaoAutenticada(
-        `/usuarios/administrar/${pessoaEmEdicao.usuarioId}/editar/`,
+      // 30/07/2026: passo 1 -- nome/matricula/status sao dados do
+      // Colaborador. Se a matricula mudar, o login vinculado tambem
+      // muda (colaboradores/views.py::editar recria o vinculo) -- por
+      // isso o passo 2 usa o usuario_id que VOLTA na resposta deste
+      // passo, nunca o usuario_id antigo capturado quando o modal
+      // abriu (que pode ter ficado obsoleto).
+      const respostaColaborador = await RadAuth.requisicaoAutenticada(
+        `/colaboradores/${pessoaEmEdicao.id}/editar/`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ registro_empresa: matricula, nome }),
+        }
+      );
+      const dadosColaborador = await respostaColaborador.json();
+      if (!respostaColaborador.ok) {
+        const mensagem = (dadosColaborador.erros || []).map((e) => e.mensagem).join(' ') || dadosColaborador.erro || 'Não foi possível salvar nome/matrícula.';
+        mostrarAviso(avisoEditarPerfis, mensagem, 'erro');
+        return;
+      }
+
+      // Passo 2 -- perfis e e-mail sao dados do Usuario, usando o
+      // usuario_id atual (pode ter mudado no passo 1).
+      const usuarioIdAtual = dadosColaborador.usuario_id;
+      const respostaUsuario = await RadAuth.requisicaoAutenticada(
+        `/usuarios/administrar/${usuarioIdAtual}/editar/`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ perfis, email }),
         }
       );
-      const dados = await resposta.json();
-      if (!resposta.ok) {
-        const mensagem = (dados.erros || []).map((e) => e.mensagem).join(' ') || dados.erro || 'Não foi possível salvar.';
+      const dadosUsuario = await respostaUsuario.json();
+      if (!respostaUsuario.ok) {
+        const mensagem = (dadosUsuario.erros || []).map((e) => e.mensagem).join(' ') || dadosUsuario.erro || 'Não foi possível salvar perfis/e-mail.';
         mostrarAviso(avisoEditarPerfis, mensagem, 'erro');
         return;
       }
+
       modalEditarPerfis.style.display = 'none';
       pessoaEmEdicao = null;
       await pesquisar();

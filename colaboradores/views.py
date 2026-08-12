@@ -350,18 +350,16 @@ def importar(request):
     Nome, Matricula, Perfis, Email (30/07/2026, revisado). Cabecalho e
     opcional (detectado automaticamente).
 
-    - Nome, Matricula: obrigatorios em toda linha.
+    - Nome, Matricula, Email: obrigatorios em toda linha (Email
+      revisado 30/07/2026 -- antes era opcional na importacao em
+      lote, mas ficou consistente com o cadastro manual: sem e-mail a
+      pessoa nunca consegue "Esqueci minha senha").
     - Perfis: opcional. Quando vazio, aplica so "usuario". Quando
       preenchido, aceita mais de um perfil na mesma celula separado
       por virgula (ex.: "usuario,supervisor") -- por isso o
       delimitador do ARQUIVO deve ser ";" quando essa coluna for usada
       com mais de um perfil (ver _detectar_delimitador_csv). Valores
       aceitos: usuario, supervisor, administrador.
-    - Email: opcional na importacao em lote (ao contrario do cadastro
-      manual, onde e obrigatorio) -- listas grandes de colaboradores
-      legados nem sempre tem e-mail de todo mundo already à mão;
-      melhor permitir importar mesmo assim e completar depois, um por
-      um, do que travar o lote inteiro.
 
     Cada linha nova cria tambem o login (matricula = login). Linhas ja
     existentes atualizam nome/perfis/email/status, sem duplicar.
@@ -411,7 +409,9 @@ def importar(request):
             email_informado = (linha[3] if len(linha) > 3 else '').strip().lower()
 
             erros_campo = _validar_registro_e_nome(registro_empresa, nome)
-            if email_informado and not REGEX_EMAIL_SIMPLES.match(email_informado):
+            if not email_informado:
+                erros_campo.append({'campo': 'email', 'mensagem': 'Informe o e-mail.'})
+            elif not REGEX_EMAIL_SIMPLES.match(email_informado):
                 erros_campo.append({'campo': 'email', 'mensagem': 'E-mail invalido.'})
             if erros_campo:
                 erros_linhas.append(

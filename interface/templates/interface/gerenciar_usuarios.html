@@ -181,9 +181,10 @@
       Arquivo deve ser em .CSV. O arquivo deve ter as colunas: Nome, Matrícula, Perfis, E-mail.
     </p>
     <p class="texto-suave" style="font-size:0.85rem;">
-      Perfis e E-mail são opcionais — linhas sem Perfis recebem "Usuário" por padrão. Para
-      informar mais de um perfil na mesma linha, separe por vírgula (ex.: usuario,supervisor)
-      e use ponto e vírgula como separador de colunas do arquivo.
+      Perfis é opcional — linhas sem Perfis recebem "Usuário" por padrão. E-mail é
+      obrigatório em toda linha. Para informar mais de um perfil na mesma linha, separe
+      por vírgula (ex.: usuario,supervisor) e use ponto e vírgula como separador de
+      colunas do arquivo.
     </p>
     <button type="button" class="botao botao--secundaria" id="botao-fechar-como-importar" style="margin-top:1rem;">
       Entendi
@@ -199,6 +200,15 @@
     <h2 style="font-size:1.05rem;">Editar — <span id="nome-pessoa-editar"></span></h2>
     <div id="aviso-editar-perfis"></div>
 
+    <div class="campo">
+      <label for="campo-nome-editar">Nome</label>
+      <input type="text" id="campo-nome-editar" maxlength="200">
+    </div>
+    <div class="campo">
+      <label for="campo-matricula-editar">Matrícula</label>
+      <input type="text" id="campo-matricula-editar" inputmode="numeric" maxlength="20">
+      <span class="campo__ajuda">Mudar a matrícula não altera RADs já sincronizados.</span>
+    </div>
     <div class="campo">
       <label for="campo-email-editar">E-mail <span class="texto-suave">(opcional, necessário para "Esqueci minha senha")</span></label>
       <input type="email" id="campo-email-editar" maxlength="254">

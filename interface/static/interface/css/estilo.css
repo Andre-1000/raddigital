@@ -344,6 +344,16 @@ h1, h2, h3 {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
+/* 30/07/2026: variante mais compacta -- necessaria quando o
+   grade-campos vive dentro de uma coluna estreita (ex.: metade da
+   tela, na grade de 2 colunas do formulario Novo RAD). Com o minimo
+   padrao de 220px, so cabe 1 campo por linha nesse contexto -- pra
+   campos genuinamente curtos (OS, N. SA, Data), 150px de minimo ja
+   sobra espaco e deixa 2-3 lado a lado mesmo na coluna estreita. */
+.grade-campos--compacta {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
 /* Mensagens de estado -- fundo e texto sempre explícitos nas próprias
    regras, então funcionam iguais em qualquer fundo por trás delas. */
 .aviso {
