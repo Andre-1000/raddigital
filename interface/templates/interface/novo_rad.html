@@ -18,24 +18,10 @@
 </div>
 
 <div id="conteudo-protegido" style="display:none;">
-  <h1 style="font-size:1.3rem;">Novo RAD</h1>
-  <p class="texto-suave" id="status-rascunho" style="margin-top:-0.5rem; font-size:0.85rem;"></p>
-  <button type="button" class="botao botao--secundaria" id="botao-apagar-rascunho" style="width:auto; min-height:36px; padding:0 0.9rem; margin-bottom:1rem;">
-    Apagar rascunho
-  </button>
 
-  <div id="aviso-formulario"></div>
-
-  <!-- 30/07/2026 (revisado): a tentativa de 2 colunas lado a lado foi
-       abandonada -- quando um bloco condicional abria (Terceiros, AMV,
-       um grupo de Servicos expandido), as colunas ficavam com alturas
-       muito diferentes e a pagina parecia "desconfigurada". Trocado
-       por navegacao lateral fixa (sticky): o conteudo principal volta
-       a ser uma coluna so, crescendo naturalmente sem desequilibrar
-       nada, e a lateral (so aparece a partir de 860px de largura) da
-       atalho pra pular direto pra qualquer secao. -->
   <div class="layout-formulario">
     <nav class="nav-lateral-formulario" aria-label="Atalhos do formulário">
+      <a href="{% url 'interface:inicio' %}" class="nav-lateral-formulario__home">← Home</a>
       <p class="nav-lateral-formulario__titulo">Seções</p>
       <a href="#secao-identificacao">Identificação</a>
       <a href="#secao-localizacao">Localização</a>
@@ -49,6 +35,14 @@
     </nav>
 
     <div class="conteudo-formulario">
+  <h1 style="font-size:1.3rem;">Novo RAD</h1>
+  <p class="texto-suave" id="status-rascunho" style="margin-top:-0.5rem; font-size:0.85rem;"></p>
+  <button type="button" class="botao botao--secundaria" id="botao-apagar-rascunho" style="width:auto; min-height:36px; padding:0 0.9rem; margin-bottom:1rem;">
+    Apagar rascunho
+  </button>
+
+  <div id="aviso-formulario"></div>
+
   <form id="form-rad" novalidate>
 
     <div class="cartao" id="secao-identificacao">
@@ -71,7 +65,7 @@
       </div>
 
       <div class="campo">
-        <label for="campo-data">Data <span class="obrigatorio">*</span></label>
+        <label for="campo-data">Data preenchimento <span class="obrigatorio">*</span></label>
         <input type="date" id="campo-data" required>
       </div>
       </div>
@@ -514,6 +508,16 @@
      largura -- abaixo disso, uma coluna de atalhos brigando por
      espaco com o formulario atrapalha mais do que ajuda; a pessoa so
      rola a tela normalmente, como sempre foi. */
+  /* 30/07/2026 (revisado de novo): "position: sticky" nao estava
+     ficando de fato congelado (ficava preso ao espaco do proprio
+     grid, que rola junto com o conteudo quando a coluna de conteudo
+     e mais alta -- bug real, visto em producao). Trocado por
+     "position: fixed" de verdade, que ignora a rolagem da pagina
+     completamente. Como fixed tira o elemento do fluxo, o
+     .conteudo-formulario ganha um respiro a esquerda (margin-left)
+     do tamanho da lateral, pra nao ficar escondido atras dela. O
+     "left" da lateral usa calc() pra acompanhar o container centralizado
+     (1040px) em qualquer largura de tela, sem precisar de JS. */
   .layout-formulario {
     display: block;
   }
@@ -521,19 +525,36 @@
     display: none;
   }
   @media (min-width: 860px) {
-    .layout-formulario {
-      display: grid;
-      grid-template-columns: 190px 1fr;
-      gap: 2rem;
-      align-items: start;
-    }
     .nav-lateral-formulario {
       display: flex;
       flex-direction: column;
       gap: 0.2rem;
-      position: sticky;
-      top: 1rem;
+      position: fixed;
+      top: 80px;
+      left: max(1rem, calc((100vw - 1040px) / 2 + 1rem));
+      width: 190px;
+      max-height: calc(100vh - 100px);
+      overflow-y: auto;
     }
+    .conteudo-formulario {
+      margin-left: 210px;
+    }
+  }
+  .nav-lateral-formulario__home {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #fffcff;
+    text-decoration: none;
+    padding: 0.5rem 0.6rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    margin-bottom: 0.75rem;
+  }
+  .nav-lateral-formulario__home:hover {
+    background: rgba(255, 255, 255, 0.08);
   }
   .nav-lateral-formulario__titulo {
     font-size: 0.75rem;
