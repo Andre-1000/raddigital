@@ -26,22 +26,32 @@
 
   <div id="aviso-formulario"></div>
 
+  <!-- 30/07/2026 (revisado): a tentativa de 2 colunas lado a lado foi
+       abandonada -- quando um bloco condicional abria (Terceiros, AMV,
+       um grupo de Servicos expandido), as colunas ficavam com alturas
+       muito diferentes e a pagina parecia "desconfigurada". Trocado
+       por navegacao lateral fixa (sticky): o conteudo principal volta
+       a ser uma coluna so, crescendo naturalmente sem desequilibrar
+       nada, e a lateral (so aparece a partir de 860px de largura) da
+       atalho pra pular direto pra qualquer secao. -->
+  <div class="layout-formulario">
+    <nav class="nav-lateral-formulario" aria-label="Atalhos do formulário">
+      <p class="nav-lateral-formulario__titulo">Seções</p>
+      <a href="#secao-identificacao">Identificação</a>
+      <a href="#secao-localizacao">Localização</a>
+      <a href="#secao-controle-operacional">Controle Operacional</a>
+      <a href="#secao-horarios">Horários</a>
+      <a href="#secao-servicos">Serviços Executados</a>
+      <a href="#secao-colaboradores">Colaboradores</a>
+      <a href="#secao-anexos">Anexos</a>
+      <a href="#secao-responsaveis">Responsáveis e Detalhes</a>
+      <a href="#secao-observacoes">Observações Gerais</a>
+    </nav>
+
+    <div class="conteudo-formulario">
   <form id="form-rad" novalidate>
 
-    <!-- 30/07/2026: no computador, os cartoes de contexto/identificacao
-         (esquerda) e os de execucao do servico (direita) ficam lado a
-         lado -- "auto-fit, minmax(320px,1fr)" colapsa sozinho pra 1
-         coluna quando a tela nao tem largura pra 2 (mesma tecnica ja
-         usada em Gerenciar Usuarios), entao o celular continua
-         empilhado como sempre foi, sem precisar de media query
-         separada. Colaboradores/Anexos/Responsaveis/Observacoes ficam
-         DE FORA dessa grade, sempre largura total -- sao conteudo
-         "largo" (fotos, listas dinamicas, texto longo) que fica
-         apertado demais dividido ao meio. -->
-    <div class="duas-colunas-formulario">
-    <div class="coluna-formulario">
-
-    <div class="cartao">
+    <div class="cartao" id="secao-identificacao">
       <h2 style="font-size:1rem;">Identificação</h2>
 
       <div class="grade-campos grade-campos--compacta">
@@ -67,7 +77,7 @@
       </div>
     </div>
 
-    <div class="cartao" style="margin-top:1rem;">
+    <div class="cartao" id="secao-localizacao" style="margin-top:1rem;">
       <h2 style="font-size:1rem;">Localização</h2>
 
       <div class="campo">
@@ -106,7 +116,7 @@
       </div>
     </div>
 
-    <div class="cartao" style="margin-top:1rem;">
+    <div class="cartao" id="secao-controle-operacional" style="margin-top:1rem;">
       <h2 style="font-size:1rem; display:flex; align-items:center; gap:0.4rem;">
         Controle Operacional
         <button type="button" id="botao-ajuda-tipo-manutencao" class="selo selo--online" style="border:none; cursor:pointer;" aria-label="O que significa cada tipo de manutenção?">?</button>
@@ -125,10 +135,7 @@
       </div>
     </div>
 
-    </div>
-    <div class="coluna-formulario">
-
-    <div class="cartao">
+    <div class="cartao" id="secao-horarios" style="margin-top:1rem;">
       <h2 style="font-size:1rem;">Horários</h2>
 
       <div class="duas-colunas">
@@ -198,7 +205,7 @@
       </div>
     </div>
 
-    <div class="cartao">
+    <div class="cartao" id="secao-servicos" style="margin-top:1rem;">
       <h2 style="font-size:1rem;">Serviços Executados <span class="obrigatorio">*</span></h2>
       <button type="button" class="botao botao--secundaria" id="botao-sobre-servicos"
               style="width:auto; min-height:36px; padding:0 0.9rem; margin-bottom:0.9rem; font-size:0.85rem;">
@@ -218,7 +225,7 @@
          "N Op Maquina" e "Volume" so aparecem quando algum servico
          selecionado exige aquele campo especificamente -- os demais
          (Encarregados, Ajudantes, Motorista) sao comuns aos quatro. -->
-    <div class="cartao" id="bloco-terceiros" style="display:none;">
+    <div class="cartao" id="bloco-terceiros" style="margin-top:1rem; display:none;">
       <h2 style="font-size:1rem;">Terceiros</h2>
 
       <div class="campo">
@@ -247,7 +254,7 @@
       </div>
     </div>
 
-    <div class="cartao" id="bloco-amv" style="display:none;">
+    <div class="cartao" id="bloco-amv" style="margin-top:1rem; display:none;">
       <h2 style="font-size:1rem;">Bloco AMV</h2>
       <p class="campo__ajuda" style="margin-top:-0.4rem;">
         Um bloco por MCH verificada. Use "Adicionar MCH" se mais de uma máquina de chave foi verificada nesta atividade.
@@ -261,12 +268,7 @@
       <p class="texto-suave centro" id="contador-blocos-amv" style="font-size:0.8rem; margin-top:0.4rem;"></p>
     </div>
 
-    </div>
-    </div>
-    <!-- fim da grade de 2 colunas -- Colaboradores/Anexos/Responsaveis/
-         Observacoes ficam sempre em largura total dai pra baixo. -->
-
-    <div class="cartao" style="margin-top:1rem;">
+    <div class="cartao" id="secao-colaboradores" style="margin-top:1rem;">
       <h2 style="font-size:1rem;">Colaboradores e Participantes</h2>
 
       <div class="pilha" id="lista-colaboradores-adicionados"></div>
@@ -302,7 +304,7 @@
       </div>
     </div>
 
-    <div class="cartao" style="margin-top:1rem;">
+    <div class="cartao" id="secao-anexos" style="margin-top:1rem;">
       <h2 style="font-size:1rem;">Anexos</h2>
       <p class="texto-suave" style="font-size:0.85rem; margin-top:-0.5rem;">
         Pelo menos 1 foto é obrigatória <span class="obrigatorio">*</span> (de qualquer uma das categorias abaixo).
@@ -343,7 +345,7 @@
       </div>
     </div>
 
-    <div class="cartao" style="margin-top:1rem;">
+    <div class="cartao" id="secao-responsaveis" style="margin-top:1rem;">
       <h2 style="font-size:1rem;">Responsáveis e Detalhes</h2>
 
       <div class="campo">
@@ -408,7 +410,7 @@
 
     <!-- Observações Gerais fica abaixo dos anexos de proposito
          (decisao registrada em docs/NOTAS_LAYOUT_FRONTEND.md) -->
-    <div class="cartao" style="margin-top:1rem;">
+    <div class="cartao" id="secao-observacoes" style="margin-top:1rem;">
       <h2 style="font-size:1rem;">Observações Gerais</h2>
       <div class="campo">
         <label for="campo-observacoes-gerais" style="display:none;">Observações Gerais</label>
@@ -419,6 +421,8 @@
   </form>
 
   <div id="lista-erros-sincronizacao"></div>
+    </div>
+  </div>
 </div>
 
 <div class="acao-fixa">
@@ -497,23 +501,71 @@
 
 {% block cabecalho_extra %}
 <style>
-  /* 30/07/2026: Novo RAD ganha mais largura no computador pra caber 2
-     colunas de cartao lado a lado -- em telas estreitas isso nao
-     muda nada visualmente (o container so nao "estica" alem do
-     necessario, e a propria grade abaixo colapsa pra 1 coluna). */
-  .container-app { max-width: 980px; }
+  /* 30/07/2026 (revisado): Novo RAD ganha mais largura no computador
+     pra caber a navegacao lateral + conteudo -- em telas estreitas
+     isso nao muda nada visualmente (container so nao "estica" alem
+     do necessario). */
+  .container-app { max-width: 1040px; }
 
-  .duas-colunas-formulario {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 1rem;
-    align-items: start;
+  /* Navegacao lateral fixa (opcao D) -- conteudo principal continua
+     sendo UMA coluna so, crescendo naturalmente sem desequilibrar
+     nada quando um bloco condicional abre (Terceiros, AMV, um grupo
+     de Servicos expandido). A lateral so aparece a partir de 860px de
+     largura -- abaixo disso, uma coluna de atalhos brigando por
+     espaco com o formulario atrapalha mais do que ajuda; a pessoa so
+     rola a tela normalmente, como sempre foi. */
+  .layout-formulario {
+    display: block;
   }
-  .coluna-formulario {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    min-width: 0; /* evita que campo largo (ex.: select) estoure a coluna */
+  .nav-lateral-formulario {
+    display: none;
+  }
+  @media (min-width: 860px) {
+    .layout-formulario {
+      display: grid;
+      grid-template-columns: 190px 1fr;
+      gap: 2rem;
+      align-items: start;
+    }
+    .nav-lateral-formulario {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      position: sticky;
+      top: 1rem;
+    }
+  }
+  .nav-lateral-formulario__titulo {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #fffcff;
+    opacity: 0.6;
+    margin: 0 0 0.5rem 0.6rem;
+  }
+  .nav-lateral-formulario a {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #fffcff;
+    opacity: 0.75;
+    text-decoration: none;
+    padding: 0.45rem 0.6rem;
+    border-radius: 8px;
+    border-left: 2px solid transparent;
+  }
+  .nav-lateral-formulario a:hover {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .conteudo-formulario {
+    min-width: 0;
+  }
+  /* Compensa a barra superior (sticky, fica por cima) ao pular direto
+     pra uma secao pelo link -- senao o titulo do cartao fica escondido
+     atras dela. */
+  .cartao[id^="secao-"] {
+    scroll-margin-top: 80px;
   }
 
   .grupo-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
