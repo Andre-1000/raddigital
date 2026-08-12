@@ -2,12 +2,11 @@
  * Gerenciar Usuários — tela única que substitui as antigas telas
  * separadas "Gerenciar Usuários" e "Gerenciar Colaboradores".
  *
- * Usa os endpoints do app colaboradores como fonte principal (cada
- * colaborador já traz login/perfis/status/e-mail/senha_definida do
- * usuário vinculado, ver colaboradores/views.py::_serializar). Editar
- * perfis e e-mail usa o endpoint de usuarios
- * (usuarios/administrar/<id>/editar/), porque sao dados do Usuario,
- * nao do Colaborador.
+ * 30/07/2026: busca e filtros só aplicam ao clicar em "Pesquisar" —
+ * nada é buscado/mostrado antes disso. Filtros "vazios" (nenhuma
+ * caixa marcada) significam "todos", tanto para Perfil quanto Status.
+ * Ações da tabela viram ícones com tooltip (title) em vez de botão
+ * com texto. Coluna "Senha" foi removida da tabela.
  */
 document.addEventListener('DOMContentLoaded', function () {
   if (!RadAuth.exigirSessao()) return;
@@ -29,12 +28,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
   let pessoaEmEdicao = null;
   let pessoaEmExclusao = null;
+  let pesquisaJaFeita = false;
 
   const avisoCriar = document.getElementById('aviso-criar');
   const avisoImportar = document.getElementById('aviso-importar');
   const avisoLista = document.getElementById('aviso-lista');
   const corpoTabela = document.getElementById('corpo-tabela-pessoas');
   const mensagemVazia = document.getElementById('mensagem-vazia');
+  const mensagemInicial = document.getElementById('mensagem-inicial');
 
   function html(strings, ...valores) {
     return strings.reduce((acc, str, i) => acc + str + (valores[i] ?? ''), '');
@@ -55,6 +56,15 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   // -------------------------------------------------------------
+  // Ícones (SVG inline, sem dependência externa) — cada um com
+  // tooltip via title no <button> que o envolve.
+  // -------------------------------------------------------------
+  const ICONE_EDITAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"></path></svg>';
+  const ICONE_ATIVAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>';
+  const ICONE_DESATIVAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.9" y1="4.9" x2="19.1" y2="19.1"></line></svg>';
+  const ICONE_EXCLUIR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
+
+  // -------------------------------------------------------------
   // Modal: Como importar
   // -------------------------------------------------------------
   const modalComoImportar = document.getElementById('modal-como-importar');
@@ -66,7 +76,8 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   // -------------------------------------------------------------
-  // Cadastro manual
+  // Cadastro manual — 30/07/2026: email obrigatorio, tudo numa unica
+  // chamada (POST /colaboradores/ ja aceita email+perfis direto).
   // -------------------------------------------------------------
   document.getElementById('botao-criar-usuario').addEventListener('click', async function () {
     limparAviso(avisoCriar);
@@ -85,16 +96,18 @@ document.addEventListener('DOMContentLoaded', function () {
       mostrarAviso(avisoCriar, 'Preencha nome e matrícula.', 'erro');
       return;
     }
+    if (!email) {
+      mostrarAviso(avisoCriar, 'O e-mail é obrigatório.', 'erro');
+      return;
+    }
 
     const botao = document.getElementById('botao-criar-usuario');
     botao.disabled = true;
     try {
-      // 1) cria o colaborador — isso ja cria o login com perfil
-      //    Usuario automaticamente (ver colaboradores/views.py::_garantir_usuario)
       const resposta = await RadAuth.requisicaoAutenticada('/colaboradores/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ registro_empresa: matricula, nome }),
+        body: JSON.stringify({ registro_empresa: matricula, nome, email, perfis }),
       });
       const dados = await resposta.json();
 
@@ -104,22 +117,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
       }
 
-      // 2) se pediram perfis alem do padrao (Usuario) ou informaram
-      //    e-mail, atualiza numa segunda chamada (perfil/e-mail sao
-      //    dados do Usuario, nao do Colaborador -- ver docstring do
-      //    modulo).
-      const perfisDiferentesDoPadrao = perfis.length !== 1 || perfis[0] !== 'usuario';
-      if ((perfisDiferentesDoPadrao || email) && dados.usuario_id) {
-        const corpoEdicao = {};
-        if (perfisDiferentesDoPadrao) corpoEdicao.perfis = perfis;
-        if (email) corpoEdicao.email = email;
-        await RadAuth.requisicaoAutenticada(`/usuarios/administrar/${dados.usuario_id}/editar/`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(corpoEdicao),
-        });
-      }
-
       mostrarAviso(avisoCriar, `${nome} cadastrado com sucesso.`, 'sucesso');
       document.getElementById('campo-novo-nome').value = '';
       document.getElementById('campo-novo-matricula').value = '';
@@ -127,7 +124,7 @@ document.addEventListener('DOMContentLoaded', function () {
       document.getElementById('perfil-novo-usuario').checked = true;
       document.getElementById('perfil-novo-supervisor').checked = false;
       document.getElementById('perfil-novo-administrador').checked = false;
-      await carregarLista();
+      if (pesquisaJaFeita) await pesquisar();
     } catch (erro) {
       mostrarAviso(avisoCriar, 'Erro de conexão ao cadastrar.', 'erro');
     } finally {
@@ -173,7 +170,7 @@ document.addEventListener('DOMContentLoaded', function () {
         mostrarAviso(avisoImportar, mensagem, 'sucesso');
       }
       campoArquivo.value = '';
-      await carregarLista();
+      if (pesquisaJaFeita) await pesquisar();
     } catch (erro) {
       mostrarAviso(avisoImportar, 'Erro de conexão ao importar.', 'erro');
     } finally {
@@ -183,7 +180,7 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   // -------------------------------------------------------------
-  // Listagem, busca e filtros
+  // Listagem — só carrega/mostra ao clicar em "Pesquisar"
   // -------------------------------------------------------------
   function seloStatus(ativo) {
     return ativo
@@ -191,27 +188,30 @@ document.addEventListener('DOMContentLoaded', function () {
       : '<span class="selo selo--offline">Inativo</span>';
   }
 
-  function seloSenha(senhaDefinida) {
-    return senhaDefinida
-      ? '<span class="selo selo--online">Definida</span>'
-      : '<span class="selo selo--offline" title="Precisa de e-mail cadastrado + Esqueci minha senha">Pendente</span>';
-  }
-
   function seloPerfil(perfil) {
     const rotulos = { usuario: 'Usuário', supervisor: 'Supervisor', administrador: 'Administrador' };
-    return `<span class="selo selo--online" style="margin-right:0.3rem;">${rotulos[perfil] || perfil}</span>`;
+    return `<span class="selo selo--online" style="margin-right:0.6rem;">${rotulos[perfil] || perfil}</span>`;
   }
 
-  function pessoaCorrespondeAosFiltros(pessoa, termoBusca, perfisPermitidos, mostrarInativos) {
-    if (!mostrarInativos && !pessoa.ativo) return false;
-
+  function pessoaCorrespondeAosFiltros(pessoa, termoBusca, perfisPermitidos, statusPermitidos) {
     if (termoBusca) {
       const alvo = `${pessoa.nome} ${pessoa.registro_empresa}`.toLowerCase();
       if (!alvo.includes(termoBusca.toLowerCase())) return false;
     }
 
-    if (pessoa.perfis.length === 0) return true; // sem perfil ainda aparece (cadastro incompleto)
-    return pessoa.perfis.some((p) => perfisPermitidos.has(p));
+    // "nenhum marcado" = sem filtro (todos passam)
+    if (perfisPermitidos.size > 0) {
+      const temPerfilPermitido = pessoa.perfis.some((p) => perfisPermitidos.has(p));
+      if (pessoa.perfis.length === 0 && !perfisPermitidos.has('usuario')) return false;
+      if (pessoa.perfis.length > 0 && !temPerfilPermitido) return false;
+    }
+
+    if (statusPermitidos.size > 0) {
+      const statusDaPessoa = pessoa.ativo ? 'ativos' : 'inativos';
+      if (!statusPermitidos.has(statusDaPessoa)) return false;
+    }
+
+    return true;
   }
 
   function linhaTabela(pessoa) {
@@ -222,31 +222,31 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const botoesAcao = podeGerenciarAdmin
       ? html`
-        <button type="button" class="botao botao--secundaria botao-editar-perfis"
+        <button type="button" class="botao botao--secundaria botao-icone botao-editar-perfis"
+                title="Editar perfis e e-mail"
                 data-id="${pessoa.id}" data-usuario-id="${pessoa.usuario_id ?? ''}"
                 data-nome="${escapar(pessoa.nome)}" data-perfis="${pessoa.perfis.join(',')}"
-                data-email="${escapar(pessoa.email || '')}"
-                style="width:auto; min-height:36px; padding:0 0.75rem; font-size:0.85rem;">
-          Editar
+                data-email="${escapar(pessoa.email || '')}">
+          ${ICONE_EDITAR}
         </button>
-        <button type="button" class="botao botao--secundaria botao-alternar-status"
-                data-id="${pessoa.id}" data-ativo="${pessoa.ativo}"
-                style="width:auto; min-height:36px; padding:0 0.75rem; font-size:0.85rem;">
-          ${pessoa.ativo ? 'Desativar' : 'Ativar'}
+        <button type="button" class="botao botao--secundaria botao-icone botao-alternar-status"
+                title="${pessoa.ativo ? 'Desativar' : 'Ativar'}"
+                data-id="${pessoa.id}" data-ativo="${pessoa.ativo}">
+          ${pessoa.ativo ? ICONE_DESATIVAR : ICONE_ATIVAR}
         </button>
-        <button type="button" class="botao botao--perigo botao-excluir"
-                data-id="${pessoa.id}" data-nome="${escapar(pessoa.nome)}"
-                style="width:auto; min-height:36px; padding:0 0.75rem; font-size:0.85rem;">
-          Excluir
+        <button type="button" class="botao botao--perigo botao-icone botao-excluir"
+                title="Excluir definitivamente"
+                data-id="${pessoa.id}" data-nome="${escapar(pessoa.nome)}">
+          ${ICONE_EXCLUIR}
         </button>`
-      : '<span class="texto-suave" style="font-size:0.8rem;">Editar/excluir Admin — somente outro Administrador</span>';
+      : '<span class="texto-suave" style="font-size:0.8rem;">Somente outro Administrador</span>';
 
     return html`
       <tr>
         <td>${escapar(pessoa.nome)}</td>
         <td>${escapar(pessoa.registro_empresa)}</td>
+        <td>${pessoa.email ? escapar(pessoa.email) : '<span class="texto-suave">—</span>'}</td>
         <td>${perfisHtml}</td>
-        <td>${seloSenha(pessoa.senha_definida)}</td>
         <td>${seloStatus(pessoa.ativo)}</td>
         <td><div style="display:flex; gap:0.4rem; flex-wrap:wrap;">${botoesAcao}</div></td>
       </tr>`;
@@ -254,38 +254,32 @@ document.addEventListener('DOMContentLoaded', function () {
 
   let todasAsPessoas = [];
 
-  async function carregarLista() {
-    limparAviso(avisoLista);
-    try {
-      const resposta = await RadAuth.requisicaoAutenticada('/colaboradores/administrar/');
-      if (!resposta.ok) {
-        mostrarAviso(avisoLista, 'Não foi possível carregar a lista.', 'erro');
-        return;
-      }
-      const dados = await resposta.json();
-      todasAsPessoas = dados.colaboradores;
-      aplicarFiltrosERenderizar();
-    } catch (erro) {
-      mostrarAviso(avisoLista, 'Erro de conexão ao carregar a lista.', 'erro');
-    }
+  async function buscarTodasAsPessoas() {
+    const resposta = await RadAuth.requisicaoAutenticada('/colaboradores/administrar/');
+    if (!resposta.ok) throw new Error('Falha ao carregar lista');
+    const dados = await resposta.json();
+    return dados.colaboradores;
   }
 
-  function aplicarFiltrosERenderizar() {
+  function renderizar() {
     const termoBusca = document.getElementById('campo-busca').value.trim();
-    const mostrarInativos = document.getElementById('filtro-inativos').checked;
 
     const perfisPermitidos = new Set();
-    if (document.getElementById('filtro-usuario').checked) perfisPermitidos.add('usuario');
-    if (document.getElementById('filtro-supervisor').checked) perfisPermitidos.add('supervisor');
-    if (souAdministrador && document.getElementById('filtro-administrador').checked) {
+    if (document.getElementById('filtro-perfil-usuario').checked) perfisPermitidos.add('usuario');
+    if (document.getElementById('filtro-perfil-supervisor').checked) perfisPermitidos.add('supervisor');
+    if (souAdministrador && document.getElementById('filtro-perfil-administrador').checked) {
       perfisPermitidos.add('administrador');
-    } else if (!souAdministrador) {
-      perfisPermitidos.add('administrador'); // supervisor sempre ve admins na lista (so nao gerencia)
     }
 
+    const statusPermitidos = new Set();
+    if (document.getElementById('filtro-status-ativos').checked) statusPermitidos.add('ativos');
+    if (document.getElementById('filtro-status-inativos').checked) statusPermitidos.add('inativos');
+
     const filtradas = todasAsPessoas.filter((p) =>
-      pessoaCorrespondeAosFiltros(p, termoBusca, perfisPermitidos, mostrarInativos)
+      pessoaCorrespondeAosFiltros(p, termoBusca, perfisPermitidos, statusPermitidos)
     );
+
+    mensagemInicial.style.display = 'none';
 
     if (filtradas.length === 0) {
       corpoTabela.innerHTML = '';
@@ -306,10 +300,27 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  document.getElementById('campo-busca').addEventListener('input', aplicarFiltrosERenderizar);
-  ['filtro-usuario', 'filtro-supervisor', 'filtro-administrador', 'filtro-inativos'].forEach((id) => {
-    const elemento = document.getElementById(id);
-    if (elemento) elemento.addEventListener('change', aplicarFiltrosERenderizar);
+  async function pesquisar() {
+    limparAviso(avisoLista);
+    const botaoPesquisar = document.getElementById('botao-pesquisar');
+    botaoPesquisar.disabled = true;
+    botaoPesquisar.textContent = 'Pesquisando…';
+    try {
+      todasAsPessoas = await buscarTodasAsPessoas();
+      pesquisaJaFeita = true;
+      renderizar();
+    } catch (erro) {
+      mostrarAviso(avisoLista, 'Erro de conexão ao pesquisar.', 'erro');
+    } finally {
+      botaoPesquisar.disabled = false;
+      botaoPesquisar.textContent = 'Pesquisar';
+    }
+  }
+
+  document.getElementById('botao-pesquisar').addEventListener('click', pesquisar);
+  // Enter no campo de busca tambem pesquisa, sem precisar clicar no botao
+  document.getElementById('campo-busca').addEventListener('keydown', function (evento) {
+    if (evento.key === 'Enter') pesquisar();
   });
 
   // -------------------------------------------------------------
@@ -379,7 +390,7 @@ document.addEventListener('DOMContentLoaded', function () {
       }
       modalEditarPerfis.style.display = 'none';
       pessoaEmEdicao = null;
-      await carregarLista();
+      await pesquisar();
     } catch (erro) {
       mostrarAviso(avisoEditarPerfis, 'Erro de conexão ao salvar.', 'erro');
     } finally {
@@ -388,8 +399,7 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   // -------------------------------------------------------------
-  // Ativar / desativar (usa o endpoint de colaboradores, que e' a
-  // fonte "oficial" de status usada tambem na busca do RAD)
+  // Ativar / desativar
   // -------------------------------------------------------------
   async function alternarStatus(dataset) {
     const ativoAtual = dataset.ativo === 'true';
@@ -403,7 +413,7 @@ document.addEventListener('DOMContentLoaded', function () {
         mostrarAviso(avisoLista, 'Não foi possível alterar o status.', 'erro');
         return;
       }
-      await carregarLista();
+      await pesquisar();
     } catch (erro) {
       mostrarAviso(avisoLista, 'Erro de conexão ao alterar status.', 'erro');
     }
@@ -439,13 +449,11 @@ document.addEventListener('DOMContentLoaded', function () {
       }
       modalExcluir.style.display = 'none';
       pessoaEmExclusao = null;
-      await carregarLista();
+      await pesquisar();
     } catch (erro) {
       mostrarAviso(avisoLista, 'Erro de conexão ao excluir.', 'erro');
     } finally {
       botao.disabled = false;
     }
   });
-
-  carregarLista();
 });

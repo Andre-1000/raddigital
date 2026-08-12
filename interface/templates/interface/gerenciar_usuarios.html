@@ -5,6 +5,51 @@
 {% block cabecalho_extra %}
 <style>
   .container-app { max-width: var(--largura-app-administrativa); }
+
+  /* 30/07/2026: filtros em grupo, com rotulo proprio acima de cada
+     grupo -- Perfil e Status lado a lado no computador (o proprio
+     flex-wrap ja colapsa pra empilhado no celular, sem precisar de
+     media query separada). */
+  .grupo-filtro { margin-bottom: 0.9rem; }
+  .grupo-filtro__titulo {
+    font-weight: 600;
+    font-size: 0.85rem;
+    margin: 0 0 0.4rem;
+    color: var(--cor-tinta-suave);
+  }
+  .grupo-filtro__opcoes {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .grupo-filtro__opcoes label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+    min-height: 32px;
+    font-size: 0.92rem;
+  }
+  .filtros-lado-a-lado {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0 1.5rem;
+  }
+
+  /* 30/07/2026: acoes da tabela viram icones (com tooltip via title)
+     em vez de botao com texto -- ocupa bem menos espaco na linha,
+     principalmente relevante agora que a coluna E-mail entrou. */
+  .botao-icone {
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .botao-icone svg { width: 18px; height: 18px; }
 </style>
 {% endblock %}
 
@@ -31,9 +76,9 @@
         <span class="campo__ajuda">Vira o login automaticamente.</span>
       </div>
       <div class="campo">
-        <label for="campo-novo-email">E-mail <span class="texto-suave">(opcional)</span></label>
-        <input type="email" id="campo-novo-email" maxlength="254">
-        <span class="campo__ajuda">Necessário para a pessoa usar "Esqueci minha senha" — pode ser preenchido depois.</span>
+        <label for="campo-novo-email">E-mail <span class="obrigatorio">*</span></label>
+        <input type="email" id="campo-novo-email" maxlength="254" required>
+        <span class="campo__ajuda">Necessário para a pessoa usar "Esqueci minha senha".</span>
       </div>
       <div class="campo">
         <label>Perfis <span class="texto-suave" style="font-size:0.8rem; font-weight:400;">(até 2)</span></label>
@@ -72,27 +117,33 @@
 
   <!-- Busca e filtros -->
   <div class="cartao" style="margin-top:1rem;">
-    <div class="grade-campos">
-      <div class="campo" style="margin-bottom:0;">
-        <label for="campo-busca">Buscar por nome ou matrícula</label>
-        <input type="text" id="campo-busca" placeholder="Digite para buscar…"
-               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    <div class="campo" style="margin-bottom:1rem;">
+      <label for="campo-busca">Buscar por nome ou matrícula</label>
+      <input type="text" id="campo-busca" placeholder="Digite para buscar…"
+             autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    </div>
+
+    <div class="filtros-lado-a-lado">
+      <div class="grupo-filtro">
+        <p class="grupo-filtro__titulo">Perfil <span class="texto-suave" style="font-weight:400;">(nenhum marcado = todos)</span></p>
+        <div class="grupo-filtro__opcoes">
+          <label><input type="checkbox" id="filtro-perfil-usuario"> Usuário</label>
+          <label><input type="checkbox" id="filtro-perfil-supervisor"> Supervisor</label>
+          <label id="label-filtro-admin"><input type="checkbox" id="filtro-perfil-administrador"> Administrador</label>
+        </div>
+      </div>
+      <div class="grupo-filtro">
+        <p class="grupo-filtro__titulo">Status <span class="texto-suave" style="font-weight:400;">(nenhum marcado = todos)</span></p>
+        <div class="grupo-filtro__opcoes">
+          <label><input type="checkbox" id="filtro-status-ativos"> Ativos</label>
+          <label><input type="checkbox" id="filtro-status-inativos"> Inativos</label>
+        </div>
       </div>
     </div>
-    <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:0.9rem;">
-      <label style="display:flex; align-items:center; gap:0.35rem; font-size:0.9rem; cursor:pointer;">
-        <input type="checkbox" id="filtro-usuario" checked> Usuário
-      </label>
-      <label style="display:flex; align-items:center; gap:0.35rem; font-size:0.9rem; cursor:pointer;">
-        <input type="checkbox" id="filtro-supervisor" checked> Supervisor
-      </label>
-      <label id="label-filtro-admin" style="display:flex; align-items:center; gap:0.35rem; font-size:0.9rem; cursor:pointer;">
-        <input type="checkbox" id="filtro-administrador" checked> Administrador
-      </label>
-      <label style="display:flex; align-items:center; gap:0.35rem; font-size:0.9rem; cursor:pointer;">
-        <input type="checkbox" id="filtro-inativos"> Mostrar inativos
-      </label>
-    </div>
+
+    <button type="button" class="botao botao--primaria" id="botao-pesquisar" style="margin-top:0.5rem; width:auto;">
+      Pesquisar
+    </button>
   </div>
 
   <div id="aviso-lista" style="margin-top:1rem;"></div>
@@ -102,9 +153,9 @@
       <thead>
         <tr>
           <th>Nome</th>
-          <th>Matrícula / Login</th>
+          <th>Matrícula</th>
+          <th>E-mail</th>
           <th>Perfis</th>
-          <th>Senha</th>
           <th>Status</th>
           <th>Ações</th>
         </tr>
@@ -115,6 +166,9 @@
   <p id="mensagem-vazia" class="texto-suave centro" style="display:none; margin-top:2rem;">
     Nenhum usuário encontrado.
   </p>
+  <p id="mensagem-inicial" class="texto-suave centro" style="margin-top:2rem;">
+    Use a busca e os filtros acima e clique em "Pesquisar" para ver a lista.
+  </p>
 </div>
 
 <!-- Modal: como importar -->
@@ -124,12 +178,12 @@
   <div class="cartao" style="max-width:460px; width:100%;">
     <h2 style="font-size:1.05rem;">Como importar</h2>
     <p style="margin-bottom:0;">
-      Faça uma lista em Excel com 2 colunas, sendo coluna 1 = Matrícula,
-      coluna 2 = Nome; grave em .CSV e importe.
-      A partir do momento que está cadastrado, o usuário/colaborador pode
-      ser usado em RAD automaticamente. O e-mail (necessário para "Esqueci
-      minha senha") precisa ser preenchido depois, individualmente, em
-      "Editar perfis".
+      Arquivo deve ser em .CSV. O arquivo deve ter as colunas: Nome, Matrícula, Perfis, E-mail.
+    </p>
+    <p class="texto-suave" style="font-size:0.85rem;">
+      Perfis e E-mail são opcionais — linhas sem Perfis recebem "Usuário" por padrão. Para
+      informar mais de um perfil na mesma linha, separe por vírgula (ex.: usuario,supervisor)
+      e use ponto e vírgula como separador de colunas do arquivo.
     </p>
     <button type="button" class="botao botao--secundaria" id="botao-fechar-como-importar" style="margin-top:1rem;">
       Entendi
