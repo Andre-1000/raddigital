@@ -140,6 +140,63 @@ def validar_token(request):
     )
 
 
+@requer_token
+def listar_meus_dispositivos(request):
+    """
+    GET /usuarios/meus-dispositivos/
+    30/07/2026. Lista as sessões (tokens) ativas do próprio usuário --
+    permite encerrar uma sessão específica (ex.: celular perdido) sem
+    precisar derrubar TODAS as sessões válidas de uma vez. Cada token
+    já guarda `dispositivo` (User-Agent resumido, capturado no momento
+    do login) para a pessoa reconhecer qual é qual.
+    """
+    usuario = request.usuario_rad
+    token_atual = request.token_rad
+    tokens = usuario.tokens.filter(validade__gt=timezone.now()).order_by('-data_criacao')
+    return JsonResponse(
+        {
+            'dispositivos': [
+                {
+                    'id': t.id,
+                    'dispositivo': t.dispositivo or 'Dispositivo desconhecido',
+                    'criado_em': t.data_criacao.isoformat(),
+                    'validade': t.validade.isoformat(),
+                    'este_dispositivo': t.id == token_atual.id,
+                }
+                for t in tokens
+            ]
+        }
+    )
+
+
+@csrf_exempt
+@require_POST
+@requer_token
+def encerrar_dispositivo(request, id_token):
+    """
+    POST /usuarios/meus-dispositivos/<id>/encerrar/
+    30/07/2026. Remove um token específico do PRÓPRIO usuário --
+    obriga aquele dispositivo a fazer login de novo na próxima ação,
+    sem afetar os demais dispositivos logados. Não permite encerrar o
+    dispositivo atual por aqui (evita a pessoa se derrubar sem querer
+    no meio do uso) -- pra isso existe "Sair" no proprio dispositivo.
+    """
+    usuario = request.usuario_rad
+    token_atual = request.token_rad
+
+    if id_token == token_atual.id:
+        return JsonResponse(
+            {'erro': 'Não é possível encerrar a sessão do dispositivo atual por aqui.'},
+            status=400,
+        )
+
+    apagados, _ = Token.objects.filter(id=id_token, usuario=usuario).delete()
+    if not apagados:
+        return JsonResponse({'erro': 'Sessão não encontrada.'}, status=404)
+
+    return JsonResponse({'sucesso': True})
+
+
 @csrf_exempt
 @require_POST
 @requer_token

@@ -9,6 +9,8 @@ urlpatterns = [
     path('login/', views.login, name='login'),
     path('validar-token/', views.validar_token, name='validar_token'),
     path('trocar-senha/', views.trocar_senha, name='trocar_senha'),
+    path('meus-dispositivos/', views.listar_meus_dispositivos, name='listar_meus_dispositivos'),
+    path('meus-dispositivos/<int:id_token>/encerrar/', views.encerrar_dispositivo, name='encerrar_dispositivo'),
     path('esqueci-senha/', views.solicitar_redefinicao_senha, name='solicitar_redefinicao_senha'),
     path('redefinir-senha/confirmar/', views.confirmar_redefinicao_senha, name='confirmar_redefinicao_senha'),
     # Gestao de usuarios (EFD secao 4.4)

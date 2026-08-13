@@ -31,12 +31,21 @@
       <button type="submit" class="botao botao--primaria" id="botao-salvar-senha-troca">Salvar nova senha</button>
     </form>
   </div>
+
+  <div class="cartao" style="max-width:400px; margin:1rem auto 0;">
+    <h2 style="font-size:1.05rem;">Dispositivos conectados</h2>
+    <p class="texto-suave" style="font-size:0.85rem; margin-top:-0.25rem;">
+      Sessões ativas nesta conta. Se perder um celular ou computador logado, encerre a sessão dele aqui.
+    </p>
+    <div id="aviso-dispositivos"></div>
+    <div id="lista-dispositivos" class="pilha"></div>
+  </div>
 </div>
 {% endblock %}
 
 {% block script_extra %}
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
+  document.addEventListener('DOMContentLoaded', async function () {
     if (!RadAuth.exigirSessao()) return;
     document.getElementById('conteudo-protegido').style.display = '';
 
@@ -84,6 +93,90 @@
         botao.textContent = 'Salvar nova senha';
       }
     });
+
+    // ---- Dispositivos conectados -------------------------------------
+
+    const avisoDispositivos = document.getElementById('aviso-dispositivos');
+    const listaDispositivos = document.getElementById('lista-dispositivos');
+
+    function formatarData(isoString) {
+      const data = new Date(isoString);
+      return data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
+        ' às ' + data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    async function carregarDispositivos() {
+      avisoDispositivos.innerHTML = '';
+      try {
+        const resposta = await RadAuth.requisicaoAutenticada('/usuarios/meus-dispositivos/');
+        if (!resposta.ok) {
+          avisoDispositivos.innerHTML = '<div class="aviso aviso--erro">Não foi possível carregar os dispositivos.</div>';
+          return;
+        }
+        const dados = await resposta.json();
+        renderizarDispositivos(dados.dispositivos);
+      } catch (erro) {
+        avisoDispositivos.innerHTML = '<div class="aviso aviso--erro">Erro de conexão ao carregar dispositivos.</div>';
+      }
+    }
+
+    function renderizarDispositivos(dispositivos) {
+      listaDispositivos.innerHTML = '';
+      dispositivos.forEach(function (d) {
+        const linha = document.createElement('div');
+        linha.className = 'cartao';
+        linha.style.padding = '0.75rem 1rem';
+        linha.style.display = 'flex';
+        linha.style.justifyContent = 'space-between';
+        linha.style.alignItems = 'center';
+        linha.style.gap = '0.75rem';
+
+        const info = document.createElement('div');
+        const rotuloAtual = d.este_dispositivo ? ' <span class="selo selo--online">Este dispositivo</span>' : '';
+        info.innerHTML = `
+          <strong style="font-size:0.85rem;">${d.dispositivo}</strong>${rotuloAtual}
+          <div class="texto-suave" style="font-size:0.78rem; margin-top:0.2rem;">
+            Entrou em ${formatarData(d.criado_em)} · válido até ${formatarData(d.validade)}
+          </div>
+        `;
+        linha.appendChild(info);
+
+        if (!d.este_dispositivo) {
+          const botaoEncerrar = document.createElement('button');
+          botaoEncerrar.type = 'button';
+          botaoEncerrar.className = 'botao botao--perigo';
+          botaoEncerrar.style.width = 'auto';
+          botaoEncerrar.style.minHeight = '36px';
+          botaoEncerrar.style.padding = '0 0.9rem';
+          botaoEncerrar.style.fontSize = '0.82rem';
+          botaoEncerrar.style.flexShrink = '0';
+          botaoEncerrar.textContent = 'Encerrar';
+          botaoEncerrar.addEventListener('click', async function () {
+            botaoEncerrar.disabled = true;
+            try {
+              const resposta = await RadAuth.requisicaoAutenticada(`/usuarios/meus-dispositivos/${d.id}/encerrar/`, {
+                method: 'POST',
+              });
+              if (!resposta.ok) {
+                const corpo = await resposta.json().catch(() => ({}));
+                avisoDispositivos.innerHTML = `<div class="aviso aviso--erro">${corpo.erro || 'Não foi possível encerrar.'}</div>`;
+                botaoEncerrar.disabled = false;
+                return;
+              }
+              await carregarDispositivos();
+            } catch (erro) {
+              avisoDispositivos.innerHTML = '<div class="aviso aviso--erro">Erro de conexão ao encerrar.</div>';
+              botaoEncerrar.disabled = false;
+            }
+          });
+          linha.appendChild(botaoEncerrar);
+        }
+
+        listaDispositivos.appendChild(linha);
+      });
+    }
+
+    await carregarDispositivos();
   });
 </script>
 {% endblock %}
