@@ -1,0 +1,38 @@
+# 30/07/2026 (Seguranca A03 -- OWASP Top 10:2025). Roda pip-audit
+# (ferramenta oficial da PyPA, cruza requirements.txt contra o banco
+# de vulnerabilidades conhecidas do PyPI) a cada push/PR na main, e
+# tambem toda segunda-feira de madrugada -- pra pegar uma
+# vulnerabilidade descoberta DEPOIS que a dependencia ja estava
+# instalada ha semanas, sem precisar de push novo pra disparar o scan.
+#
+# Se achar vulnerabilidade, o job falha (X vermelho no commit/PR) --
+# da pra ver o motivo direto na aba "Actions" do GitHub, sem precisar
+# rodar nada localmente.
+name: Auditoria de dependências
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 8 * * 1'  # toda segunda-feira, 8h UTC (~5h em Sao Paulo)
+  workflow_dispatch:  # permite rodar manualmente pela aba Actions, se quiser
+
+jobs:
+  pip-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixa o codigo
+        uses: actions/checkout@v4
+
+      - name: Configura Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instala pip-audit
+        run: pip install pip-audit
+
+      - name: Audita requirements.txt
+        run: pip-audit -r requirements.txt

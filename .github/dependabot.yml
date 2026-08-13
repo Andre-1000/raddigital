@@ -1,0 +1,51 @@
+# 30/07/2026 (Seguranca A03 -- OWASP Top 10:2025, Software Supply
+# Chain Failures). Verifica semanalmente as dependencias Python
+# (requirements.txt) e a imagem base do Docker, e abre um Pull
+# Request automatico sempre que encontrar uma versao mais nova --
+# COM PRIORIDADE pra atualizacoes que corrigem vulnerabilidade
+# conhecida (o GitHub sinaliza isso no proprio PR).
+#
+# Isso e diferente do "Dependabot alerts" (aviso passivo de
+# vulnerabilidade, sem PR) -- esse aqui precisa ser ligado a parte,
+# em Settings -> Security -> Code security and analysis, no repo do
+# GitHub. Esse arquivo cobre a parte de ATUALIZACAO automatica; o
+# toggle no site cobre o ALERTA. Os dois juntos fecham o A03.
+version: 2
+updates:
+  # requirements.txt -- Django, psycopg2, Pillow, reportlab, etc.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencias"
+      - "seguranca"
+    commit-message:
+      prefix: "deps"
+
+  # Imagem base do Dockerfile (ex.: python:3.12-slim) -- tambem pode
+  # ter vulnerabilidade conhecida, independente do codigo Python.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencias"
+      - "seguranca"
+    commit-message:
+      prefix: "deps"
+
+  # Acoes do GitHub Actions usadas no workflow de auditoria abaixo
+  # (actions/checkout, actions/setup-python) -- boa pratica manter
+  # atualizadas tambem, tem historico de vulnerabilidade em acoes
+  # populares no passado.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencias"
