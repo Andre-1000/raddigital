@@ -20,7 +20,14 @@ from django.contrib import admin
 from django.urls import include, path
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    # 30/07/2026 (Seguranca A02 -- OWASP Top 10:2025): endereço do
+    # /admin/ movido pra um caminho nao obvio, configuravel via
+    # settings.ADMIN_URL_PATH (env ADMIN_URL_PATH). Reduz drasticamente
+    # o volume de bots que tentam login as cegas em "/admin/", o
+    # caminho mais escaneado da internet -- ver tambem
+    # usuarios/middleware.py (bloqueio por tentativas) e
+    # usuarios/signals.py (contagem das tentativas).
+    path(f'{settings.ADMIN_URL_PATH}/', admin.site.urls),
     path('usuarios/', include('usuarios.urls')),
     path('rad/', include('rad.urls')),
     path('consulta/', include('consulta.urls')),

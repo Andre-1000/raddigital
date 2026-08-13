@@ -78,6 +78,18 @@ LOGS_ATIVOS = os.getenv('LOGS_ATIVOS', 'False') == 'True'
 MAXIMO_TENTATIVAS_LOGIN = int(os.getenv('MAXIMO_TENTATIVAS_LOGIN', 5))
 BLOQUEIO_LOGIN_MINUTOS = int(os.getenv('BLOQUEIO_LOGIN_MINUTOS', 15))
 
+# 30/07/2026 (Seguranca A02 -- OWASP Top 10:2025): endereço do /admin/
+# do Django movido pra um caminho nao obvio -- reduz drasticamente o
+# volume de bots que tentam login as cegas em "/admin/", o alvo mais
+# escaneado da internet. Trocar esse valor por env var em produção
+# (ADMIN_URL_PATH) se quiser um caminho so seu, sem depender de deploy
+# de codigo -- so avisar quem precisa saber o endereço novo. Mesmo
+# esquema de bloqueio por tentativas do login normal, mas por IP (ver
+# usuarios/middleware.py e usuarios/signals.py).
+ADMIN_URL_PATH = os.getenv('ADMIN_URL_PATH', 'gestao-sistema-8f3k2x')
+MAXIMO_TENTATIVAS_ADMIN = int(os.getenv('MAXIMO_TENTATIVAS_ADMIN', 5))
+BLOQUEIO_ADMIN_MINUTOS = int(os.getenv('BLOQUEIO_ADMIN_MINUTOS', 15))
+
 # 30/07/2026: URL publica do site, usada pra montar o link do e-mail de
 # redefinicao de senha (usuarios/servicos_email.py). Sem barra no final.
 URL_BASE_SITE = os.getenv('URL_BASE_SITE', 'https://raddigital.onrender.com')
@@ -99,7 +111,7 @@ EMAIL_HOST = os.getenv('EMAIL_HOST', '')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True') == 'True'
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').strip().lower() == 'true'
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'nao-responda@raddigital.onrender.com')
 
 # Armazenamento de anexos (RG-ANX-007/008): o banco guarda so a
@@ -145,6 +157,11 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # 30/07/2026 (Seguranca A02): bloqueio do /admin/ por tentativas
+    # erradas, por IP. Precisa vir DEPOIS do AuthenticationMiddleware
+    # (usa request.META, nao depende de auth, mas mantem a ordem
+    # convencional de "seguranca por cima, funcionalidade por baixo").
+    'usuarios.middleware.BloqueioAdminMiddleware',
 ]
 if not DEBUG:
     # Em desenvolvimento o runserver ja serve estatico nativamente;

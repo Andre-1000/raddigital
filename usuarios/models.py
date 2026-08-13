@@ -236,3 +236,28 @@ class TokenRedefinicaoSenha(models.Model):
             token=secrets.token_urlsafe(48),
             validade=timezone.now() + timedelta(hours=horas_validade),
         )
+
+
+class TentativaLoginAdmin(models.Model):
+    """
+    30/07/2026 (Seguranca A02 -- OWASP Top 10:2025): rate limit do
+    /admin/ do Django. O admin usa django.contrib.auth, com
+    usuario/senha totalmente separados do login do Sistema RAD
+    (Usuario, acima) -- por isso o bloqueio aqui e por IP, nao por
+    usuario. Funciona mesmo quando a tentativa usa um nome de usuario
+    que nem existe (um bot tentando "admin"/"root"/etc., por exemplo).
+    Populado pelos sinais em usuarios/signals.py.
+    """
+
+    ip = models.GenericIPAddressField(unique=True)
+    tentativas = models.PositiveSmallIntegerField(default=0)
+    bloqueado_ate = models.DateTimeField(null=True, blank=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tentativas_login_admin'
+        verbose_name = 'Tentativa de Login (Admin)'
+        verbose_name_plural = 'Tentativas de Login (Admin)'
+
+    def __str__(self):
+        return f'{self.ip} — {self.tentativas} tentativa(s)'
