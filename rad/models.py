@@ -608,6 +608,13 @@ class RadCanaletaDimensao(models.Model):
     altura_inicial = models.DecimalField(max_digits=8, decimal_places=2)
     altura_final = models.DecimalField(max_digits=8, decimal_places=2)
     comprimento = models.DecimalField(max_digits=8, decimal_places=2)
+    # 14/08/2026: km/poste da linha de medida -- texto livre, mesmo
+    # formato/mascara do campo Km/Poste geral do RAD (XX/XX - XX/XX),
+    # mas opcional (nao entra em VLD-042): cada linha de Dimensões pode
+    # ter seu proprio trecho, sem travar a sincronizacao se a pessoa
+    # nao souber o km exato.
+    km_poste_inicial = models.CharField(max_length=20, null=True, blank=True)
+    km_poste_final = models.CharField(max_length=20, null=True, blank=True)
 
     class Meta:
         db_table = 'rad_canaleta_dimensoes'

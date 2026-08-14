@@ -237,6 +237,8 @@ def _criar_bloco_canaleta(rad, payload):
                 altura_inicial=linha['altura_inicial'],
                 altura_final=linha['altura_final'],
                 comprimento=linha['comprimento'],
+                km_poste_inicial=linha.get('km_poste_inicial') or None,
+                km_poste_final=linha.get('km_poste_final') or None,
             )
             for indice, linha in enumerate(canaleta_dados.get('dimensoes', []))
         ]

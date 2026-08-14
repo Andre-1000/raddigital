@@ -53,9 +53,22 @@ document.addEventListener('DOMContentLoaded', async function () {
           altura_inicial: rascunho.canaleta_altura_inicial || '',
           altura_final: rascunho.canaleta_altura_final || '',
           comprimento: rascunho.canaleta_comprimento || '',
+          km_poste_inicial: '',
+          km_poste_final: '',
         }]
-      : [{ largura_inicial: '', largura_final: '', altura_inicial: '', altura_final: '', comprimento: '' }];
+      : [{
+          largura_inicial: '', largura_final: '', altura_inicial: '', altura_final: '', comprimento: '',
+          km_poste_inicial: '', km_poste_final: '',
+        }];
   }
+  // 14/08/2026: rascunhos que ja tinham canaleta_dimensoes (versao
+  // anterior desta mesma funcionalidade, sem os campos de Km/Poste)
+  // ganham os 2 campos novos com valor vazio, sem perder o resto da
+  // linha ja preenchida.
+  rascunho.canaleta_dimensoes.forEach(function (linha) {
+    if (linha.km_poste_inicial === undefined) linha.km_poste_inicial = '';
+    if (linha.km_poste_final === undefined) linha.km_poste_final = '';
+  });
   delete rascunho.canaleta_largura_inicial;
   delete rascunho.canaleta_largura_final;
   delete rascunho.canaleta_altura_inicial;
@@ -1112,12 +1125,18 @@ document.addEventListener('DOMContentLoaded', async function () {
     { valor: 'esquerdo', rotulo: 'Esquerdo' },
     { valor: 'entrevia', rotulo: 'Entrevia' },
   ];
+  // 14/08/2026: 5 campos numericos + 2 campos de texto (Km/Poste
+  // Inicial/Final, mesma mascara XX/XX - XX/XX do Km/Poste geral do
+  // RAD) -- 'tipo' diferencia como cada input e criado e tratado em
+  // renderizarLinhasDimensoesCanaleta.
   const CAMPOS_DIMENSAO_CANALETA = [
-    ['largura_inicial', 'Largura Inicial (m)'],
-    ['largura_final', 'Largura Final (m)'],
-    ['altura_inicial', 'Altura Inicial (m)'],
-    ['altura_final', 'Altura Final (m)'],
-    ['comprimento', 'Comprimento (m)'],
+    ['largura_inicial', 'Largura Inicial (m)', 'numero'],
+    ['largura_final', 'Largura Final (m)', 'numero'],
+    ['altura_inicial', 'Altura Inicial (m)', 'numero'],
+    ['altura_final', 'Altura Final (m)', 'numero'],
+    ['comprimento', 'Comprimento (m)', 'numero'],
+    ['km_poste_inicial', 'Km/Poste Inicial', 'km'],
+    ['km_poste_final', 'Km/Poste Final', 'km'],
   ];
 
   function criarLinhaDimensaoCanaletaVazia() {
@@ -1125,6 +1144,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       largura_inicial: '', largura_final: '',
       altura_inicial: '', altura_final: '',
       comprimento: '',
+      km_poste_inicial: '', km_poste_final: '',
     };
   }
 
@@ -1206,7 +1226,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       const grade = document.createElement('div');
       grade.className = 'grade-campos--dimensao-canaleta';
 
-      CAMPOS_DIMENSAO_CANALETA.forEach(function ([chave, rotulo]) {
+      CAMPOS_DIMENSAO_CANALETA.forEach(function ([chave, rotulo, tipo]) {
         const campoDiv = document.createElement('div');
         campoDiv.className = 'campo';
         const label = document.createElement('label');
@@ -1214,14 +1234,33 @@ document.addEventListener('DOMContentLoaded', async function () {
         label.style.fontSize = '0.75rem';
         label.textContent = rotulo;
         const input = document.createElement('input');
-        input.type = 'number';
-        input.step = '0.01';
-        input.min = '0';
-        input.value = linha[chave];
-        input.addEventListener('input', function () {
-          linha[chave] = input.value;
-          salvarRascunhoAgora();
-        });
+        if (tipo === 'numero') {
+          input.type = 'number';
+          input.step = '0.01';
+          input.min = '0';
+          input.value = linha[chave];
+          input.addEventListener('input', function () {
+            linha[chave] = input.value;
+            salvarRascunhoAgora();
+          });
+        } else {
+          // Km/Poste da linha -- texto livre com a mesma mascara
+          // XX/XX - XX/XX do campo Km/Poste geral do RAD
+          // (aplicarMascaraKmPoste, definida mais acima).
+          input.type = 'text';
+          input.inputMode = 'numeric';
+          input.placeholder = 'XX/XX - XX/XX';
+          input.maxLength = 13;
+          input.value = linha[chave];
+          input.addEventListener('input', function () {
+            const somenteDigitos = /^\d+$/.test(input.value.replace(/[/\s-]/g, ''));
+            if (somenteDigitos) {
+              input.value = aplicarMascaraKmPoste(input.value);
+            }
+            linha[chave] = input.value;
+            salvarRascunhoAgora();
+          });
+        }
         campoDiv.appendChild(label);
         campoDiv.appendChild(input);
         grade.appendChild(campoDiv);
@@ -1973,6 +2012,8 @@ document.addEventListener('DOMContentLoaded', async function () {
             altura_inicial: linha.altura_inicial !== '' ? Number(linha.altura_inicial) : null,
             altura_final: linha.altura_final !== '' ? Number(linha.altura_final) : null,
             comprimento: linha.comprimento !== '' ? Number(linha.comprimento) : null,
+            km_poste_inicial: linha.km_poste_inicial || null,
+            km_poste_final: linha.km_poste_final || null,
           };
         }),
         lados: rascunho.canaleta_lados,

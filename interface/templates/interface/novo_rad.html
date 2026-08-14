@@ -763,10 +763,10 @@
   }
 
   /* Linhas de Dimensões da Canaleta (14/08/2026) -- cada linha e um
-     cartao com os 5 campos lado a lado, menores que o padrao pra
-     caberem juntos numa linha so no computador (pedido do André).
-     Colapsa pra grade normal em telas estreitas, igual as outras
-     grades responsivas do formulario. */
+     cartao com os campos (5 medidas + Km/Poste Inicial/Final) lado a
+     lado, menores que o padrao pra caberem juntos numa linha so no
+     computador (pedido do André). Colapsa pra grade normal em telas
+     estreitas, igual as outras grades responsivas do formulario. */
   .linha-dimensao-canaleta {
     border: 1px solid var(--cor-linha);
     border-radius: var(--raio-pequeno);
@@ -785,15 +785,14 @@
     color: var(--cor-tinta-suave);
     margin: 0;
   }
+  /* 14/08/2026: 7 campos por linha agora (5 medidas + Km/Poste
+     Inicial/Final) -- auto-fit deixa os 7 numa linha so em telas
+     largas (computador) e quebra pra 2 linhas sozinho em telas
+     estreitas, sem precisar de uma media query separada pra isso. */
   .grade-campos--dimensao-canaleta {
     display: grid;
-    grid-template-columns: repeat(5, minmax(90px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
     gap: 0.5rem 0.6rem;
-  }
-  @media (max-width: 700px) {
-    .grade-campos--dimensao-canaleta {
-      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-    }
   }
   .grade-campos--dimensao-canaleta input {
     padding: 0.45rem 0.5rem;
