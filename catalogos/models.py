@@ -117,6 +117,10 @@ class CatServico(models.Model):
     Op Maquina e Volume sao especificos de cada servico, controlados
     por terceiros_tem_op_maquina e terceiros_tem_volume.
 
+    requer_canaleta (30/07/2026): TRUE somente para "Inspeção de
+    Canaleta" -- abre o bloco "Anomalias" (checkboxes de anomalia,
+    grau de criticidade, dimensoes, cautela, lado).
+
     area (30/07/2026): agrupamento visual usado na tela de
     preenchimento do RAD, para separar os servicos em blocos
     expansiveis (Geral, Infra, Corretiva, Mecanizada). Nao afeta
@@ -144,6 +148,10 @@ class CatServico(models.Model):
     requer_terceiros = models.BooleanField(
         default=False,
         help_text='TRUE para Recolhimento de Lixo, Limpeza de Canaleta, Capina Quimica, Rocada/Poda.',
+    )
+    requer_canaleta = models.BooleanField(
+        default=False,
+        help_text='TRUE somente para Inspeção de Canaleta -- abre o bloco Anomalias.',
     )
     terceiros_tem_op_maquina = models.BooleanField(
         default=False, help_text='So relevante quando requer_terceiros=True.'

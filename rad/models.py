@@ -539,3 +539,109 @@ class RadAnexo(models.Model):
         if self.categoria_foto:
             return f'{self.nome_original} ({self.get_categoria_foto_display()}) — {self.rad.numero_rad}'
         return f'{self.nome_original} ({self.rad.numero_rad})'
+
+
+class RadCanaleta(models.Model):
+    """
+    30/07/2026: bloco "Anomalias" -- aberto quando o servico "Inspeção
+    de Canaleta" (area infra, CatServico.requer_canaleta) e
+    selecionado. Diferente do bloco AMV (que pode se repetir varias
+    vezes por RAD, um por MCH), aqui e sempre 1-para-1 com o RAD --
+    so existe uma inspecao de canaleta por RAD.
+    """
+
+    BAIXA = 'baixa'
+    MEDIA = 'media'
+    ALTA = 'alta'
+    CRITICA = 'critica'
+    GRAU_CRITICIDADE_CHOICES = [
+        (BAIXA, 'Baixa'),
+        (MEDIA, 'Média'),
+        (ALTA, 'Alta'),
+        (CRITICA, 'Crítica'),
+    ]
+
+    rad = models.OneToOneField(
+        Rad, on_delete=models.CASCADE, related_name='canaleta', db_column='id_rad'
+    )
+    grau_criticidade = models.CharField(max_length=10, choices=GRAU_CRITICIDADE_CHOICES)
+    necessita_cautela = models.BooleanField()
+    largura_inicial = models.DecimalField(max_digits=8, decimal_places=2)
+    largura_final = models.DecimalField(max_digits=8, decimal_places=2)
+    altura_inicial = models.DecimalField(max_digits=8, decimal_places=2)
+    altura_final = models.DecimalField(max_digits=8, decimal_places=2)
+    comprimento = models.DecimalField(max_digits=8, decimal_places=2)
+
+    class Meta:
+        db_table = 'rad_canaleta'
+        verbose_name = 'Bloco Anomalias (Canaleta)'
+        verbose_name_plural = 'Blocos Anomalias (Canaleta)'
+
+    def __str__(self):
+        return f'Canaleta de {self.rad.numero_rad}'
+
+
+class RadCanaletaAnomalia(models.Model):
+    """Anomalias selecionadas no bloco Canaleta. Multipla selecao."""
+
+    LIMPA = 'limpa'
+    OBSTRUIDA = 'obstruida'
+    AUSENTE = 'ausente'
+    QUEBRADA = 'quebrada'
+    VEGETACAO = 'vegetacao'
+    LASTRO = 'lastro'
+    LIXO = 'lixo'
+    DORMENTES = 'dormentes'
+    ENTULHO = 'entulho'
+    TERRA = 'terra'
+    ANOMALIA_CHOICES = [
+        (LIMPA, 'Limpa'),
+        (OBSTRUIDA, 'Obstruída'),
+        (AUSENTE, 'Ausente'),
+        (QUEBRADA, 'Quebrada'),
+        (VEGETACAO, 'Vegetação'),
+        (LASTRO, 'Lastro'),
+        (LIXO, 'Lixo'),
+        (DORMENTES, 'Dormentes'),
+        (ENTULHO, 'Entulho'),
+        (TERRA, 'Terra'),
+    ]
+
+    canaleta = models.ForeignKey(
+        RadCanaleta, on_delete=models.CASCADE, related_name='anomalias', db_column='id_canaleta'
+    )
+    anomalia = models.CharField(max_length=20, choices=ANOMALIA_CHOICES)
+
+    class Meta:
+        db_table = 'rad_canaleta_anomalias'
+        verbose_name = 'Anomalia da Canaleta'
+        verbose_name_plural = 'Anomalias da Canaleta'
+        constraints = [
+            models.UniqueConstraint(fields=['canaleta', 'anomalia'], name='uniq_canaleta_anomalia')
+        ]
+
+
+class RadCanaletaLado(models.Model):
+    """Lados selecionados no bloco Canaleta. Multipla selecao."""
+
+    DIREITO = 'direito'
+    ESQUERDO = 'esquerdo'
+    ENTREVIA = 'entrevia'
+    LADO_CHOICES = [
+        (DIREITO, 'Direito'),
+        (ESQUERDO, 'Esquerdo'),
+        (ENTREVIA, 'Entrevia'),
+    ]
+
+    canaleta = models.ForeignKey(
+        RadCanaleta, on_delete=models.CASCADE, related_name='lados', db_column='id_canaleta'
+    )
+    lado = models.CharField(max_length=10, choices=LADO_CHOICES)
+
+    class Meta:
+        db_table = 'rad_canaleta_lados'
+        verbose_name = 'Lado da Canaleta'
+        verbose_name_plural = 'Lados da Canaleta'
+        constraints = [
+            models.UniqueConstraint(fields=['canaleta', 'lado'], name='uniq_canaleta_lado')
+        ]

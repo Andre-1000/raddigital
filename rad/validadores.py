@@ -22,6 +22,17 @@ NOME_SERVICO_OUTROS = 'Outros'
 NOME_TIPO_MANUTENCAO_FALHA = 'Falha'
 NOME_TIPO_MANUTENCAO_VPM001 = 'VPM001'
 
+# 30/07/2026: choices validas do bloco Canaleta -- espelham
+# rad.models.RadCanaleta/RadCanaletaAnomalia/RadCanaletaLado, mas
+# como listas simples de string (nao dependem de import do model)
+# porque a validacao roda antes de qualquer objeto ser criado.
+GRAUS_CRITICIDADE_VALIDOS = {'baixa', 'media', 'alta', 'critica'}
+ANOMALIAS_CANALETA_VALIDAS = {
+    'limpa', 'obstruida', 'ausente', 'quebrada', 'vegetacao',
+    'lastro', 'lixo', 'dormentes', 'entulho', 'terra',
+}
+LADOS_CANALETA_VALIDOS = {'direito', 'esquerdo', 'entrevia'}
+
 
 def _erro(codigo, campo, mensagem):
     return {'codigo': codigo, 'campo': campo, 'mensagem': mensagem}
@@ -393,6 +404,62 @@ def _validar_bloco_amv(payload, erros):
             )
 
 
+def _validar_bloco_canaleta(payload, erros):
+    """
+    VLD-040 a VLD-044 (30/07/2026): bloco "Anomalias", exigido somente
+    quando o servico "Inspeção de Canaleta" (CatServico.requer_canaleta)
+    foi selecionado. Diferente do bloco AMV, e um unico bloco (nao uma
+    lista) -- so existe 1 inspecao de canaleta por RAD.
+    """
+    servicos_ids = payload.get('servicos') or []
+    canaleta_selecionada = CatServico.objects.filter(
+        id__in=servicos_ids, requer_canaleta=True
+    ).exists()
+    if not canaleta_selecionada:
+        return
+
+    canaleta = payload.get('canaleta') or {}
+
+    anomalias = canaleta.get('anomalias') or []
+    if not anomalias:
+        erros.append(_erro('VLD-040', 'canaleta.anomalias', 'Selecione ao menos uma Anomalia.'))
+    elif any(a not in ANOMALIAS_CANALETA_VALIDAS for a in anomalias):
+        erros.append(_erro('VLD-040', 'canaleta.anomalias', 'Anomalia inválida.'))
+
+    grau = canaleta.get('grau_criticidade')
+    if not grau:
+        erros.append(_erro('VLD-041', 'canaleta.grau_criticidade', 'Selecione o Grau de Criticidade.'))
+    elif grau not in GRAUS_CRITICIDADE_VALIDOS:
+        erros.append(_erro('VLD-041', 'canaleta.grau_criticidade', 'Grau de Criticidade inválido.'))
+
+    campos_dimensao = {
+        'largura_inicial': 'Largura Inicial',
+        'largura_final': 'Largura Final',
+        'altura_inicial': 'Altura Inicial',
+        'altura_final': 'Altura Final',
+        'comprimento': 'Comprimento',
+    }
+    for campo, rotulo in campos_dimensao.items():
+        valor = canaleta.get(campo)
+        if valor is None or valor == '':
+            erros.append(_erro('VLD-042', f'canaleta.{campo}', f'Informe {rotulo}.'))
+            continue
+        try:
+            if float(valor) < 0:
+                erros.append(_erro('VLD-042', f'canaleta.{campo}', f'{rotulo} não pode ser negativo.'))
+        except (TypeError, ValueError):
+            erros.append(_erro('VLD-042', f'canaleta.{campo}', f'{rotulo} deve ser um número.'))
+
+    if canaleta.get('necessita_cautela') is None:
+        erros.append(_erro('VLD-043', 'canaleta.necessita_cautela', 'Informe se necessita de cautela.'))
+
+    lados = canaleta.get('lados') or []
+    if not lados:
+        erros.append(_erro('VLD-044', 'canaleta.lados', 'Selecione ao menos um Lado.'))
+    elif any(l not in LADOS_CANALETA_VALIDOS for l in lados):
+        erros.append(_erro('VLD-044', 'canaleta.lados', 'Lado inválido.'))
+
+
 def _remover_erros_de_campos_desabilitados(erros):
     """
     Regra de negocio (17/07/2026): campo desabilitado pelo Administrador
@@ -558,7 +625,7 @@ def _aplicar_configuracao_obrigatoriedade(payload, erros):
 def validar_payload_sincronizacao(payload, *, hoje):
     """
     Executa todas as validacoes de bloqueio da sincronizacao (VLD-001 a
-    VLD-033, exceto VLD-023/024 que exigem os arquivos de anexo, ver
+    VLD-044, exceto VLD-023/024 que exigem os arquivos de anexo, ver
     rad.validadores_arquivos).
 
     payload deve conter, alem dos campos brutos do formulario, os campos
@@ -592,6 +659,7 @@ def validar_payload_sincronizacao(payload, *, hoje):
     _validar_colaboradores_no_cadastro_oficial(payload, erros)
     _validar_colaboradores_sem_registro_duplicado(payload, erros)
     _validar_bloco_amv(payload, erros)
+    _validar_bloco_canaleta(payload, erros)
     _validar_responsavel_atividade(payload, erros)
     _validar_operador_ccm(payload, erros)
     _validar_descricoes_foto_vpm001(payload, erros)

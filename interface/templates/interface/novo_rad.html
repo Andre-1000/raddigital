@@ -214,11 +214,12 @@
     </div>
 
     <!-- Terceiros: aparece quando ao menos um dos servicos que exige
-         mao de obra terceirizada e selecionado (Recolhimento de Lixo,
-         Limpeza de Canaleta, Capina Quimica, Rocada/Poda). Os campos
-         "N Op Maquina" e "Volume" so aparecem quando algum servico
-         selecionado exige aquele campo especificamente -- os demais
-         (Encarregados, Ajudantes, Motorista) sao comuns aos quatro. -->
+         mao de obra terceirizada e selecionado (Recolhimento de
+         Descartes, Limpeza de Canaleta, Capina Quimica, Rocada/Poda).
+         Os campos "N Op Maquina" e "Volume" so aparecem quando algum
+         servico selecionado exige aquele campo especificamente -- os
+         demais (Encarregados, Ajudantes, Motorista) sao comuns aos
+         quatro. -->
     <div class="cartao" id="bloco-terceiros" style="margin-top:1rem; display:none;">
       <h2 style="font-size:1rem;">Terceiros</h2>
 
@@ -260,6 +261,70 @@
         + Adicionar MCH
       </button>
       <p class="texto-suave centro" id="contador-blocos-amv" style="font-size:0.8rem; margin-top:0.4rem;"></p>
+    </div>
+
+    <!-- Anomalias (bloco Canaleta, 30/07/2026): aparece quando o
+         servico "Inspecao de Canaleta" e selecionado (ver
+         catalogos.models.CatServico.requer_canaleta). Ao contrario do
+         AMV, este bloco NAO se repete -- no maximo 1 por RAD. -->
+    <div class="cartao" id="bloco-canaleta" style="margin-top:1rem; display:none;">
+      <h2 style="font-size:1rem;">Anomalias</h2>
+
+      <div class="campo">
+        <label>Anomalias <span class="obrigatorio">*</span></label>
+        <div class="grade-checkboxes" id="lista-canaleta-anomalias"></div>
+      </div>
+
+      <div class="campo">
+        <label for="campo-canaleta-criticidade">Grau de Criticidade <span class="obrigatorio">*</span></label>
+        <select id="campo-canaleta-criticidade" required>
+          <option value="">Selecione…</option>
+          <option value="baixa">Baixa</option>
+          <option value="media">Média</option>
+          <option value="alta">Alta</option>
+          <option value="critica">Crítica</option>
+        </select>
+      </div>
+
+      <div class="campo">
+        <label>Dimensões <span class="obrigatorio">*</span></label>
+        <div class="grade-campos grade-campos--compacta">
+          <div class="campo">
+            <label for="campo-canaleta-largura-inicial" class="texto-suave" style="font-size:0.8rem;">Largura Inicial (m)</label>
+            <input type="number" id="campo-canaleta-largura-inicial" step="0.01" min="0" required>
+          </div>
+          <div class="campo">
+            <label for="campo-canaleta-largura-final" class="texto-suave" style="font-size:0.8rem;">Largura Final (m)</label>
+            <input type="number" id="campo-canaleta-largura-final" step="0.01" min="0" required>
+          </div>
+          <div class="campo">
+            <label for="campo-canaleta-altura-inicial" class="texto-suave" style="font-size:0.8rem;">Altura Inicial (m)</label>
+            <input type="number" id="campo-canaleta-altura-inicial" step="0.01" min="0" required>
+          </div>
+          <div class="campo">
+            <label for="campo-canaleta-altura-final" class="texto-suave" style="font-size:0.8rem;">Altura Final (m)</label>
+            <input type="number" id="campo-canaleta-altura-final" step="0.01" min="0" required>
+          </div>
+          <div class="campo">
+            <label for="campo-canaleta-comprimento" class="texto-suave" style="font-size:0.8rem;">Comprimento (m)</label>
+            <input type="number" id="campo-canaleta-comprimento" step="0.01" min="0" required>
+          </div>
+        </div>
+      </div>
+
+      <div class="campo">
+        <label for="campo-canaleta-cautela">Necessita de Cautela? <span class="obrigatorio">*</span></label>
+        <select id="campo-canaleta-cautela" required>
+          <option value="">Selecione…</option>
+          <option value="sim">Sim</option>
+          <option value="nao">Não</option>
+        </select>
+      </div>
+
+      <div class="campo">
+        <label>Lado <span class="obrigatorio">*</span></label>
+        <div class="grade-checkboxes" id="lista-canaleta-lado"></div>
+      </div>
     </div>
 
     <div class="cartao" id="secao-colaboradores" style="margin-top:1rem;">
@@ -503,20 +568,16 @@
 
   /* Navegacao lateral fixa (opcao D) -- conteudo principal continua
      sendo UMA coluna so, crescendo naturalmente sem desequilibrar
-     nada quando um bloco condicional abre (Terceiros, AMV, um grupo
-     de Servicos expandido). A lateral so aparece a partir de 860px de
-     largura -- abaixo disso, uma coluna de atalhos brigando por
-     espaco com o formulario atrapalha mais do que ajuda; a pessoa so
-     rola a tela normalmente, como sempre foi. */
-  /* 30/07/2026 (revisado de novo): "position: sticky" nao estava
-     ficando de fato congelado (ficava preso ao espaco do proprio
-     grid, que rola junto com o conteudo quando a coluna de conteudo
-     e mais alta -- bug real, visto em producao). Trocado por
-     "position: fixed" de verdade, que ignora a rolagem da pagina
-     completamente. Como fixed tira o elemento do fluxo, o
-     .conteudo-formulario ganha um respiro a esquerda (margin-left)
-     do tamanho da lateral, pra nao ficar escondido atras dela. O
-     "left" da lateral usa calc() pra acompanhar o container centralizado
+     nada quando um bloco condicional abre (Terceiros, AMV, Canaleta,
+     um grupo de Servicos expandido). A lateral so aparece a partir de
+     860px de largura -- abaixo disso, uma coluna de atalhos brigando
+     por espaco com o formulario atrapalha mais do que ajuda; a pessoa
+     so rola a tela normalmente, como sempre foi. */
+  /* "position: fixed" de verdade (nao sticky) -- ignora a rolagem da
+     pagina completamente. Como fixed tira o elemento do fluxo, o
+     .conteudo-formulario ganha um respiro a esquerda (margin-left) do
+     tamanho da lateral, pra nao ficar escondido atras dela. O "left"
+     da lateral usa calc() pra acompanhar o container centralizado
      (1040px) em qualquer largura de tela, sem precisar de JS. */
   .layout-formulario {
     display: block;

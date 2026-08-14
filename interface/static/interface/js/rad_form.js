@@ -125,6 +125,15 @@ document.addEventListener('DOMContentLoaded', async function () {
       terceiros_num_motorista: '',
       terceiros_volume: '',
       amv_blocos: [],
+      canaleta_anomalias: [],
+      canaleta_grau_criticidade: '',
+      canaleta_necessita_cautela: '',
+      canaleta_largura_inicial: '',
+      canaleta_largura_final: '',
+      canaleta_altura_inicial: '',
+      canaleta_altura_final: '',
+      canaleta_comprimento: '',
+      canaleta_lados: [],
       colaboradores: [],
       anexos: {
         fotos_intervencao_verificada: [],
@@ -775,6 +784,9 @@ document.addEventListener('DOMContentLoaded', async function () {
   function algumServicoSelecionadoTem(flag) {
     return servicos.some((s) => s[flag] && rascunho.servicos.includes(s.id));
   }
+  function servicoRequerCanaletaSelecionado() {
+    return algumServicoSelecionadoTem('requer_canaleta');
+  }
 
   // 30/07/2026: limite de fotos configuravel (Configuracoes -> Limites
   // de Fotos), e varia conforme a area do(s) servico(s) selecionado(s)
@@ -1030,6 +1042,71 @@ document.addEventListener('DOMContentLoaded', async function () {
     salvarRascunhoAgora();
   });
 
+  // 30/07/2026: Bloco Canaleta ("Anomalias") -- ao contrario do AMV,
+  // nao se repete (no maximo 1 bloco por RAD). Listas de opcao fixas
+  // (nao vem de catalogo do banco, ver rad/models.py::RadCanaleta).
+  const blocoCanaleta = document.getElementById('bloco-canaleta');
+  const listaCanaletaAnomaliasEl = document.getElementById('lista-canaleta-anomalias');
+  const listaCanaletaLadoEl = document.getElementById('lista-canaleta-lado');
+  const campoCanaletaCriticidade = document.getElementById('campo-canaleta-criticidade');
+  const campoCanaletaCautela = document.getElementById('campo-canaleta-cautela');
+  const campoCanaletaLarguraInicial = document.getElementById('campo-canaleta-largura-inicial');
+  const campoCanaletaLarguraFinal = document.getElementById('campo-canaleta-largura-final');
+  const campoCanaletaAlturaInicial = document.getElementById('campo-canaleta-altura-inicial');
+  const campoCanaletaAlturaFinal = document.getElementById('campo-canaleta-altura-final');
+  const campoCanaletaComprimento = document.getElementById('campo-canaleta-comprimento');
+
+  const ANOMALIAS_CANALETA = [
+    { valor: 'limpa', rotulo: 'Limpa' },
+    { valor: 'obstruida', rotulo: 'Obstruída' },
+    { valor: 'ausente', rotulo: 'Ausente' },
+    { valor: 'quebrada', rotulo: 'Quebrada' },
+    { valor: 'vegetacao', rotulo: 'Vegetação' },
+    { valor: 'lastro', rotulo: 'Lastro' },
+    { valor: 'lixo', rotulo: 'Lixo' },
+    { valor: 'dormentes', rotulo: 'Dormentes' },
+    { valor: 'entulho', rotulo: 'Entulho' },
+    { valor: 'terra', rotulo: 'Terra' },
+  ];
+  const LADOS_CANALETA = [
+    { valor: 'direito', rotulo: 'Direito' },
+    { valor: 'esquerdo', rotulo: 'Esquerdo' },
+    { valor: 'entrevia', rotulo: 'Entrevia' },
+  ];
+
+  function renderizarBlocoCanaleta() {
+    renderizarListaCheckbox(listaCanaletaAnomaliasEl, ANOMALIAS_CANALETA, rascunho.canaleta_anomalias, salvarRascunhoAgora);
+    renderizarListaCheckbox(listaCanaletaLadoEl, LADOS_CANALETA, rascunho.canaleta_lados, salvarRascunhoAgora);
+    campoCanaletaCriticidade.value = rascunho.canaleta_grau_criticidade || '';
+    campoCanaletaCautela.value = rascunho.canaleta_necessita_cautela || '';
+    campoCanaletaLarguraInicial.value = rascunho.canaleta_largura_inicial || '';
+    campoCanaletaLarguraFinal.value = rascunho.canaleta_largura_final || '';
+    campoCanaletaAlturaInicial.value = rascunho.canaleta_altura_inicial || '';
+    campoCanaletaAlturaFinal.value = rascunho.canaleta_altura_final || '';
+    campoCanaletaComprimento.value = rascunho.canaleta_comprimento || '';
+  }
+
+  campoCanaletaCriticidade.addEventListener('change', function () {
+    rascunho.canaleta_grau_criticidade = campoCanaletaCriticidade.value;
+    salvarRascunhoAgora();
+  });
+  campoCanaletaCautela.addEventListener('change', function () {
+    rascunho.canaleta_necessita_cautela = campoCanaletaCautela.value;
+    salvarRascunhoAgora();
+  });
+
+  function ligarCampoDimensaoCanaleta(elemento, chave) {
+    elemento.addEventListener('input', function () {
+      rascunho[chave] = elemento.value;
+      salvarRascunhoAgora();
+    });
+  }
+  ligarCampoDimensaoCanaleta(campoCanaletaLarguraInicial, 'canaleta_largura_inicial');
+  ligarCampoDimensaoCanaleta(campoCanaletaLarguraFinal, 'canaleta_largura_final');
+  ligarCampoDimensaoCanaleta(campoCanaletaAlturaInicial, 'canaleta_altura_inicial');
+  ligarCampoDimensaoCanaleta(campoCanaletaAlturaFinal, 'canaleta_altura_final');
+  ligarCampoDimensaoCanaleta(campoCanaletaComprimento, 'canaleta_comprimento');
+
   const blocoTerceiros = document.getElementById('bloco-terceiros');
   const campoGrupoTerceirosOpMaquina = document.getElementById('campo-grupo-terceiros-op-maquina');
   const campoGrupoTerceirosVolume = document.getElementById('campo-grupo-terceiros-volume');
@@ -1037,6 +1114,18 @@ document.addEventListener('DOMContentLoaded', async function () {
   function limparCampoTerceiros(elementoId, chaveRascunho) {
     document.getElementById(elementoId).value = '';
     rascunho[chaveRascunho] = '';
+  }
+
+  function limparBlocoCanaleta() {
+    rascunho.canaleta_anomalias.length = 0;
+    rascunho.canaleta_lados.length = 0;
+    rascunho.canaleta_grau_criticidade = '';
+    rascunho.canaleta_necessita_cautela = '';
+    rascunho.canaleta_largura_inicial = '';
+    rascunho.canaleta_largura_final = '';
+    rascunho.canaleta_altura_inicial = '';
+    rascunho.canaleta_altura_final = '';
+    rascunho.canaleta_comprimento = '';
   }
 
   function atualizarVisibilidadeServicos() {
@@ -1056,6 +1145,14 @@ document.addEventListener('DOMContentLoaded', async function () {
       blocoAmv.style.display = 'none';
       rascunho.amv_blocos.length = 0;
       containerBlocosAmv.innerHTML = '';
+    }
+
+    if (servicoRequerCanaletaSelecionado()) {
+      blocoCanaleta.style.display = '';
+      renderizarBlocoCanaleta();
+    } else {
+      blocoCanaleta.style.display = 'none';
+      limparBlocoCanaleta();
     }
 
     if (servicoRequerTerceirosSelecionado()) {
@@ -1700,6 +1797,19 @@ document.addEventListener('DOMContentLoaded', async function () {
       terceiros_num_motorista: rascunho.terceiros_num_motorista ? Number(rascunho.terceiros_num_motorista) : null,
       terceiros_volume: rascunho.terceiros_volume ? Number(rascunho.terceiros_volume) : null,
       amv_blocos: rascunho.amv_blocos,
+      canaleta: servicoRequerCanaletaSelecionado() ? {
+        anomalias: rascunho.canaleta_anomalias,
+        grau_criticidade: rascunho.canaleta_grau_criticidade || null,
+        necessita_cautela:
+          rascunho.canaleta_necessita_cautela === 'sim' ? true :
+          (rascunho.canaleta_necessita_cautela === 'nao' ? false : null),
+        largura_inicial: rascunho.canaleta_largura_inicial !== '' ? Number(rascunho.canaleta_largura_inicial) : null,
+        largura_final: rascunho.canaleta_largura_final !== '' ? Number(rascunho.canaleta_largura_final) : null,
+        altura_inicial: rascunho.canaleta_altura_inicial !== '' ? Number(rascunho.canaleta_altura_inicial) : null,
+        altura_final: rascunho.canaleta_altura_final !== '' ? Number(rascunho.canaleta_altura_final) : null,
+        comprimento: rascunho.canaleta_comprimento !== '' ? Number(rascunho.canaleta_comprimento) : null,
+        lados: rascunho.canaleta_lados,
+      } : null,
       colaboradores: rascunho.colaboradores,
       responsavel_atividade: rascunho.responsavel_atividade,
       operador_ccm_abertura_nome: rascunho.operador_ccm_abertura_nome,

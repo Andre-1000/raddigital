@@ -38,7 +38,8 @@ def listar_todos(request):
     foto por categoria/area) sob a chave 'limites_fotos' -- mesmo
     payload que os demais catalogos, para que o formulario funcione
     offline sem precisar de uma chamada de rede separada so pra saber
-    quantas fotos permitir.
+    quantas fotos permitir. 'requer_canaleta' exposto em 'servicos'
+    pra abrir o bloco Anomalias no cliente sem chamada extra.
     """
     dados = {
         'linhas': list(CatLinha.objects.values('codigo', 'nome')),
@@ -52,7 +53,7 @@ def listar_todos(request):
             CatServico.objects.filter(ativo=True).values(
                 'id', 'nome', 'descricao', 'requer_amv', 'requer_descricao',
                 'requer_terceiros', 'terceiros_tem_op_maquina', 'terceiros_tem_volume',
-                'area',
+                'requer_canaleta', 'area',
             )
         ),
         'motivos_atraso': list(

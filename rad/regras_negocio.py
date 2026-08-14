@@ -21,6 +21,9 @@ from .models import (
     RadAmvAcao,
     RadAmvDefeito,
     RadAnexo,
+    RadCanaleta,
+    RadCanaletaAnomalia,
+    RadCanaletaLado,
     RadColaborador,
     RadEquipe,
     RadLinha,
@@ -189,6 +192,39 @@ def _preparar_horarios(payload):
     return resultado
 
 
+def _criar_bloco_canaleta(rad, payload):
+    """
+    30/07/2026: cria o bloco Anomalias (RadCanaleta + anomalias/lados
+    selecionados) quando presente no payload -- so existe quando o
+    servico "Inspeção de Canaleta" foi selecionado, ja garantido pela
+    validacao (VLD-040 a VLD-044) antes de chegar aqui. Diferente do
+    bloco AMV, e um unico bloco por RAD (nao uma lista).
+    """
+    canaleta_dados = payload.get('canaleta')
+    if not canaleta_dados:
+        return
+
+    canaleta = RadCanaleta.objects.create(
+        rad=rad,
+        grau_criticidade=canaleta_dados['grau_criticidade'],
+        necessita_cautela=bool(canaleta_dados['necessita_cautela']),
+        largura_inicial=canaleta_dados['largura_inicial'],
+        largura_final=canaleta_dados['largura_final'],
+        altura_inicial=canaleta_dados['altura_inicial'],
+        altura_final=canaleta_dados['altura_final'],
+        comprimento=canaleta_dados['comprimento'],
+    )
+    RadCanaletaAnomalia.objects.bulk_create(
+        [
+            RadCanaletaAnomalia(canaleta=canaleta, anomalia=a)
+            for a in canaleta_dados.get('anomalias', [])
+        ]
+    )
+    RadCanaletaLado.objects.bulk_create(
+        [RadCanaletaLado(canaleta=canaleta, lado=l) for l in canaleta_dados.get('lados', [])]
+    )
+
+
 def _criar_relacionamentos(rad, payload):
     """Cria as linhas, vias, servicos, colaboradores, equipes e bloco AMV de um RAD novo."""
     RadLinha.objects.bulk_create(
@@ -262,6 +298,10 @@ def _criar_relacionamentos(rad, payload):
         RadAmvAcao.objects.bulk_create(
             [RadAmvAcao(amv=amv, acao_id=id_acao) for id_acao in bloco.get('acoes', [])]
         )
+
+    # 30/07/2026: bloco Anomalias (Canaleta) -- so existe quando o
+    # servico "Inspeção de Canaleta" foi selecionado.
+    _criar_bloco_canaleta(rad, payload)
 
 
 def _salvar_anexos(rad, fotos_intervencao, fotos_acao, pdfs):
@@ -350,7 +390,7 @@ def processar_sincronizacao(payload, usuario, fotos_intervencao=None, fotos_acao
     1. Calculo dos horarios derivados (regras_horario) -- necessario
        antes de validar, pois VLD-012/013 dependem dos DateTime
        completos ja calculados.
-    2. Validacao completa (RG-VLD-001 a 003, VLD-001 a 033, incluindo
+    2. Validacao completa (RG-VLD-001 a 003, VLD-001 a 044, incluindo
        os anexos e a configuracao de obrigatoriedade customizada do
        Administrador). Se houver qualquer erro, nao toca o banco nem o
        storage de arquivos (RG-VLD-002) e retorna (None, erros).
