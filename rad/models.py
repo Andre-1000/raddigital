@@ -548,6 +548,12 @@ class RadCanaleta(models.Model):
     selecionado. Diferente do bloco AMV (que pode se repetir varias
     vezes por RAD, um por MCH), aqui e sempre 1-para-1 com o RAD --
     so existe uma inspecao de canaleta por RAD.
+
+    14/08/2026: ganhou o campo justificativa (texto livre, exigido pela
+    validacao -- VLD-045 -- somente quando grau_criticidade e Media,
+    Alta ou Critica). As antigas 5 medidas fixas (largura/altura/
+    comprimento) saíram daqui e viraram uma lista repetivel -- ver
+    RadCanaletaDimensao.
     """
 
     BAIXA = 'baixa'
@@ -565,12 +571,14 @@ class RadCanaleta(models.Model):
         Rad, on_delete=models.CASCADE, related_name='canaleta', db_column='id_rad'
     )
     grau_criticidade = models.CharField(max_length=10, choices=GRAU_CRITICIDADE_CHOICES)
+    justificativa = models.TextField(
+        null=True, blank=True,
+        help_text=(
+            'Obrigatoria (VLD-045) quando grau_criticidade e Media, Alta '
+            'ou Critica. Sem limite de caracteres.'
+        ),
+    )
     necessita_cautela = models.BooleanField()
-    largura_inicial = models.DecimalField(max_digits=8, decimal_places=2)
-    largura_final = models.DecimalField(max_digits=8, decimal_places=2)
-    altura_inicial = models.DecimalField(max_digits=8, decimal_places=2)
-    altura_final = models.DecimalField(max_digits=8, decimal_places=2)
-    comprimento = models.DecimalField(max_digits=8, decimal_places=2)
 
     class Meta:
         db_table = 'rad_canaleta'
@@ -579,6 +587,36 @@ class RadCanaleta(models.Model):
 
     def __str__(self):
         return f'Canaleta de {self.rad.numero_rad}'
+
+
+class RadCanaletaDimensao(models.Model):
+    """
+    14/08/2026: linha de medidas da Canaleta. Ate LIMITE_DIMENSOES (ver
+    rad/validadores.py) linhas por bloco Canaleta -- mesmo padrao do
+    RadAmv (repete via ForeignKey, nao e 1-para-1), mas aninhado dentro
+    do bloco Canaleta em vez de apontar direto pro Rad. 'ordem' guarda a
+    posicao em que a linha foi preenchida no formulario, para exibir na
+    mesma sequencia depois.
+    """
+
+    canaleta = models.ForeignKey(
+        RadCanaleta, on_delete=models.CASCADE, related_name='dimensoes', db_column='id_canaleta'
+    )
+    ordem = models.PositiveSmallIntegerField(default=1)
+    largura_inicial = models.DecimalField(max_digits=8, decimal_places=2)
+    largura_final = models.DecimalField(max_digits=8, decimal_places=2)
+    altura_inicial = models.DecimalField(max_digits=8, decimal_places=2)
+    altura_final = models.DecimalField(max_digits=8, decimal_places=2)
+    comprimento = models.DecimalField(max_digits=8, decimal_places=2)
+
+    class Meta:
+        db_table = 'rad_canaleta_dimensoes'
+        verbose_name = 'Dimensão da Canaleta'
+        verbose_name_plural = 'Dimensões da Canaleta'
+        ordering = ['ordem', 'id']
+
+    def __str__(self):
+        return f'Dimensão {self.ordem} de {self.canaleta.rad.numero_rad}'
 
 
 class RadCanaletaAnomalia(models.Model):

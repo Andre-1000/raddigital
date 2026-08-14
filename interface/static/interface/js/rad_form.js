@@ -35,6 +35,33 @@ document.addEventListener('DOMContentLoaded', async function () {
   if (!rascunho.anexos) {
     rascunho.anexos = { fotos_intervencao_verificada: [], fotos_acao_realizada: [], pdf: [] };
   }
+  if (!rascunho.canaleta_dimensoes) {
+    // 14/08/2026: migracao defensiva de rascunhos antigos que ainda
+    // tenham os 5 campos fixos antigos (canaleta_largura_inicial etc,
+    // um unico conjunto de medidas) salvos no IndexedDB -- converte
+    // pra lista de 1 linha, sem perder o que a pessoa ja tinha
+    // preenchido. Mesmo padrao ja usado acima para amv_blocos.
+    const tinhaAlgumaDimensaoAntiga = !!(
+      rascunho.canaleta_largura_inicial || rascunho.canaleta_largura_final ||
+      rascunho.canaleta_altura_inicial || rascunho.canaleta_altura_final ||
+      rascunho.canaleta_comprimento
+    );
+    rascunho.canaleta_dimensoes = tinhaAlgumaDimensaoAntiga
+      ? [{
+          largura_inicial: rascunho.canaleta_largura_inicial || '',
+          largura_final: rascunho.canaleta_largura_final || '',
+          altura_inicial: rascunho.canaleta_altura_inicial || '',
+          altura_final: rascunho.canaleta_altura_final || '',
+          comprimento: rascunho.canaleta_comprimento || '',
+        }]
+      : [{ largura_inicial: '', largura_final: '', altura_inicial: '', altura_final: '', comprimento: '' }];
+  }
+  delete rascunho.canaleta_largura_inicial;
+  delete rascunho.canaleta_largura_final;
+  delete rascunho.canaleta_altura_inicial;
+  delete rascunho.canaleta_altura_final;
+  delete rascunho.canaleta_comprimento;
+  if (rascunho.canaleta_justificativa === undefined) rascunho.canaleta_justificativa = '';
 
   let resolverConflitoPendente = null;
   const modalConfirmarExclusao = document.getElementById('modal-confirmar-exclusao');
@@ -127,12 +154,11 @@ document.addEventListener('DOMContentLoaded', async function () {
       amv_blocos: [],
       canaleta_anomalias: [],
       canaleta_grau_criticidade: '',
+      canaleta_justificativa: '',
       canaleta_necessita_cautela: '',
-      canaleta_largura_inicial: '',
-      canaleta_largura_final: '',
-      canaleta_altura_inicial: '',
-      canaleta_altura_final: '',
-      canaleta_comprimento: '',
+      canaleta_dimensoes: [
+        { largura_inicial: '', largura_final: '', altura_inicial: '', altura_final: '', comprimento: '' },
+      ],
       canaleta_lados: [],
       colaboradores: [],
       anexos: {
@@ -1045,22 +1071,33 @@ document.addEventListener('DOMContentLoaded', async function () {
   // 30/07/2026: Bloco Canaleta ("Anomalias") -- ao contrario do AMV,
   // nao se repete (no maximo 1 bloco por RAD). Listas de opcao fixas
   // (nao vem de catalogo do banco, ver rad/models.py::RadCanaleta).
+  // 14/08/2026: Vegetacao/Lastro/Lixo/Dormentes/Entulho/Terra viraram
+  // sub-opcoes, condicionadas a "Obstruida" estar marcada -- deixam de
+  // aparecer (e sao limpas) quando Obstruida e desmarcada. Grau de
+  // Criticidade Media/Alta/Critica passou a exigir Justificativa.
+  // Dimensoes passou de um conjunto fixo de 5 campos para uma lista de
+  // ate MAXIMO_DIMENSOES_CANALETA linhas repetiveis, com um botao "+"
+  // pra adicionar linha -- mesmo padrao ja usado no bloco AMV.
   const blocoCanaleta = document.getElementById('bloco-canaleta');
   const listaCanaletaAnomaliasEl = document.getElementById('lista-canaleta-anomalias');
+  const grupoCanaletaObstrucao = document.getElementById('grupo-canaleta-obstrucao');
+  const listaCanaletaSubAnomaliasEl = document.getElementById('lista-canaleta-sub-anomalias');
   const listaCanaletaLadoEl = document.getElementById('lista-canaleta-lado');
   const campoCanaletaCriticidade = document.getElementById('campo-canaleta-criticidade');
+  const grupoCanaletaJustificativa = document.getElementById('campo-grupo-canaleta-justificativa');
+  const campoCanaletaJustificativa = document.getElementById('campo-canaleta-justificativa');
   const campoCanaletaCautela = document.getElementById('campo-canaleta-cautela');
-  const campoCanaletaLarguraInicial = document.getElementById('campo-canaleta-largura-inicial');
-  const campoCanaletaLarguraFinal = document.getElementById('campo-canaleta-largura-final');
-  const campoCanaletaAlturaInicial = document.getElementById('campo-canaleta-altura-inicial');
-  const campoCanaletaAlturaFinal = document.getElementById('campo-canaleta-altura-final');
-  const campoCanaletaComprimento = document.getElementById('campo-canaleta-comprimento');
+  const containerDimensoesCanaleta = document.getElementById('container-canaleta-dimensoes');
+  const botaoAdicionarDimensaoCanaleta = document.getElementById('botao-adicionar-dimensao-canaleta');
+  const contadorDimensoesCanaleta = document.getElementById('contador-dimensoes-canaleta');
 
   const ANOMALIAS_CANALETA = [
     { valor: 'limpa', rotulo: 'Limpa' },
     { valor: 'obstruida', rotulo: 'Obstruída' },
     { valor: 'ausente', rotulo: 'Ausente' },
     { valor: 'quebrada', rotulo: 'Quebrada' },
+  ];
+  const SUB_ANOMALIAS_OBSTRUIDA_CANALETA = [
     { valor: 'vegetacao', rotulo: 'Vegetação' },
     { valor: 'lastro', rotulo: 'Lastro' },
     { valor: 'lixo', rotulo: 'Lixo' },
@@ -1068,44 +1105,172 @@ document.addEventListener('DOMContentLoaded', async function () {
     { valor: 'entulho', rotulo: 'Entulho' },
     { valor: 'terra', rotulo: 'Terra' },
   ];
+  const GRAUS_CRITICIDADE_EXIGEM_JUSTIFICATIVA = ['media', 'alta', 'critica'];
+  const MAXIMO_DIMENSOES_CANALETA = 10;
   const LADOS_CANALETA = [
     { valor: 'direito', rotulo: 'Direito' },
     { valor: 'esquerdo', rotulo: 'Esquerdo' },
     { valor: 'entrevia', rotulo: 'Entrevia' },
   ];
+  const CAMPOS_DIMENSAO_CANALETA = [
+    ['largura_inicial', 'Largura Inicial (m)'],
+    ['largura_final', 'Largura Final (m)'],
+    ['altura_inicial', 'Altura Inicial (m)'],
+    ['altura_final', 'Altura Final (m)'],
+    ['comprimento', 'Comprimento (m)'],
+  ];
+
+  function criarLinhaDimensaoCanaletaVazia() {
+    return {
+      largura_inicial: '', largura_final: '',
+      altura_inicial: '', altura_final: '',
+      comprimento: '',
+    };
+  }
+
+  function aoMudarAnomaliaCanaleta() {
+    atualizarVisibilidadeSubAnomaliasCanaleta();
+    salvarRascunhoAgora();
+  }
+
+  // Obstruida so mostra as sub-opcoes de tipo de obstrucao quando
+  // marcada -- ao desmarcar, qualquer sub-opcao ja marcada e limpa (RG:
+  // nao faz sentido guardar "Vegetação" selecionada se a canaleta nao
+  // esta mais marcada como Obstruida -- mesmo principio de "ultima
+  // caixa so obrigatoria/visivel quando a anterior estiver marcada").
+  function atualizarVisibilidadeSubAnomaliasCanaleta() {
+    const obstruidaMarcada = rascunho.canaleta_anomalias.includes('obstruida');
+    grupoCanaletaObstrucao.style.display = obstruidaMarcada ? '' : 'none';
+    if (!obstruidaMarcada) {
+      let mudou = false;
+      SUB_ANOMALIAS_OBSTRUIDA_CANALETA.forEach(function (sub) {
+        const indice = rascunho.canaleta_anomalias.indexOf(sub.valor);
+        if (indice !== -1) {
+          rascunho.canaleta_anomalias.splice(indice, 1);
+          mudou = true;
+        }
+      });
+      if (mudou) {
+        renderizarListaCheckbox(
+          listaCanaletaSubAnomaliasEl, SUB_ANOMALIAS_OBSTRUIDA_CANALETA,
+          rascunho.canaleta_anomalias, aoMudarAnomaliaCanaleta
+        );
+      }
+    }
+  }
+
+  // Justificativa so aparece (e so e exigida no backend, VLD-045)
+  // quando o Grau de Criticidade e Media, Alta ou Critica.
+  function atualizarVisibilidadeJustificativaCanaleta() {
+    const exige = GRAUS_CRITICIDADE_EXIGEM_JUSTIFICATIVA.includes(rascunho.canaleta_grau_criticidade);
+    grupoCanaletaJustificativa.style.display = exige ? '' : 'none';
+    if (!exige) {
+      rascunho.canaleta_justificativa = '';
+      campoCanaletaJustificativa.value = '';
+    }
+  }
+
+  function renderizarLinhasDimensoesCanaleta() {
+    containerDimensoesCanaleta.innerHTML = '';
+    rascunho.canaleta_dimensoes.forEach(function (linha, indice) {
+      const cartaoLinha = document.createElement('div');
+      cartaoLinha.className = 'linha-dimensao-canaleta';
+
+      const cabecalho = document.createElement('div');
+      cabecalho.className = 'linha-dimensao-canaleta__cabecalho';
+      const titulo = document.createElement('p');
+      titulo.className = 'linha-dimensao-canaleta__titulo';
+      titulo.textContent = `Linha ${indice + 1} de ${rascunho.canaleta_dimensoes.length}`;
+      cabecalho.appendChild(titulo);
+
+      if (rascunho.canaleta_dimensoes.length > 1) {
+        // So pode remover se sobrar ao menos 1 linha -- Dimensões
+        // continua obrigatória (VLD-042).
+        const botaoRemover = document.createElement('button');
+        botaoRemover.type = 'button';
+        botaoRemover.className = 'botao botao--perigo';
+        botaoRemover.style.width = 'auto';
+        botaoRemover.style.minHeight = '30px';
+        botaoRemover.style.padding = '0 0.7rem';
+        botaoRemover.style.fontSize = '0.78rem';
+        botaoRemover.textContent = 'Remover';
+        botaoRemover.addEventListener('click', function () {
+          rascunho.canaleta_dimensoes.splice(indice, 1);
+          renderizarLinhasDimensoesCanaleta();
+          salvarRascunhoAgora();
+        });
+        cabecalho.appendChild(botaoRemover);
+      }
+      cartaoLinha.appendChild(cabecalho);
+
+      const grade = document.createElement('div');
+      grade.className = 'grade-campos--dimensao-canaleta';
+
+      CAMPOS_DIMENSAO_CANALETA.forEach(function ([chave, rotulo]) {
+        const campoDiv = document.createElement('div');
+        campoDiv.className = 'campo';
+        const label = document.createElement('label');
+        label.className = 'texto-suave';
+        label.style.fontSize = '0.75rem';
+        label.textContent = rotulo;
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.step = '0.01';
+        input.min = '0';
+        input.value = linha[chave];
+        input.addEventListener('input', function () {
+          linha[chave] = input.value;
+          salvarRascunhoAgora();
+        });
+        campoDiv.appendChild(label);
+        campoDiv.appendChild(input);
+        grade.appendChild(campoDiv);
+      });
+      cartaoLinha.appendChild(grade);
+
+      containerDimensoesCanaleta.appendChild(cartaoLinha);
+    });
+
+    contadorDimensoesCanaleta.textContent = `${rascunho.canaleta_dimensoes.length} de ${MAXIMO_DIMENSOES_CANALETA} linhas usadas`;
+    botaoAdicionarDimensaoCanaleta.style.display =
+      rascunho.canaleta_dimensoes.length >= MAXIMO_DIMENSOES_CANALETA ? 'none' : '';
+  }
+
+  botaoAdicionarDimensaoCanaleta.addEventListener('click', function () {
+    if (rascunho.canaleta_dimensoes.length >= MAXIMO_DIMENSOES_CANALETA) return;
+    rascunho.canaleta_dimensoes.push(criarLinhaDimensaoCanaletaVazia());
+    renderizarLinhasDimensoesCanaleta();
+    salvarRascunhoAgora();
+  });
 
   function renderizarBlocoCanaleta() {
-    renderizarListaCheckbox(listaCanaletaAnomaliasEl, ANOMALIAS_CANALETA, rascunho.canaleta_anomalias, salvarRascunhoAgora);
+    renderizarListaCheckbox(listaCanaletaAnomaliasEl, ANOMALIAS_CANALETA, rascunho.canaleta_anomalias, aoMudarAnomaliaCanaleta);
+    renderizarListaCheckbox(listaCanaletaSubAnomaliasEl, SUB_ANOMALIAS_OBSTRUIDA_CANALETA, rascunho.canaleta_anomalias, aoMudarAnomaliaCanaleta);
+    atualizarVisibilidadeSubAnomaliasCanaleta();
     renderizarListaCheckbox(listaCanaletaLadoEl, LADOS_CANALETA, rascunho.canaleta_lados, salvarRascunhoAgora);
     campoCanaletaCriticidade.value = rascunho.canaleta_grau_criticidade || '';
+    campoCanaletaJustificativa.value = rascunho.canaleta_justificativa || '';
+    atualizarVisibilidadeJustificativaCanaleta();
     campoCanaletaCautela.value = rascunho.canaleta_necessita_cautela || '';
-    campoCanaletaLarguraInicial.value = rascunho.canaleta_largura_inicial || '';
-    campoCanaletaLarguraFinal.value = rascunho.canaleta_largura_final || '';
-    campoCanaletaAlturaInicial.value = rascunho.canaleta_altura_inicial || '';
-    campoCanaletaAlturaFinal.value = rascunho.canaleta_altura_final || '';
-    campoCanaletaComprimento.value = rascunho.canaleta_comprimento || '';
+    if (!rascunho.canaleta_dimensoes || rascunho.canaleta_dimensoes.length === 0) {
+      rascunho.canaleta_dimensoes = [criarLinhaDimensaoCanaletaVazia()];
+    }
+    renderizarLinhasDimensoesCanaleta();
   }
 
   campoCanaletaCriticidade.addEventListener('change', function () {
     rascunho.canaleta_grau_criticidade = campoCanaletaCriticidade.value;
+    atualizarVisibilidadeJustificativaCanaleta();
+    salvarRascunhoAgora();
+  });
+  campoCanaletaJustificativa.addEventListener('input', function () {
+    rascunho.canaleta_justificativa = campoCanaletaJustificativa.value;
     salvarRascunhoAgora();
   });
   campoCanaletaCautela.addEventListener('change', function () {
     rascunho.canaleta_necessita_cautela = campoCanaletaCautela.value;
     salvarRascunhoAgora();
   });
-
-  function ligarCampoDimensaoCanaleta(elemento, chave) {
-    elemento.addEventListener('input', function () {
-      rascunho[chave] = elemento.value;
-      salvarRascunhoAgora();
-    });
-  }
-  ligarCampoDimensaoCanaleta(campoCanaletaLarguraInicial, 'canaleta_largura_inicial');
-  ligarCampoDimensaoCanaleta(campoCanaletaLarguraFinal, 'canaleta_largura_final');
-  ligarCampoDimensaoCanaleta(campoCanaletaAlturaInicial, 'canaleta_altura_inicial');
-  ligarCampoDimensaoCanaleta(campoCanaletaAlturaFinal, 'canaleta_altura_final');
-  ligarCampoDimensaoCanaleta(campoCanaletaComprimento, 'canaleta_comprimento');
 
   const blocoTerceiros = document.getElementById('bloco-terceiros');
   const campoGrupoTerceirosOpMaquina = document.getElementById('campo-grupo-terceiros-op-maquina');
@@ -1120,12 +1285,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     rascunho.canaleta_anomalias.length = 0;
     rascunho.canaleta_lados.length = 0;
     rascunho.canaleta_grau_criticidade = '';
+    rascunho.canaleta_justificativa = '';
     rascunho.canaleta_necessita_cautela = '';
-    rascunho.canaleta_largura_inicial = '';
-    rascunho.canaleta_largura_final = '';
-    rascunho.canaleta_altura_inicial = '';
-    rascunho.canaleta_altura_final = '';
-    rascunho.canaleta_comprimento = '';
+    rascunho.canaleta_dimensoes = [criarLinhaDimensaoCanaletaVazia()];
   }
 
   function atualizarVisibilidadeServicos() {
@@ -1800,14 +1962,19 @@ document.addEventListener('DOMContentLoaded', async function () {
       canaleta: servicoRequerCanaletaSelecionado() ? {
         anomalias: rascunho.canaleta_anomalias,
         grau_criticidade: rascunho.canaleta_grau_criticidade || null,
+        justificativa: rascunho.canaleta_justificativa || null,
         necessita_cautela:
           rascunho.canaleta_necessita_cautela === 'sim' ? true :
           (rascunho.canaleta_necessita_cautela === 'nao' ? false : null),
-        largura_inicial: rascunho.canaleta_largura_inicial !== '' ? Number(rascunho.canaleta_largura_inicial) : null,
-        largura_final: rascunho.canaleta_largura_final !== '' ? Number(rascunho.canaleta_largura_final) : null,
-        altura_inicial: rascunho.canaleta_altura_inicial !== '' ? Number(rascunho.canaleta_altura_inicial) : null,
-        altura_final: rascunho.canaleta_altura_final !== '' ? Number(rascunho.canaleta_altura_final) : null,
-        comprimento: rascunho.canaleta_comprimento !== '' ? Number(rascunho.canaleta_comprimento) : null,
+        dimensoes: (rascunho.canaleta_dimensoes || []).map(function (linha) {
+          return {
+            largura_inicial: linha.largura_inicial !== '' ? Number(linha.largura_inicial) : null,
+            largura_final: linha.largura_final !== '' ? Number(linha.largura_final) : null,
+            altura_inicial: linha.altura_inicial !== '' ? Number(linha.altura_inicial) : null,
+            altura_final: linha.altura_final !== '' ? Number(linha.altura_final) : null,
+            comprimento: linha.comprimento !== '' ? Number(linha.comprimento) : null,
+          };
+        }),
         lados: rascunho.canaleta_lados,
       } : null,
       colaboradores: rascunho.colaboradores,

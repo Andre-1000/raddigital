@@ -23,6 +23,7 @@ from .models import (
     RadAnexo,
     RadCanaleta,
     RadCanaletaAnomalia,
+    RadCanaletaDimensao,
     RadCanaletaLado,
     RadColaborador,
     RadEquipe,
@@ -197,8 +198,15 @@ def _criar_bloco_canaleta(rad, payload):
     30/07/2026: cria o bloco Anomalias (RadCanaleta + anomalias/lados
     selecionados) quando presente no payload -- so existe quando o
     servico "Inspeção de Canaleta" foi selecionado, ja garantido pela
-    validacao (VLD-040 a VLD-044) antes de chegar aqui. Diferente do
+    validacao (VLD-040 a VLD-045) antes de chegar aqui. Diferente do
     bloco AMV, e um unico bloco por RAD (nao uma lista).
+
+    14/08/2026: 'justificativa' passou a ser gravada junto (so tem
+    valor real quando grau_criticidade e Media/Alta/Critica, mas gravar
+    sempre que vier preenchida e inofensivo -- mesmo padrao ja usado
+    para outros_servico_desc). 'dimensoes' agora e uma LISTA -- cada
+    item vira um RadCanaletaDimensao proprio, numerado na ordem em que
+    chegou (1-indexado, mesma ordem exibida no formulario).
     """
     canaleta_dados = payload.get('canaleta')
     if not canaleta_dados:
@@ -207,12 +215,8 @@ def _criar_bloco_canaleta(rad, payload):
     canaleta = RadCanaleta.objects.create(
         rad=rad,
         grau_criticidade=canaleta_dados['grau_criticidade'],
+        justificativa=canaleta_dados.get('justificativa') or None,
         necessita_cautela=bool(canaleta_dados['necessita_cautela']),
-        largura_inicial=canaleta_dados['largura_inicial'],
-        largura_final=canaleta_dados['largura_final'],
-        altura_inicial=canaleta_dados['altura_inicial'],
-        altura_final=canaleta_dados['altura_final'],
-        comprimento=canaleta_dados['comprimento'],
     )
     RadCanaletaAnomalia.objects.bulk_create(
         [
@@ -222,6 +226,20 @@ def _criar_bloco_canaleta(rad, payload):
     )
     RadCanaletaLado.objects.bulk_create(
         [RadCanaletaLado(canaleta=canaleta, lado=l) for l in canaleta_dados.get('lados', [])]
+    )
+    RadCanaletaDimensao.objects.bulk_create(
+        [
+            RadCanaletaDimensao(
+                canaleta=canaleta,
+                ordem=indice + 1,
+                largura_inicial=linha['largura_inicial'],
+                largura_final=linha['largura_final'],
+                altura_inicial=linha['altura_inicial'],
+                altura_final=linha['altura_final'],
+                comprimento=linha['comprimento'],
+            )
+            for indice, linha in enumerate(canaleta_dados.get('dimensoes', []))
+        ]
     )
 
 
@@ -390,7 +408,7 @@ def processar_sincronizacao(payload, usuario, fotos_intervencao=None, fotos_acao
     1. Calculo dos horarios derivados (regras_horario) -- necessario
        antes de validar, pois VLD-012/013 dependem dos DateTime
        completos ja calculados.
-    2. Validacao completa (RG-VLD-001 a 003, VLD-001 a 044, incluindo
+    2. Validacao completa (RG-VLD-001 a 003, VLD-001 a 045, incluindo
        os anexos e a configuracao de obrigatoriedade customizada do
        Administrador). Se houver qualquer erro, nao toca o banco nem o
        storage de arquivos (RG-VLD-002) e retorna (None, erros).

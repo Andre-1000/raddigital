@@ -266,13 +266,22 @@
     <!-- Anomalias (bloco Canaleta, 30/07/2026): aparece quando o
          servico "Inspecao de Canaleta" e selecionado (ver
          catalogos.models.CatServico.requer_canaleta). Ao contrario do
-         AMV, este bloco NAO se repete -- no maximo 1 por RAD. -->
+         AMV, este bloco NAO se repete -- no maximo 1 por RAD.
+         14/08/2026: sub-opcoes de obstrucao (aparecem so quando
+         "Obstruída" esta marcada), Justificativa (aparece so quando o
+         Grau de Criticidade e Media/Alta/Critica) e Dimensões virou
+         uma lista de linhas repetiveis com botao "+". -->
     <div class="cartao" id="bloco-canaleta" style="margin-top:1rem; display:none;">
       <h2 style="font-size:1rem;">Anomalias</h2>
 
       <div class="campo">
         <label>Anomalias <span class="obrigatorio">*</span></label>
         <div class="grade-checkboxes" id="lista-canaleta-anomalias"></div>
+      </div>
+
+      <div class="campo" id="grupo-canaleta-obstrucao" style="display:none;">
+        <label class="texto-suave" style="font-size:0.85rem;">Tipo de obstrução <span class="obrigatorio">*</span></label>
+        <div class="grade-checkboxes grade-checkboxes--sub" id="lista-canaleta-sub-anomalias"></div>
       </div>
 
       <div class="campo">
@@ -286,30 +295,19 @@
         </select>
       </div>
 
+      <div class="campo" id="campo-grupo-canaleta-justificativa" style="display:none;">
+        <label for="campo-canaleta-justificativa">Justificativa <span class="obrigatorio">*</span></label>
+        <textarea id="campo-canaleta-justificativa"></textarea>
+      </div>
+
       <div class="campo">
         <label>Dimensões <span class="obrigatorio">*</span></label>
-        <div class="grade-campos grade-campos--compacta">
-          <div class="campo">
-            <label for="campo-canaleta-largura-inicial" class="texto-suave" style="font-size:0.8rem;">Largura Inicial (m)</label>
-            <input type="number" id="campo-canaleta-largura-inicial" step="0.01" min="0" required>
-          </div>
-          <div class="campo">
-            <label for="campo-canaleta-largura-final" class="texto-suave" style="font-size:0.8rem;">Largura Final (m)</label>
-            <input type="number" id="campo-canaleta-largura-final" step="0.01" min="0" required>
-          </div>
-          <div class="campo">
-            <label for="campo-canaleta-altura-inicial" class="texto-suave" style="font-size:0.8rem;">Altura Inicial (m)</label>
-            <input type="number" id="campo-canaleta-altura-inicial" step="0.01" min="0" required>
-          </div>
-          <div class="campo">
-            <label for="campo-canaleta-altura-final" class="texto-suave" style="font-size:0.8rem;">Altura Final (m)</label>
-            <input type="number" id="campo-canaleta-altura-final" step="0.01" min="0" required>
-          </div>
-          <div class="campo">
-            <label for="campo-canaleta-comprimento" class="texto-suave" style="font-size:0.8rem;">Comprimento (m)</label>
-            <input type="number" id="campo-canaleta-comprimento" step="0.01" min="0" required>
-          </div>
-        </div>
+        <div id="container-canaleta-dimensoes"></div>
+        <button type="button" class="botao botao--secundaria" id="botao-adicionar-dimensao-canaleta"
+                style="width:auto; min-height:36px; padding:0 0.9rem; margin-top:0.2rem; font-size:0.85rem;">
+          + Adicionar linha
+        </button>
+        <p class="texto-suave centro" id="contador-dimensoes-canaleta" style="font-size:0.8rem; margin-top:0.4rem;"></p>
       </div>
 
       <div class="campo">
@@ -667,6 +665,16 @@
     gap: 0.5rem;
     font-weight: 400;
   }
+  /* Sub-opcoes condicionais (14/08/2026: tipo de obstrucao da
+     Canaleta, so aparece quando "Obstruida" esta marcada) -- recuo +
+     borda a esquerda pra deixar visualmente claro que "pertencem" a
+     opcao pai, mesmo padrao visual de hierarquia usado em formularios
+     encadeados. */
+  .grade-checkboxes--sub {
+    margin-top: 0.4rem;
+    padding-left: 0.8rem;
+    border-left: 3px solid var(--cor-linha);
+  }
   /* Blocos expansiveis de Servicos Executados (Geral/Infra/Corretiva/
      Mecanizada, 30/07/2026). Empilhados verticalmente -- cada grupo
      ocupa a largura toda, sem grid de colunas, pra um grupo aberto
@@ -752,6 +760,45 @@
     gap: 1rem;
     flex-wrap: wrap;
     margin-top: 0.5rem;
+  }
+
+  /* Linhas de Dimensões da Canaleta (14/08/2026) -- cada linha e um
+     cartao com os 5 campos lado a lado, menores que o padrao pra
+     caberem juntos numa linha so no computador (pedido do André).
+     Colapsa pra grade normal em telas estreitas, igual as outras
+     grades responsivas do formulario. */
+  .linha-dimensao-canaleta {
+    border: 1px solid var(--cor-linha);
+    border-radius: var(--raio-pequeno);
+    padding: 0.6rem 0.7rem;
+    margin-bottom: 0.6rem;
+  }
+  .linha-dimensao-canaleta__cabecalho {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.4rem;
+  }
+  .linha-dimensao-canaleta__titulo {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--cor-tinta-suave);
+    margin: 0;
+  }
+  .grade-campos--dimensao-canaleta {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(90px, 1fr));
+    gap: 0.5rem 0.6rem;
+  }
+  @media (max-width: 700px) {
+    .grade-campos--dimensao-canaleta {
+      grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    }
+  }
+  .grade-campos--dimensao-canaleta input {
+    padding: 0.45rem 0.5rem;
+    font-size: 0.85rem;
+    min-height: 38px;
   }
 </style>
 {% endblock %}

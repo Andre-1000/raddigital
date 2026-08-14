@@ -31,7 +31,30 @@ ANOMALIAS_CANALETA_VALIDAS = {
     'limpa', 'obstruida', 'ausente', 'quebrada', 'vegetacao',
     'lastro', 'lixo', 'dormentes', 'entulho', 'terra',
 }
+# 14/08/2026: Vegetacao/Lastro/Lixo/Dormentes/Entulho/Terra deixaram de
+# ser anomalias "soltas" na tela -- agora sao sub-opcoes que so fazem
+# sentido (e so aparecem no formulario) quando "Obstruida" tambem foi
+# marcada. VLD-040 passa a exigir ao menos uma delas nesse caso.
+SUB_ANOMALIAS_OBSTRUIDA_CANALETA = {
+    'vegetacao', 'lastro', 'lixo', 'dormentes', 'entulho', 'terra',
+}
 LADOS_CANALETA_VALIDOS = {'direito', 'esquerdo', 'entrevia'}
+
+# 14/08/2026: Grau de Criticidade Media/Alta/Critica passa a exigir o
+# campo Justificativa (VLD-045). Baixa continua sem exigir nada extra.
+GRAUS_CRITICIDADE_EXIGEM_JUSTIFICATIVA = {'media', 'alta', 'critica'}
+
+# 14/08/2026: Dimensoes deixou de ser um conjunto fixo de 5 medidas e
+# virou uma lista de linhas repetiveis (mesmo padrao do bloco AMV) --
+# no minimo 1, no maximo LIMITE_DIMENSOES_CANALETA.
+LIMITE_DIMENSOES_CANALETA = 10
+_CAMPOS_DIMENSAO_CANALETA = {
+    'largura_inicial': 'Largura Inicial',
+    'largura_final': 'Largura Final',
+    'altura_inicial': 'Altura Inicial',
+    'altura_final': 'Altura Final',
+    'comprimento': 'Comprimento',
+}
 
 
 def _erro(codigo, campo, mensagem):
@@ -404,12 +427,61 @@ def _validar_bloco_amv(payload, erros):
             )
 
 
+def _validar_dimensoes_canaleta(canaleta, erros):
+    """
+    VLD-042 (revisado 14/08/2026): Dimensoes deixou de ser um unico
+    conjunto de 5 medidas e virou uma lista de linhas (mesma ideia do
+    bloco AMV) -- no minimo 1 linha, no maximo LIMITE_DIMENSOES_CANALETA.
+    Cada linha precisa das mesmas 5 medidas de antes, todas numericas e
+    nao-negativas.
+    """
+    dimensoes = canaleta.get('dimensoes') or []
+    if not dimensoes:
+        erros.append(_erro('VLD-042', 'canaleta.dimensoes', 'Adicione ao menos uma linha de Dimensões.'))
+        return
+
+    if len(dimensoes) > LIMITE_DIMENSOES_CANALETA:
+        erros.append(
+            _erro(
+                'VLD-042', 'canaleta.dimensoes',
+                f'No máximo {LIMITE_DIMENSOES_CANALETA} linhas de Dimensões.',
+            )
+        )
+
+    for indice, linha in enumerate(dimensoes):
+        prefixo = f'canaleta.dimensoes[{indice}]'
+        for campo, rotulo in _CAMPOS_DIMENSAO_CANALETA.items():
+            valor = linha.get(campo) if isinstance(linha, dict) else None
+            if valor is None or valor == '':
+                erros.append(
+                    _erro('VLD-042', f'{prefixo}.{campo}', f'Informe {rotulo} na linha {indice + 1}.')
+                )
+                continue
+            try:
+                if float(valor) < 0:
+                    erros.append(
+                        _erro('VLD-042', f'{prefixo}.{campo}', f'{rotulo} não pode ser negativo (linha {indice + 1}).')
+                    )
+            except (TypeError, ValueError):
+                erros.append(
+                    _erro('VLD-042', f'{prefixo}.{campo}', f'{rotulo} deve ser um número (linha {indice + 1}).')
+                )
+
+
 def _validar_bloco_canaleta(payload, erros):
     """
-    VLD-040 a VLD-044 (30/07/2026): bloco "Anomalias", exigido somente
-    quando o servico "Inspeção de Canaleta" (CatServico.requer_canaleta)
-    foi selecionado. Diferente do bloco AMV, e um unico bloco (nao uma
-    lista) -- so existe 1 inspecao de canaleta por RAD.
+    VLD-040 a VLD-045 (30/07/2026, revisado 14/08/2026): bloco
+    "Anomalias", exigido somente quando o servico "Inspeção de
+    Canaleta" (CatServico.requer_canaleta) foi selecionado. Diferente
+    do bloco AMV, e um unico bloco (nao uma lista) -- so existe 1
+    inspecao de canaleta por RAD.
+
+    Regras em cascata adicionadas em 14/08/2026 (mesmo padrao ja usado
+    para "Outros" em Servicos/Tipo de Defeito AMV: uma opcao "guarda-
+    chuva" so libera o campo seguinte quando ela propria e escolhida):
+      - "Obstruída" marcada -> exige ao menos um tipo de obstrução
+        (Vegetação/Lastro/Lixo/Dormentes/Entulho/Terra).
+      - Grau de Criticidade Média/Alta/Crítica -> exige Justificativa.
     """
     servicos_ids = payload.get('servicos') or []
     canaleta_selecionada = CatServico.objects.filter(
@@ -425,30 +497,32 @@ def _validar_bloco_canaleta(payload, erros):
         erros.append(_erro('VLD-040', 'canaleta.anomalias', 'Selecione ao menos uma Anomalia.'))
     elif any(a not in ANOMALIAS_CANALETA_VALIDAS for a in anomalias):
         erros.append(_erro('VLD-040', 'canaleta.anomalias', 'Anomalia inválida.'))
+    elif 'obstruida' in anomalias and not any(
+        a in SUB_ANOMALIAS_OBSTRUIDA_CANALETA for a in anomalias
+    ):
+        erros.append(
+            _erro(
+                'VLD-040', 'canaleta.anomalias',
+                'Selecione ao menos um tipo de obstrução (Vegetação, Lastro, Lixo, Dormentes, Entulho ou Terra).',
+            )
+        )
 
     grau = canaleta.get('grau_criticidade')
     if not grau:
         erros.append(_erro('VLD-041', 'canaleta.grau_criticidade', 'Selecione o Grau de Criticidade.'))
     elif grau not in GRAUS_CRITICIDADE_VALIDOS:
         erros.append(_erro('VLD-041', 'canaleta.grau_criticidade', 'Grau de Criticidade inválido.'))
+    elif grau in GRAUS_CRITICIDADE_EXIGEM_JUSTIFICATIVA and not str(
+        canaleta.get('justificativa') or ''
+    ).strip():
+        erros.append(
+            _erro(
+                'VLD-045', 'canaleta.justificativa',
+                'Informe a Justificativa quando o Grau de Criticidade for Média, Alta ou Crítica.',
+            )
+        )
 
-    campos_dimensao = {
-        'largura_inicial': 'Largura Inicial',
-        'largura_final': 'Largura Final',
-        'altura_inicial': 'Altura Inicial',
-        'altura_final': 'Altura Final',
-        'comprimento': 'Comprimento',
-    }
-    for campo, rotulo in campos_dimensao.items():
-        valor = canaleta.get(campo)
-        if valor is None or valor == '':
-            erros.append(_erro('VLD-042', f'canaleta.{campo}', f'Informe {rotulo}.'))
-            continue
-        try:
-            if float(valor) < 0:
-                erros.append(_erro('VLD-042', f'canaleta.{campo}', f'{rotulo} não pode ser negativo.'))
-        except (TypeError, ValueError):
-            erros.append(_erro('VLD-042', f'canaleta.{campo}', f'{rotulo} deve ser um número.'))
+    _validar_dimensoes_canaleta(canaleta, erros)
 
     if canaleta.get('necessita_cautela') is None:
         erros.append(_erro('VLD-043', 'canaleta.necessita_cautela', 'Informe se necessita de cautela.'))
@@ -625,7 +699,7 @@ def _aplicar_configuracao_obrigatoriedade(payload, erros):
 def validar_payload_sincronizacao(payload, *, hoje):
     """
     Executa todas as validacoes de bloqueio da sincronizacao (VLD-001 a
-    VLD-044, exceto VLD-023/024 que exigem os arquivos de anexo, ver
+    VLD-045, exceto VLD-023/024 que exigem os arquivos de anexo, ver
     rad.validadores_arquivos).
 
     payload deve conter, alem dos campos brutos do formulario, os campos
