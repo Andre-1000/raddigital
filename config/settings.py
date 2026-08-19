@@ -29,6 +29,14 @@ DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
+# CORS: libera o domínio do Hub (Ferramenta de Atalhos) a chamar a API
+# do RAD (login, validação de token) direto do navegador. Sem isso, o
+# navegador bloqueia a chamada por vir de um domínio diferente.
+# Documento de continuidade do Hub, decisão 1 (CORS).
+CORS_ALLOWED_ORIGINS = os.getenv(
+    'CORS_ALLOWED_ORIGINS', 'https://hub-atalhos.onrender.com'
+).split(',')
+
 # Producao: forca HTTPS e cookies seguros quando DEBUG=False. Nao afeta
 # desenvolvimento local (DEBUG=True), entao nao muda nada do fluxo
 # existente -- so passa a valer quando alguem configurar DEBUG=False
@@ -56,6 +64,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'storages',
+    'corsheaders',
     # Apps do Sistema RAD (PADROES_E_DIRETRIZES secao 4.3)
     'usuarios',
     'rad',
@@ -151,6 +160,11 @@ LIMITE_TAMANHO_ARQUIVO_BYTES = 10 * 1024 * 1024  # 10MB
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # CORS: precisa ficar o mais alto possível na lista, antes de
+    # qualquer middleware que possa gerar uma resposta (ex:
+    # CommonMiddleware) -- exigência da própria documentação do
+    # django-cors-headers.
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
