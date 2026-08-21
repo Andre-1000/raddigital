@@ -7,6 +7,10 @@ app_name = 'consulta'
 urlpatterns = [
     path('rads/', views.listar_rads, name='listar_rads'),
     path('meus-rads/', views.listar_meus_rads, name='listar_meus_rads'),
+    # exportar-excel/ precisa vir ANTES de rads/<str:numero_rad>/ --
+    # senao o Django casaria "exportar-excel" como se fosse um
+    # numero_rad, e essa rota nunca seria alcancada.
+    path('rads/exportar-excel/', views.exportar_excel, name='exportar_excel'),
     path('rads/<str:numero_rad>/', views.detalhe_rad, name='detalhe_rad'),
     path('rads/<str:numero_rad>/mensagem/', views.mensagem_copiar, name='mensagem_copiar'),
     path('rads/<str:numero_rad>/docx-oficial/', views.exportar_docx_oficial, name='exportar_docx_oficial'),

@@ -189,7 +189,16 @@ class Rad(models.Model):
     )
 
     # --- Exportacao / Sincronizacao ---------------------------------------
-    exportado = models.BooleanField(default=False)
+    # data_ultima_exportacao_excel (21/08/2026): substitui o antigo campo
+    # 'exportado' (booleano, nunca usado em nenhum lugar do sistema --
+    # confirmado 0 registros com valor True antes da remocao). Guarda
+    # QUANDO o RAD foi incluido pela ultima vez numa exportacao Excel,
+    # nao so um SIM/NAO -- da historico/auditoria e permite que o
+    # endpoint 'Exportar novos para Excel'
+    # (consulta/views.py::exportar_excel) filtre automaticamente so o
+    # que ainda nao foi exportado (data_ultima_exportacao_excel IS
+    # NULL), sem controle manual.
+    data_ultima_exportacao_excel = models.DateTimeField(null=True, blank=True)
     status = models.CharField(
         max_length=20, choices=STATUS_CHOICES, default=SINCRONIZADO
     )

@@ -10,9 +10,12 @@ proprio login.
 22/07/2026: exportacao pos-sincronizacao agora usa exclusivamente o
 layout oficial (rad/exportacao_oficial.py) -- o antigo layout simples
 (rad/exportacao.py, endpoints /pdf/ e /docx/) foi descontinuado.
+
+21/08/2026: nova exportacao em Excel (rad/exportacao_excel.py) --
 """
 from django.core.paginator import Paginator
 from django.http import FileResponse, HttpResponse, JsonResponse
+from django.utils import timezone
 
 from comum.datas import parse_data, parse_datetime_aware
 from usuarios.decorators import requer_perfil, requer_token
@@ -380,6 +383,64 @@ def exportar_pdf_oficial(request, numero_rad):
 
     resposta = HttpResponse(pdf_bytes, content_type='application/pdf')
     resposta['Content-Disposition'] = f'attachment; filename="{rad.numero_rad}.pdf"'
+    return resposta
+
+
+@requer_token
+@requer_perfil(UsuarioPerfil.ADMINISTRADOR)
+def exportar_excel(request):
+    """
+    GET /consulta/rads/exportar-excel/?<filtros iguais a listar_rads>&incluir_exportados=1
+    21/08/2026. Acesso: somente Administrador -- essa tela fica
+    reservada, diferente da Consulta (Supervisor+Administrador).
+
+    Por padrao, so entram RADs ainda nao exportados
+    (data_ultima_exportacao_excel IS NULL) -- cada exportacao nova traz
+    automaticamente so o que e novidade desde a ultima vez, sem
+    controle manual de quem ja pegou o que. Passar
+    ?incluir_exportados=1 desliga esse filtro padrao (util para
+    reexportar um periodo especifico, ex.: recuperar um arquivo
+    perdido).
+
+    Reaproveita os mesmos filtros de listar_rads (_aplicar_filtros) --
+    a pessoa pode restringir por data, status etc. antes de exportar,
+    exatamente como ja faz na tela de Consulta.
+    """
+    queryset = Rad.objects.select_related(
+        'local_inicial', 'local_final', 'tipo_manutencao', 'usuario',
+        'motivo_atraso_inicio', 'motivo_atraso_termino',
+    ).prefetch_related(
+        'linhas', 'vias', 'equipes', 'servicos__servico', 'amv_blocos__mch', 'colaboradores',
+    ).order_by('numero_rad')
+
+    queryset = _aplicar_filtros(queryset, request.GET)
+
+    if request.GET.get('incluir_exportados') != '1':
+        queryset = queryset.filter(data_ultima_exportacao_excel__isnull=True)
+
+    rads = list(queryset)
+
+    if not rads:
+        return JsonResponse(
+            {'erro': 'Nenhum RAD encontrado para exportar com os filtros informados.'},
+            status=404,
+        )
+
+    from rad.exportacao_excel import gerar_excel_bytes
+
+    excel_bytes = gerar_excel_bytes(rads)
+
+    agora = timezone.now()
+    Rad.objects.filter(id_rad__in=[rad.id_rad for rad in rads]).update(
+        data_ultima_exportacao_excel=agora
+    )
+
+    resposta = HttpResponse(
+        excel_bytes,
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    nome_arquivo = f'rads_export_{agora.strftime("%Y%m%d_%H%M%S")}.xlsx'
+    resposta['Content-Disposition'] = f'attachment; filename="{nome_arquivo}"'
     return resposta
 
 
