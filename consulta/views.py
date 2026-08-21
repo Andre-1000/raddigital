@@ -100,6 +100,17 @@ def _aplicar_filtros(queryset, params):
         queryset = queryset.filter(
             data_hora_real_inicio__lte=parse_datetime_aware(params['hr_inicio_ate'])
         )
+    # status_exportacao (21/08/2026): filtro do Administrador na tela
+    # de Consulta para mostrar so RADs ja exportados para Excel, so os
+    # nao exportados, ou todos (sem informar o parametro). Reaproveitado
+    # tanto por listar_rads (o que aparece na tela) quanto por
+    # exportar_excel (o que entra no arquivo) -- garante que o botao
+    # "Exportar" sempre exporta exatamente os RADs que estao sendo
+    # exibidos como resultado da pesquisa, nunca um conjunto diferente.
+    if params.get('status_exportacao') == 'exportado':
+        queryset = queryset.filter(data_ultima_exportacao_excel__isnull=False)
+    elif params.get('status_exportacao') == 'nao_exportado':
+        queryset = queryset.filter(data_ultima_exportacao_excel__isnull=True)
     return queryset
 
 
@@ -128,6 +139,10 @@ def _linha_resumo(rad):
         'hora_prog_inicio': rad.hora_prog_inicio.isoformat(),
         'hora_real_inicio': rad.hora_real_inicio.isoformat(),
         'dispositivo': rad.get_dispositivo_display(),
+        # 21/08/2026: usado pelo Administrador na tela de Consulta para
+        # ver, sem precisar abrir o detalhe, se o RAD ja entrou em
+        # alguma exportacao Excel.
+        'exportado_excel': rad.data_ultima_exportacao_excel is not None,
     }
 
 
@@ -390,21 +405,17 @@ def exportar_pdf_oficial(request, numero_rad):
 @requer_perfil(UsuarioPerfil.ADMINISTRADOR)
 def exportar_excel(request):
     """
-    GET /consulta/rads/exportar-excel/?<filtros iguais a listar_rads>&incluir_exportados=1
+    GET /consulta/rads/exportar-excel/?<mesmos filtros de listar_rads, incluindo status_exportacao>
     21/08/2026. Acesso: somente Administrador -- essa tela fica
     reservada, diferente da Consulta (Supervisor+Administrador).
 
-    Por padrao, so entram RADs ainda nao exportados
-    (data_ultima_exportacao_excel IS NULL) -- cada exportacao nova traz
-    automaticamente so o que e novidade desde a ultima vez, sem
-    controle manual de quem ja pegou o que. Passar
-    ?incluir_exportados=1 desliga esse filtro padrao (util para
-    reexportar um periodo especifico, ex.: recuperar um arquivo
-    perdido).
-
-    Reaproveita os mesmos filtros de listar_rads (_aplicar_filtros) --
-    a pessoa pode restringir por data, status etc. antes de exportar,
-    exatamente como ja faz na tela de Consulta.
+    Exporta exatamente o mesmo conjunto de RADs que a tela de Consulta
+    mostra como resultado com os filtros aplicados (mesma funcao
+    _aplicar_filtros de listar_rads) -- nao ha regra implicita de "so
+    exporta o que nunca foi exportado" aqui; quem decide isso e o
+    filtro status_exportacao ('exportado' / 'nao_exportado' / ausente
+    = todos), escolhido pelo Administrador na propria tela antes de
+    clicar em "Exportar".
     """
     queryset = Rad.objects.select_related(
         'local_inicial', 'local_final', 'tipo_manutencao', 'usuario',
@@ -414,9 +425,6 @@ def exportar_excel(request):
     ).order_by('numero_rad')
 
     queryset = _aplicar_filtros(queryset, request.GET)
-
-    if request.GET.get('incluir_exportados') != '1':
-        queryset = queryset.filter(data_ultima_exportacao_excel__isnull=True)
 
     rads = list(queryset)
 

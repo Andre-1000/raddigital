@@ -116,11 +116,28 @@
         <label for="filtro-hr-inicio-ate">Hora real início — até</label>
         <input type="datetime-local" id="filtro-hr-inicio-ate">
       </div>
+
+      <!-- 21/08/2026: filtro exclusivo do Administrador -- controla
+           tanto o que aparece na lista abaixo quanto o que o botao
+           "Exportar Excel" vai incluir no arquivo, sempre os mesmos
+           RADs. Escondido para Supervisor (so aparece via JS). -->
+      <div class="campo" id="campo-filtro-status-exportacao" style="display:none;">
+        <label for="filtro-status-exportacao">Exportação Excel</label>
+        <select id="filtro-status-exportacao">
+          <option value="">Todos</option>
+          <option value="nao_exportado">Ainda não exportados</option>
+          <option value="exportado">Já exportados</option>
+        </select>
+      </div>
     </div>
 
     <div class="linha-acoes">
       <button type="button" class="botao botao--primaria" id="botao-filtrar">Pesquisar</button>
       <button type="button" class="botao botao--secundaria" id="botao-limpar-filtros">Limpar filtros</button>
+      <!-- 21/08/2026: exclusivo do Administrador -- exporta exatamente
+           os RADs que aparecem como resultado da pesquisa atual (mesmos
+           filtros, incluindo o de status de exportação acima). -->
+      <button type="button" class="botao botao--secundaria" id="botao-exportar-excel" style="display:none;">Exportar Excel</button>
     </div>
   </div>
 
@@ -145,6 +162,15 @@
       return;
     }
     document.getElementById('conteudo-protegido').style.display = '';
+
+    // 21/08/2026: filtro de status de exportação e botão de exportar
+    // Excel são exclusivos do Administrador -- Supervisor continua
+    // vendo a tela exatamente como antes.
+    const ehAdministrador = RadAuth.temPerfil('administrador');
+    if (ehAdministrador) {
+      document.getElementById('campo-filtro-status-exportacao').style.display = '';
+      document.getElementById('botao-exportar-excel').style.display = '';
+    }
 
     const lista = document.getElementById('lista-rads');
     const aviso = document.getElementById('aviso-consulta');
@@ -273,12 +299,10 @@
       });
     }
 
-    async function carregarLista() {
-      aviso.innerHTML = '';
-      mensagemVazia.style.display = 'none';
-      mensagemAntesDePesquisar.style.display = 'none';
-      lista.innerHTML = '';
-
+    // 21/08/2026: extraida de carregarLista para ser reaproveitada
+    // pelo botao "Exportar Excel" -- garante que a pesquisa e a
+    // exportacao usem exatamente os mesmos criterios, sempre.
+    function montarParametrosFiltro() {
       const parametros = new URLSearchParams();
 
       function definirSeExistir(idCampo, nomeParametro) {
@@ -304,6 +328,20 @@
       definirSeExistir('filtro-hp-inicio-ate', 'hp_inicio_ate');
       definirSeExistir('filtro-hr-inicio-de', 'hr_inicio_de');
       definirSeExistir('filtro-hr-inicio-ate', 'hr_inicio_ate');
+      if (ehAdministrador) {
+        definirSeExistir('filtro-status-exportacao', 'status_exportacao');
+      }
+
+      return parametros;
+    }
+
+    async function carregarLista() {
+      aviso.innerHTML = '';
+      mensagemVazia.style.display = 'none';
+      mensagemAntesDePesquisar.style.display = 'none';
+      lista.innerHTML = '';
+
+      const parametros = montarParametrosFiltro();
 
       try {
         const resposta = await RadAuth.requisicaoAutenticada(`/consulta/rads/?${parametros.toString()}`);
@@ -325,10 +363,17 @@
           item.style.textDecoration = 'none';
           item.href = `/consultar/${rad.numero_rad}/`;
           const dispositivoTexto = rad.dispositivo ? ` · ${rad.dispositivo}` : '';
+          // 21/08/2026: selo "Exportado" so aparece para o
+          // Administrador, ja que so ele ve o filtro correspondente.
+          const seloExportado = ehAdministrador
+            ? (rad.exportado_excel
+                ? ' <span class="selo selo--online" style="font-size:0.7rem;">Exportado</span>'
+                : ' <span class="selo selo--offline" style="font-size:0.7rem;">Não exportado</span>')
+            : '';
           item.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <strong>${rad.numero_rad}</strong>
-              ${seloStatus(rad.status)}
+              <span>${seloStatus(rad.status)}${seloExportado}</span>
             </div>
             <div class="texto-suave" style="margin-top:0.35rem; font-size:0.9rem;">
               OS ${rad.numero_os} · ${rad.data_preenchimento} · ${rad.tipo_manutencao}${dispositivoTexto}
@@ -356,9 +401,10 @@
         'filtro-local-inicial', 'filtro-local-final', 'filtro-tipo-manutencao',
         'filtro-numero-falha', 'filtro-mch', 'filtro-linha-mch',
         'filtro-login-usuario', 'filtro-dispositivo', 'filtro-hp-inicio-de', 'filtro-hp-inicio-ate',
-        'filtro-hr-inicio-de', 'filtro-hr-inicio-ate',
+        'filtro-hr-inicio-de', 'filtro-hr-inicio-ate', 'filtro-status-exportacao',
       ].forEach(function (id) {
-        document.getElementById(id).value = '';
+        const elemento = document.getElementById(id);
+        if (elemento) elemento.value = '';
       });
       document.getElementById('filtro-login-usuario-busca').value = '';
       document.getElementById('resultados-login-usuario').innerHTML = '';
@@ -372,6 +418,53 @@
 
     document.getElementById('botao-filtrar').addEventListener('click', carregarLista);
     document.getElementById('botao-limpar-filtros').addEventListener('click', limparFiltros);
+
+    // ---- Exportar Excel (21/08/2026, exclusivo do Administrador) -------
+    // Exporta exatamente os RADs que estao aparecendo como resultado
+    // da pesquisa atual -- reaproveita montarParametrosFiltro, os
+    // mesmos criterios usados por carregarLista.
+    if (ehAdministrador) {
+      const botaoExportar = document.getElementById('botao-exportar-excel');
+      botaoExportar.addEventListener('click', async function () {
+        aviso.innerHTML = '';
+        botaoExportar.disabled = true;
+        const textoOriginal = botaoExportar.textContent;
+        botaoExportar.textContent = 'Exportando…';
+
+        try {
+          const parametros = montarParametrosFiltro();
+          const resposta = await RadAuth.requisicaoAutenticada(
+            `/consulta/rads/exportar-excel/?${parametros.toString()}`
+          );
+
+          if (!resposta.ok) {
+            const corpo = await resposta.json().catch(function () { return {}; });
+            aviso.innerHTML = `<div class="aviso aviso--erro">${corpo.erro || 'Não foi possível gerar a exportação.'}</div>`;
+            return;
+          }
+
+          const blob = await resposta.blob();
+          const urlObjeto = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = urlObjeto;
+          link.download = 'rads_export.xlsx';
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(urlObjeto);
+
+          aviso.innerHTML = '<div class="aviso aviso--sucesso">Exportação gerada. Os RADs incluídos foram marcados como exportados.</div>';
+          // Recarrega a lista para refletir o novo status de exportação
+          // nos selos, caso o filtro de status_exportacao esteja ativo.
+          await carregarLista();
+        } catch (erro) {
+          aviso.innerHTML = '<div class="aviso aviso--erro">Erro de conexão ao exportar.</div>';
+        } finally {
+          botaoExportar.disabled = false;
+          botaoExportar.textContent = textoOriginal;
+        }
+      });
+    }
 
     // So carrega os catalogos usados nos selects de filtro -- a lista
     // de RADs so aparece depois que a pessoa definir criterios e
