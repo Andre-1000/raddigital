@@ -16,6 +16,7 @@ de Consulta ou a API, nao o Excel.
 """
 import io
 
+from django.utils import timezone as django_timezone
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 
@@ -55,6 +56,20 @@ def _valor_ou_vazio(valor):
     return valor if valor not in (None, '') else ''
 
 
+def _sem_timezone(valor_datetime):
+    """
+    O Excel (e o openpyxl) nao aceita datetime com timezone -- so
+    aceita "horario de parede" puro. Django guarda data_sincronizacao
+    com timezone (USE_TZ=True); converte para o horario local
+    configurado no projeto e remove o tzinfo antes de gravar na
+    celula, para nao perder as 3h de diferenca (UTC vs America/Sao_Paulo)
+    silenciosamente.
+    """
+    if valor_datetime is None:
+        return None
+    return django_timezone.localtime(valor_datetime).replace(tzinfo=None)
+
+
 def _linha_para_rad(rad):
     return {
         'numero_rad': rad.numero_rad,
@@ -88,7 +103,7 @@ def _linha_para_rad(rad):
         'colaboradores': '; '.join(c.nome for c in rad.colaboradores.all()),
         'login_usuario': rad.usuario_id,
         'dispositivo': rad.get_dispositivo_display(),
-        'data_sincronizacao': rad.data_sincronizacao,
+        'data_sincronizacao': _sem_timezone(rad.data_sincronizacao),
     }
 
 
