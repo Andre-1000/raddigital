@@ -10,10 +10,16 @@
 </style>
 {% endblock %}
 
+{% block cabecalho_hero_corpo %}
+<div class="cabecalho-hero__corpo">
+  <div class="cabecalho-hero__rotulo">Painel administrativo</div>
+  <h1 class="cabecalho-hero__titulo">Consultar RADs</h1>
+  <p class="cabecalho-hero__subtitulo">Filtre por OS, data, técnico, status ou local para localizar um RAD já sincronizado.</p>
+</div>
+{% endblock %}
+
 {% block conteudo %}
 <div id="conteudo-protegido" style="display:none;">
-  <h1 style="font-size:1.3rem;">Consultar RADs</h1>
-
   <div class="cartao">
     <div class="grade-campos">
       <div class="campo">

@@ -6,76 +6,43 @@
   <meta name="theme-color" content="#242472">
   <title>{% block titulo %}Sistema RAD{% endblock %}</title>
   <link rel="stylesheet" href="{% static 'interface/css/estilo.css' %}">
-  <style>
-    .barra-topo__esquerda {
-      display: flex;
-      align-items: center;
-      gap: 1.1rem;
-    }
-    .barra-topo__nav {
-      display: flex;
-      align-items: center;
-      gap: 0.9rem;
-    }
-    .barra-topo__nav-botao {
-      background: none;
-      border: none;
-      color: inherit;
-      font-weight: 600;
-      font-size: 0.85rem;
-      cursor: pointer;
-      padding: 0.3rem 0;
-      text-decoration: none;
-      min-height: var(--alvo-toque);
-      display: inline-flex;
-      align-items: center;
-      gap: 0.3rem;
-    }
-    .barra-topo__usuario {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-    .barra-topo__link-senha {
-      font-size: 0.8rem;
-      font-weight: 600;
-      text-decoration: none;
-      color: inherit;
-      opacity: 0.85;
-    }
-  </style>
   {% block cabecalho_extra %}{% endblock %}
 </head>
 <body>
 
 {% block barra_topo %}
-<header class="barra-topo">
-  <div class="barra-topo__esquerda">
-    <div class="barra-topo__nav">
-      <button type="button" class="barra-topo__nav-botao" id="botao-voltar-topo" title="Voltar para a tela anterior">
+<header class="cabecalho-hero">
+  <div class="cabecalho-hero__nav">
+    <div style="display:flex; align-items:center; gap:1.1rem;">
+      <button type="button" class="pilula" id="botao-voltar-topo" title="Voltar para a tela anterior">
         ← Voltar
       </button>
-      <a class="barra-topo__nav-botao" href="{% url 'interface:inicio' %}" title="Ir para o início">
+      <a class="pilula" href="{% url 'interface:inicio' %}" title="Ir para o início">
         Home
       </a>
+      <a class="cabecalho-hero__marca" href="{% url 'interface:inicio' %}">
+        <svg class="trilho" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect width="24" height="24" rx="6" fill="#fffcff"/>
+          <path d="M8 5v14M16 5v14" stroke="#242472" stroke-width="2" stroke-linecap="round"/>
+          <path d="M8 9h8M8 14h8" stroke="#fa5e13" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+        RAD
+      </a>
     </div>
-    <a class="barra-topo__marca" href="{% url 'interface:inicio' %}">
-      <svg class="trilho" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <rect width="24" height="24" rx="6" fill="#242472"/>
-        <path d="M8 5v14M16 5v14" stroke="#fffcff" stroke-width="2" stroke-linecap="round"/>
-        <path d="M8 9h8M8 14h8" stroke="#fa5e13" stroke-width="1.8" stroke-linecap="round"/>
-      </svg>
-      RAD
-    </a>
+    <div class="cabecalho-hero__acoes">
+      <span id="indicador-conexao" class="pilula">Online</span>
+      <span id="usuario-logado" class="pilula" style="display:none;"></span>
+      <!-- 30/07/2026: so aparece quando ha sessao valida (ver JS abaixo) -->
+      <a id="link-trocar-senha" class="pilula" href="{% url 'interface:trocar_senha' %}" style="display:none;">
+        Trocar senha
+      </a>
+    </div>
   </div>
-  <div class="barra-topo__usuario">
-    <span id="indicador-conexao" class="selo selo--online">Online</span>
-    <span id="usuario-logado"></span>
-    <!-- 30/07/2026: so aparece quando ha sessao valida (ver JS abaixo) -->
-    <a id="link-trocar-senha" class="barra-topo__link-senha" href="{% url 'interface:trocar_senha' %}" style="display:none;">
-      Trocar senha
-    </a>
-  </div>
+  <!-- 21/08/2026: telas administrativas preenchem este bloco com
+       eyebrow + titulo + subtitulo (ver .cabecalho-hero__corpo em
+       estilo.css); telas de preenchimento em campo deixam vazio, para
+       nao gastar espaco vertical em mobile. -->
+  {% block cabecalho_hero_corpo %}{% endblock %}
 </header>
 {% endblock %}
 
@@ -94,10 +61,10 @@
     if (!selo) return;
     if (navigator.onLine) {
       selo.textContent = 'Online';
-      selo.className = 'selo selo--online';
+      selo.className = 'pilula';
     } else {
       selo.textContent = 'Offline';
-      selo.className = 'selo selo--offline';
+      selo.className = 'pilula pilula--atencao';
     }
   }
   window.addEventListener('online', atualizarIndicadorConexao);
@@ -110,6 +77,7 @@
     const linkTrocarSenha = document.getElementById('link-trocar-senha');
     if (info && rotuloUsuario) {
       rotuloUsuario.textContent = info.login;
+      rotuloUsuario.style.display = '';
       if (linkTrocarSenha) linkTrocarSenha.style.display = '';
     }
 

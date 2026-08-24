@@ -18,43 +18,39 @@
     roda offline e em conexão ruim em campo.
   - Alvo de toque mínimo de 44px.
 
-  Atualização (20/07/2026): modernização visual (sombras, transições,
-  cantos) + classes de grade responsiva para telas administrativas
-  (Consulta, Gestão de Colaboradores, Gestão de Usuários) usadas em
-  computador. A tela "Novo RAD" mantém prioridade de uso em celular e
-  só adota grade onde isso não prejudica a leitura em uma coluna.
+  Atualização (21/08/2026): segunda revisão visual -- referência
+  aprovada pelo cliente (tela de outro app interno, com o mesmo
+  espírito de marca). Fundo da PÁGINA deixou de ser o azul-marinho
+  cheio (usado de 22/07 a 21/08) e passou a ser um cinza muito claro,
+  com o azul-marinho reservado para uma faixa de cabeçalho ("hero")
+  no topo -- marca + navegação em pílulas + (opcionalmente) o título
+  da própria tela dentro dessa faixa. Cartões continuam brancos, agora
+  flutuando sobre um fundo claro em vez de escuro.
 
-  Atualização (22/07/2026): tema escuro adotado como identidade visual
-  do sistema inteiro -- fundo da página passou a ser o azul-marinho da
-  marca, com cartões brancos flutuando por cima (referência visual
-  aprovada pelo cliente). Ponto-chave da implementação: --cor-fundo
-  virou a cor de fundo da PÁGINA (escura); qualquer uso anterior que
-  dependia dela para um tom claro sutil (fundo de cabeçalho de tabela,
-  hover de botão secundário) foi migrado para a nova variável
-  --cor-fundo-suave, que mantém o valor claro original. .texto-suave
-  passou a usar opacity sobre a cor herdada em vez de uma cor fixa,
-  assim funciona tanto dentro de um cartão branco (fica cinza-navy)
-  quanto direto no fundo escuro da página (fica branco-acinzentado) --
-  sem precisar de duas classes diferentes.
+  Ponto-chave da implementação: --cor-fundo voltou a ser um tom CLARO
+  (era a cor escura entre 22/07 e 21/08/2026) -- textos/elementos que
+  dependiam do fundo da página ser escuro (cor de texto do body, por
+  exemplo) foram revertidos para escuro-sobre-claro. .texto-suave
+  continua funcionando sem mudança (usa opacity sobre a cor herdada).
+  --cor-hero é a nova variável para o azul-marinho da faixa de topo --
+  mantém o mesmo valor de --cor-tinta (mesma marca, dois usos: texto
+  em superfície branca e fundo da faixa de topo).
 
   Atualização (30/07/2026): input[type="password"] e type="email"
   estavam FORA da lista de tipos estilizados abaixo -- ficavam com a
   aparência crua do navegador (bem menor que os campos de texto ao
-  lado). Bug real, notado no campo Senha da tela de login (mesma caixa
-  visual de Login, mas renderizando bem menor) -- afetava tambem todo
-  campo de e-mail adicionado nesta mesma leva (Gerenciar Usuarios,
-  Esqueci minha senha, Trocar senha). Corrigido incluindo os dois tipos
-  na mesma regra dos demais.
+  lado). Corrigido incluindo os dois tipos na mesma regra dos demais.
 */
 
 :root {
   /* Cor */
-  --cor-fundo: #242472;
-  --cor-fundo-suave: #f1f0f7;
+  --cor-fundo: #f1f0f7;
+  --cor-fundo-suave: #e7e5f2;
   --cor-superficie: #fffcff;
   --cor-tinta: #242472;
   --cor-tinta-suave: #5a5a8f;
   --cor-linha: #dcdaee;
+  --cor-hero: #242472;
 
   --cor-primaria: #11aa60;
   --cor-primaria-escura: #0c8048;
@@ -73,8 +69,8 @@
   --raio-grande: 18px;
   --raio-pequeno: 8px;
   --alvo-toque: 44px;
-  --sombra: 0 1px 2px rgba(9, 9, 40, 0.20), 0 8px 24px rgba(9, 9, 40, 0.24);
-  --sombra-elevada: 0 4px 10px rgba(9, 9, 40, 0.24), 0 16px 36px rgba(9, 9, 40, 0.30);
+  --sombra: 0 1px 2px rgba(9, 9, 40, 0.08), 0 8px 24px rgba(9, 9, 40, 0.08);
+  --sombra-elevada: 0 4px 10px rgba(9, 9, 40, 0.10), 0 16px 36px rgba(9, 9, 40, 0.12);
   --transicao: 0.16s ease;
   --transicao-lenta: 0.22s ease;
 
@@ -94,7 +90,7 @@ html, body {
 
 body {
   background: var(--cor-fundo);
-  color: #fffcff;
+  color: var(--cor-tinta);
   font-family: var(--fonte-base);
   font-size: 16px;
   line-height: 1.45;
@@ -119,43 +115,145 @@ h1, h2, h3 {
   margin: 0 0 0.5rem;
 }
 
-/* Barra superior -- permanece clara mesmo com o fundo da página
-   escuro, funciona como separador visual fixo entre navegação e
-   conteúdo (mesma ideia da referência visual aprovada). */
-.barra-topo {
-  background: var(--cor-superficie);
-  border-bottom: 3px solid var(--cor-primaria);
-  padding: 0.85rem 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+/*
+  Faixa de cabeçalho (hero) -- substitui a antiga barra-topo branca
+  fixa. Sempre com fundo azul-marinho da marca e texto claro, contendo
+  a navegação em pílulas (.cabecalho-hero__nav) e, opcionalmente, um
+  título de página dentro da própria faixa (.cabecalho-hero__corpo) --
+  esse bloco só aparece nas telas que o preenchem (normalmente as
+  administrativas; telas de preenchimento em campo, mobile-first,
+  deixam esse bloco vazio para não gastar espaço vertical na tela).
+*/
+.cabecalho-hero {
+  background: var(--cor-hero);
+  color: #fffcff;
+  padding: 1rem 1.25rem;
   position: sticky;
   top: 0;
   z-index: 20;
 }
 
-.barra-topo__marca {
+.cabecalho-hero__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.cabecalho-hero__marca {
   display: flex;
   align-items: center;
   gap: 0.6rem;
   font-weight: 700;
-  font-size: 1.05rem;
+  font-size: 1rem;
   text-decoration: none;
-  color: var(--cor-tinta);
+  color: #fffcff;
 }
 
-.barra-topo__marca .trilho {
+.cabecalho-hero__marca .trilho {
   width: 22px;
   height: 22px;
   flex-shrink: 0;
 }
 
-.barra-topo__usuario {
-  font-size: 0.85rem;
-  color: var(--cor-tinta-suave);
+.cabecalho-hero__acoes {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.cabecalho-hero__corpo {
+  padding-top: 1.5rem;
+}
+
+.cabecalho-hero__rotulo {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(255, 252, 255, 0.6);
+  margin-bottom: 0.35rem;
+}
+
+.cabecalho-hero__titulo {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fffcff;
+  margin: 0 0 0.35rem;
+}
+
+.cabecalho-hero__subtitulo {
+  font-size: 0.9rem;
+  color: rgba(255, 252, 255, 0.75);
+  max-width: 620px;
+}
+
+/* Pílulas -- usadas na navegação do cabeçalho (Voltar, Home, sessão) e
+   em qualquer outro agrupamento de ações curtas fora de formulário. */
+.pilula {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 36px;
+  padding: 0 0.9rem;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 252, 255, 0.14);
+  color: #fffcff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--transicao);
+}
+.pilula:hover {
+  background: rgba(255, 252, 255, 0.22);
+}
+.pilula--clara {
+  background: #fffcff;
+  color: var(--cor-hero);
+}
+.pilula--clara:hover {
+  background: #fffcff;
+  filter: brightness(0.97);
+}
+/* Indicador de conexão offline -- mesma pílula, mas com o laranja de
+   atenção da marca, para continuar visualmente distinto do estado
+   online (antes era um selo verde/laranja; agora é a mesma forma de
+   pílula, só troca de cor). */
+.pilula--atencao {
+  background: var(--cor-atencao);
+  color: #fffcff;
+}
+.pilula--atencao:hover {
+  background: var(--cor-atencao);
+  filter: brightness(1.05);
+}
+
+/* Distintivo circular com ícone -- usado para identificar o assunto
+   de um bloco/seção dentro de um cartão (ex.: "Localização da via").
+   --neutro é o padrão; --atencao usa o laranja da marca para chamar
+   atenção para algo específico (não é "erro", é "destaque"). */
+.distintivo-icone {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 1.1rem;
+}
+.distintivo-icone--neutro {
+  background: var(--cor-fundo-suave);
+  color: var(--cor-tinta-suave);
+}
+.distintivo-icone--atencao {
+  background: var(--cor-atencao-fundo);
+  color: var(--cor-atencao);
 }
 
 .container-app {
@@ -174,9 +272,8 @@ h1, h2, h3 {
   max-width: var(--largura-app-administrativa);
 }
 
-/* Cartões -- cor de texto explícita (não herdada do body), já que o
-   body agora é claro-sobre-escuro e o cartão precisa do padrão
-   original claro-sobre-branco independente de onde ele estiver. */
+/* Cartões -- cor de texto explícita (não herdada do body), independente
+   de onde o cartão estiver. */
 .cartao {
   background: var(--cor-superficie);
   color: var(--cor-tinta);
@@ -390,8 +487,8 @@ h1, h2, h3 {
 .selo--online::before { background: var(--cor-primaria); }
 
 /* Ação fixa no rodapé (mobile) -- cor de texto explícita pelo mesmo
-   motivo do .cartao: fundo branco fixo, independente do fundo escuro
-   da página logo atrás dele. */
+   motivo do .cartao: fundo branco fixo, independente do fundo da
+   página logo atrás dele. */
 .acao-fixa {
   position: fixed;
   left: 0;
@@ -404,10 +501,10 @@ h1, h2, h3 {
   z-index: 20;
 }
 
-/* Texto suave: usa a cor herdada do contexto (navy dentro de um
-   cartão branco, branco direto no fundo escuro da página) com
-   opacidade reduzida, em vez de uma cor fixa -- assim a mesma classe
-   funciona nos dois fundos sem precisar de uma variante extra. */
+/* Texto suave: usa a cor herdada do contexto com opacidade reduzida,
+   em vez de uma cor fixa -- assim a mesma classe funciona tanto dentro
+   de um cartão branco quanto direto no fundo claro da página, sem
+   precisar de uma variante extra. */
 .texto-suave {
   color: inherit;
   opacity: 0.78;
