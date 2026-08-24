@@ -12,6 +12,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -191,6 +192,88 @@ def encerrar_dispositivo(request, id_token):
         )
 
     apagados, _ = Token.objects.filter(id=id_token, usuario=usuario).delete()
+    if not apagados:
+        return JsonResponse({'erro': 'Sessão não encontrada.'}, status=404)
+
+    return JsonResponse({'sucesso': True})
+
+
+@requer_token
+@requer_perfil(UsuarioPerfil.ADMINISTRADOR)
+def listar_sessoes_ativas(request):
+    """
+    GET /usuarios/sessoes-ativas/?busca=texto
+    21/08/2026. Exclusivo do Administrador -- aba "Sessões" dentro de
+    Gerenciar Usuários. Lista TODAS as sessões (tokens) válidas de
+    TODOS os usuários do sistema -- diferente de
+    listar_meus_dispositivos, que só mostra as sessões do próprio
+    solicitante.
+
+    Busca (?busca=) filtra por login/matrícula OU pelo nome cadastrado
+    em ColaboradorCadastro (quando o usuário tiver um vínculo -- nem
+    todo login vem de um colaborador, ver usuarios/models.py::Usuario).
+    """
+    termo = (request.GET.get('busca') or '').strip()
+
+    tokens = (
+        Token.objects.select_related('usuario')
+        .prefetch_related('usuario__colaborador')
+        .filter(validade__gt=timezone.now())
+        .order_by('-data_criacao')
+    )
+
+    if termo:
+        tokens = tokens.filter(
+            Q(usuario__login__icontains=termo) | Q(usuario__colaborador__nome__icontains=termo)
+        )
+
+    token_atual = request.token_rad
+
+    def nome_de(usuario):
+        colaborador = getattr(usuario, 'colaborador', None)
+        return colaborador.nome if colaborador and colaborador.nome else usuario.login
+
+    return JsonResponse(
+        {
+            'sessoes': [
+                {
+                    'id': t.id,
+                    'login': t.usuario.login,
+                    'nome': nome_de(t.usuario),
+                    'dispositivo': t.dispositivo or 'Dispositivo desconhecido',
+                    'criado_em': t.data_criacao.isoformat(),
+                    'validade': t.validade.isoformat(),
+                    'esta_sessao': t.id == token_atual.id,
+                }
+                for t in tokens
+            ]
+        }
+    )
+
+
+@csrf_exempt
+@require_POST
+@requer_token
+@requer_perfil(UsuarioPerfil.ADMINISTRADOR)
+def encerrar_sessao_administrativamente(request, id_token):
+    """
+    POST /usuarios/sessoes-ativas/<id>/encerrar/
+    21/08/2026. Exclusivo do Administrador -- encerra a sessão de
+    QUALQUER usuário do sistema (diferente de encerrar_dispositivo,
+    que só permite encerrar as próprias sessões). Mesma trava de
+    encerrar_dispositivo quanto à sessão atual: não deixa o próprio
+    Administrador se derrubar por aqui sem querer -- para isso existe
+    "Sair" no próprio dispositivo.
+    """
+    token_atual = request.token_rad
+
+    if id_token == token_atual.id:
+        return JsonResponse(
+            {'erro': 'Não é possível encerrar a sessão atual por aqui. Use "Sair".'},
+            status=400,
+        )
+
+    apagados, _ = Token.objects.filter(id=id_token).delete()
     if not apagados:
         return JsonResponse({'erro': 'Sessão não encontrada.'}, status=404)
 

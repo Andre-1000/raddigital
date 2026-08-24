@@ -7,6 +7,13 @@
  * caixa marcada) significam "todos", tanto para Perfil quanto Status.
  * Ações da tabela viram ícones com tooltip (title) em vez de botão
  * com texto. Coluna "Senha" foi removida da tabela.
+ *
+ * 21/08/2026: tela reorganizada em 3 abas -- "Buscar" (padrão, aberta
+ * ao entrar na tela), "Cadastro de Usuário" e "Sessões". As duas
+ * últimas são exclusivas do Administrador (o Supervisor via Cadastro
+ * antes mas o backend sempre rejeitava com 403 -- bug corrigido
+ * escondendo a aba, já que o Supervisor nunca teve permissão real de
+ * criar/editar/excluir/importar colaborador, ver colaboradores/views.py).
  */
 document.addEventListener('DOMContentLoaded', function () {
   if (!RadAuth.exigirSessao()) return;
@@ -24,7 +31,33 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('label-perfil-novo-admin').style.display = 'none';
     document.getElementById('label-filtro-admin').style.display = 'none';
     document.getElementById('label-perfil-editar-admin').style.display = 'none';
+  } else {
+    // 21/08/2026: abas "Cadastro de Usuário" e "Sessões" só existem
+    // para o Administrador.
+    document.getElementById('aba-nav-cadastro').style.display = '';
+    document.getElementById('aba-nav-sessoes').style.display = '';
   }
+
+  // -------------------------------------------------------------
+  // Navegação em abas
+  // -------------------------------------------------------------
+  const botoesAba = document.querySelectorAll('.abas__botao');
+  const paineisAba = document.querySelectorAll('.abas__painel');
+
+  function abrirAba(nomeAba) {
+    botoesAba.forEach(function (botao) {
+      botao.classList.toggle('abas__botao--ativa', botao.dataset.aba === nomeAba);
+    });
+    paineisAba.forEach(function (painel) {
+      painel.style.display = painel.dataset.painel === nomeAba ? '' : 'none';
+    });
+  }
+
+  botoesAba.forEach(function (botao) {
+    botao.addEventListener('click', function () {
+      abrirAba(botao.dataset.aba);
+    });
+  });
 
   let pessoaEmEdicao = null;
   let pessoaEmExclusao = null;
@@ -53,6 +86,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function limparAviso(container) {
     container.innerHTML = '';
+  }
+
+  function formatarDataHora(isoString) {
+    const data = new Date(isoString);
+    return data.toLocaleString('pt-BR', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
   }
 
   // -------------------------------------------------------------
@@ -489,4 +530,104 @@ document.addEventListener('DOMContentLoaded', function () {
       botao.disabled = false;
     }
   });
+
+  // -------------------------------------------------------------
+  // Aba Sessões (Administrador) -- 21/08/2026
+  // -------------------------------------------------------------
+  if (souAdministrador) {
+    const avisoSessoes = document.getElementById('aviso-sessoes');
+    const corpoTabelaSessoes = document.getElementById('corpo-tabela-sessoes');
+    const mensagemVaziaSessoes = document.getElementById('mensagem-vazia-sessoes');
+    const mensagemInicialSessoes = document.getElementById('mensagem-inicial-sessoes');
+    const campoBuscaSessoes = document.getElementById('campo-busca-sessoes');
+    const botaoPesquisarSessoes = document.getElementById('botao-pesquisar-sessoes');
+
+    function linhaSessao(sessao) {
+      const acao = sessao.esta_sessao
+        ? '<span class="texto-suave" style="font-size:0.8rem;">Esta sessão</span>'
+        : html`<button type="button" class="botao botao--perigo botao-encerrar-sessao"
+                  style="width:auto; min-height:36px; padding:0 1rem; font-size:0.85rem;"
+                  data-id="${sessao.id}">
+                Encerrar
+              </button>`;
+
+      return html`
+        <tr>
+          <td>${escapar(sessao.nome)}</td>
+          <td>${escapar(sessao.login)}</td>
+          <td>${escapar(sessao.dispositivo)}</td>
+          <td>${formatarDataHora(sessao.criado_em)}</td>
+          <td>${formatarDataHora(sessao.validade)}</td>
+          <td>${acao}</td>
+        </tr>`;
+    }
+
+    async function pesquisarSessoes() {
+      limparAviso(avisoSessoes);
+      mensagemInicialSessoes.style.display = 'none';
+      botaoPesquisarSessoes.disabled = true;
+      botaoPesquisarSessoes.textContent = 'Pesquisando…';
+      try {
+        const termo = campoBuscaSessoes.value.trim();
+        const parametros = new URLSearchParams();
+        if (termo) parametros.set('busca', termo);
+
+        const resposta = await RadAuth.requisicaoAutenticada(`/usuarios/sessoes-ativas/?${parametros.toString()}`);
+        if (!resposta.ok) {
+          mostrarAviso(avisoSessoes, 'Não foi possível carregar as sessões.', 'erro');
+          return;
+        }
+        const dados = await resposta.json();
+
+        if (dados.sessoes.length === 0) {
+          corpoTabelaSessoes.innerHTML = '';
+          mensagemVaziaSessoes.style.display = '';
+          return;
+        }
+        mensagemVaziaSessoes.style.display = 'none';
+        corpoTabelaSessoes.innerHTML = dados.sessoes.map(linhaSessao).join('');
+
+        corpoTabelaSessoes.querySelectorAll('.botao-encerrar-sessao').forEach((botao) => {
+          botao.addEventListener('click', () => encerrarSessao(botao.dataset.id));
+        });
+      } catch (erro) {
+        mostrarAviso(avisoSessoes, 'Erro de conexão ao pesquisar sessões.', 'erro');
+      } finally {
+        botaoPesquisarSessoes.disabled = false;
+        botaoPesquisarSessoes.textContent = 'Pesquisar';
+      }
+    }
+
+    async function encerrarSessao(idToken) {
+      try {
+        const resposta = await RadAuth.requisicaoAutenticada(`/usuarios/sessoes-ativas/${idToken}/encerrar/`, {
+          method: 'POST',
+        });
+        const dados = await resposta.json();
+        if (!resposta.ok) {
+          mostrarAviso(avisoSessoes, dados.erro || 'Não foi possível encerrar a sessão.', 'erro');
+          return;
+        }
+        await pesquisarSessoes();
+      } catch (erro) {
+        mostrarAviso(avisoSessoes, 'Erro de conexão ao encerrar a sessão.', 'erro');
+      }
+    }
+
+    botaoPesquisarSessoes.addEventListener('click', pesquisarSessoes);
+    campoBuscaSessoes.addEventListener('keydown', function (evento) {
+      if (evento.key === 'Enter') pesquisarSessoes();
+    });
+
+    // Carrega a lista completa assim que a aba "Sessões" é aberta pela
+    // primeira vez -- não precisa esperar a pessoa clicar em
+    // "Pesquisar" de novo se ela só quer ver "quem está online agora".
+    let sessoesJaCarregadas = false;
+    document.getElementById('aba-nav-sessoes').addEventListener('click', function () {
+      if (!sessoesJaCarregadas) {
+        sessoesJaCarregadas = true;
+        pesquisarSessoes();
+      }
+    });
+  }
 });

@@ -13,6 +13,13 @@ urlpatterns = [
     path('meus-dispositivos/<int:id_token>/encerrar/', views.encerrar_dispositivo, name='encerrar_dispositivo'),
     path('esqueci-senha/', views.solicitar_redefinicao_senha, name='solicitar_redefinicao_senha'),
     path('redefinir-senha/confirmar/', views.confirmar_redefinicao_senha, name='confirmar_redefinicao_senha'),
+    # 21/08/2026: Sessoes ativas -- exclusivo do Administrador, aba
+    # "Sessoes" dentro de Gerenciar Usuarios. Diferente de
+    # meus-dispositivos/ (que so mostra as sessoes do proprio
+    # solicitante), estas rotas enxergam e encerram sessoes de
+    # QUALQUER usuario do sistema.
+    path('sessoes-ativas/', views.listar_sessoes_ativas, name='listar_sessoes_ativas'),
+    path('sessoes-ativas/<int:id_token>/encerrar/', views.encerrar_sessao_administrativamente, name='encerrar_sessao_administrativamente'),
     # Gestao de usuarios (EFD secao 4.4)
     path('administrar/', views.listar, name='listar'),
     path('administrar/criar/', views.criar, name='criar'),

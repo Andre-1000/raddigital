@@ -521,6 +521,40 @@ h1, h2, h3 {
 }
 
 /*
+  Abas -- navegação em abas dentro de uma tela (ex.: Gerenciar
+  Usuários: Buscar / Cadastro de Usuário / Sessões). Cor de texto
+  explícita (não herdada), independente de onde a tela esteja.
+*/
+.abas__nav {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--cor-linha);
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+.abas__botao {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0.75rem 0.25rem;
+  margin-right: 1.5rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--cor-tinta-suave);
+  cursor: pointer;
+  min-height: var(--alvo-toque);
+  transition: color var(--transicao), border-color var(--transicao);
+}
+.abas__botao:hover {
+  color: var(--cor-tinta);
+}
+.abas__botao--ativa {
+  color: var(--cor-tinta);
+  border-bottom-color: var(--cor-primaria);
+}
+
+/*
   Tabela administrativa (Gestão de Colaboradores, Gestão de Usuários):
   visual mais moderno que uma tabela HTML padrão, mas continua sendo
   uma <table> semântica. Cor de texto explícita pelo mesmo motivo do
