@@ -137,16 +137,34 @@
       </div>
     </div>
 
-    <!-- 21/08/2026: Serviço executado -- Área (Geral, Infra, Corretiva,
-         Mecanizada, AMV) com os serviços específicos daquela área logo
-         abaixo, mais "Outros" solto fora de qualquer área. Populado via
-         JS a partir de /catalogos/todos/ (campo 'servicos'). Marcar só
-         a Área já filtra sozinha; marcar um serviço específico refina
-         mais; nenhum marcado = não filtra por serviço (mesma lógica de
-         Perfil/Status em Gerenciar Usuários). -->
-    <div class="campo" style="margin-top:0.5rem;">
-      <label>Serviço executado</label>
-      <div class="arvore-filtro" id="arvore-filtro-servicos"></div>
+    <!-- 21/08/2026 (revisado): Serviço executado -- dois controles
+         SEPARADOS. "Área" é um select único (escolhe 1 por vez). Ao
+         escolher uma área, aparece "Subcategoria" com os serviços
+         específicos daquela área (múltipla seleção). Sem nenhuma
+         subcategoria marcada = filtra pela área inteira; com 1+
+         marcada(s) = filtra só por elas. "Outros" fica à parte, fora
+         de qualquer área. -->
+    <div class="grade-campos" style="margin-top:0.9rem;">
+      <div class="campo">
+        <label for="filtro-servico-area">Serviço executado — Área</label>
+        <select id="filtro-servico-area">
+          <option value="">Todas</option>
+          <option value="geral">Geral</option>
+          <option value="infra">Infra</option>
+          <option value="corretiva">Corretiva</option>
+          <option value="mecanizada">Mecanizada</option>
+          <option value="amv">AMV</option>
+        </select>
+      </div>
+      <div class="campo" id="campo-subcategoria-servico" style="display:none;">
+        <label>Subcategoria</label>
+        <div class="arvore-filtro__filhos" id="lista-subcategoria-servico" style="margin-left:0; border:1px solid var(--cor-linha); border-radius:var(--raio-pequeno); padding:0.6rem 0.75rem;"></div>
+      </div>
+      <div class="campo" style="align-self:end;">
+        <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer; min-height:var(--alvo-toque);">
+          <input type="checkbox" id="filtro-servico-outros"> Outros (fora de qualquer área)
+        </label>
+      </div>
     </div>
 
     <div class="linha-acoes">
@@ -253,62 +271,53 @@
           (l) => l.nome
         );
 
-        popularArvoreServicos(catalogos.servicos);
+        popularServicosPorArea(catalogos.servicos);
       } catch (erro) {
         // Falha ao carregar catalogos nao deve travar a tela de consulta;
         // os filtros por texto continuam funcionando normalmente.
       }
     }
 
-    // 21/08/2026: monta a árvore Área -> Serviços específicos, mais o
-    // item solto "Outros" (que no banco tem area='geral', mas na tela
-    // fica fora de qualquer área, por pedido do cliente).
-    const ORDEM_AREAS = ['geral', 'infra', 'corretiva', 'mecanizada', 'amv'];
+    // 21/08/2026 (revisado): guarda os serviços agrupados por área
+    // (fora de "Outros", que fica solto e não entra em nenhum grupo).
+    // Preenchido uma vez ao carregar os catálogos; consultado sempre
+    // que a pessoa troca a Área escolhida.
     const ROTULO_AREA = {
       geral: 'Geral', infra: 'Infra', corretiva: 'Corretiva',
       mecanizada: 'Mecanizada', amv: 'AMV',
     };
+    let servicosPorArea = {};
 
-    function popularArvoreServicos(servicos) {
-      const container = document.getElementById('arvore-filtro-servicos');
-      const porArea = {};
-      let servicoOutrosId = null;
-
+    function popularServicosPorArea(servicos) {
+      servicosPorArea = {};
       servicos.forEach(function (servico) {
-        if (servico.nome === 'Outros') {
-          servicoOutrosId = servico.id;
-          return;
-        }
-        if (!porArea[servico.area]) porArea[servico.area] = [];
-        porArea[servico.area].push(servico);
+        if (servico.nome === 'Outros') return;
+        if (!servicosPorArea[servico.area]) servicosPorArea[servico.area] = [];
+        servicosPorArea[servico.area].push(servico);
       });
+    }
 
-      let html = '';
-      ORDEM_AREAS.forEach(function (area) {
-        const servicosDaArea = porArea[area];
-        if (!servicosDaArea || servicosDaArea.length === 0) return;
+    function atualizarSubcategoria() {
+      const areaEscolhida = document.getElementById('filtro-servico-area').value;
+      const campoSubcategoria = document.getElementById('campo-subcategoria-servico');
+      const listaSubcategoria = document.getElementById('lista-subcategoria-servico');
 
-        html += `<div class="arvore-filtro__grupo">
-          <label class="arvore-filtro__area">
-            <input type="checkbox" class="checkbox-area-servico" value="${area}"> ${ROTULO_AREA[area] || area}
-          </label>
-          <div class="arvore-filtro__filhos">`;
-        servicosDaArea.forEach(function (servico) {
-          html += `<label>
-            <input type="checkbox" class="checkbox-servico-especifico" value="${servico.id}"> ${servico.nome}
-          </label>`;
-        });
-        html += `</div></div>`;
-      });
-
-      if (servicoOutrosId !== null) {
-        html += `<label class="arvore-filtro__solto">
-          <input type="checkbox" id="filtro-servico-outros"> Outros
-        </label>`;
+      if (!areaEscolhida) {
+        campoSubcategoria.style.display = 'none';
+        listaSubcategoria.innerHTML = '';
+        return;
       }
 
-      container.innerHTML = html;
+      const servicosDaArea = servicosPorArea[areaEscolhida] || [];
+      listaSubcategoria.innerHTML = servicosDaArea.map(function (servico) {
+        return `<label>
+          <input type="checkbox" class="checkbox-subcategoria-servico" value="${servico.id}"> ${servico.nome}
+        </label>`;
+      }).join('');
+      campoSubcategoria.style.display = '';
     }
+
+    document.getElementById('filtro-servico-area').addEventListener('change', atualizarSubcategoria);
 
     // Busca de Tecnico: mesma lista e mesmo padrao visual usado no
     // campo de colaborador ao preencher o RAD (busca com resultados
@@ -402,20 +411,20 @@
         definirSeExistir('filtro-status-exportacao', 'status_exportacao');
       }
 
-      // Servico executado: coleta as areas marcadas, os servicos
-      // especificos marcados, e se "Outros" esta marcado.
-      const areasMarcadas = Array.from(
-        document.querySelectorAll('.checkbox-area-servico:checked')
+      // Servico executado (21/08/2026, revisado): dois controles
+      // separados. Se alguma subcategoria estiver marcada, ela manda
+      // (filtra so pelos servicos especificos escolhidos); se nao,
+      // mas uma Area estiver escolhida, filtra pela area inteira.
+      // "Outros" e independente dos dois, sempre.
+      const subcategoriasMarcadas = Array.from(
+        document.querySelectorAll('.checkbox-subcategoria-servico:checked')
       ).map((el) => el.value);
-      if (areasMarcadas.length > 0) {
-        parametros.set('servico_areas', areasMarcadas.join(','));
-      }
 
-      const servicosMarcados = Array.from(
-        document.querySelectorAll('.checkbox-servico-especifico:checked')
-      ).map((el) => el.value);
-      if (servicosMarcados.length > 0) {
-        parametros.set('servico_ids', servicosMarcados.join(','));
+      if (subcategoriasMarcadas.length > 0) {
+        parametros.set('servico_ids', subcategoriasMarcadas.join(','));
+      } else {
+        const areaEscolhida = document.getElementById('filtro-servico-area').value;
+        if (areaEscolhida) parametros.set('servico_areas', areaEscolhida);
       }
 
       const campoOutros = document.getElementById('filtro-servico-outros');
@@ -500,10 +509,11 @@
       document.getElementById('filtro-login-usuario-busca').value = '';
       document.getElementById('resultados-login-usuario').innerHTML = '';
 
-      // Desmarca todos os checkboxes da árvore de Serviço executado.
-      document.querySelectorAll(
-        '.checkbox-area-servico:checked, .checkbox-servico-especifico:checked'
-      ).forEach((el) => { el.checked = false; });
+      // Reseta Área/Subcategoria de Serviço executado e esconde o
+      // bloco de subcategoria de novo (só reaparece ao escolher área).
+      document.getElementById('filtro-servico-area').value = '';
+      document.getElementById('campo-subcategoria-servico').style.display = 'none';
+      document.getElementById('lista-subcategoria-servico').innerHTML = '';
       const campoOutros = document.getElementById('filtro-servico-outros');
       if (campoOutros) campoOutros.checked = false;
 
