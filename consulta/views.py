@@ -12,8 +12,14 @@ layout oficial (rad/exportacao_oficial.py) -- o antigo layout simples
 (rad/exportacao.py, endpoints /pdf/ e /docx/) foi descontinuado.
 
 21/08/2026: nova exportacao em Excel (rad/exportacao_excel.py) --
+
+21/08/2026: filtro por Servico executado (area + servico especifico +
+"Outros" solto) -- ver _aplicar_filtros. Isso muda a regra PRM-030
+original (servicos, por serem campo de multipla selecao, nao eram
+filtraveis) -- decisao do cliente, ver conversa de alinhamento.
 """
 from django.core.paginator import Paginator
+from django.db.models import Q
 from django.http import FileResponse, HttpResponse, JsonResponse
 from django.utils import timezone
 
@@ -51,10 +57,11 @@ def _aplicar_filtros(queryset, params):
     """
     PRM-028: um ou mais filtros aplicados simultaneamente (AND).
     PRM-029: lista de filtros permitidos.
-    PRM-030: campos de multipla selecao (servicos, colaboradores, via,
-    linha do RAD) NAO sao filtraveis aqui -- so aparecem no detalhe.
-    Excepcao explicita da propria EFD: MCH e Linha da MCH (do bloco AMV,
-    valor unico por RAD) SAO filtraveis.
+    PRM-030: campos de multipla selecao (colaboradores, via, linha do
+    RAD) NAO sao filtraveis aqui -- so aparecem no detalhe. Excecoes
+    explicitas: MCH e Linha da MCH (do bloco AMV, valor unico por RAD),
+    e -- desde 21/08/2026 -- Servico executado (ver bloco
+    servico_areas/servico_ids/servico_outros abaixo).
     """
     if params.get('numero_rad'):
         queryset = queryset.filter(numero_rad=params['numero_rad'])
@@ -111,6 +118,41 @@ def _aplicar_filtros(queryset, params):
         queryset = queryset.filter(data_ultima_exportacao_excel__isnull=False)
     elif params.get('status_exportacao') == 'nao_exportado':
         queryset = queryset.filter(data_ultima_exportacao_excel__isnull=True)
+
+    # Servico executado (21/08/2026) -- tres formas de marcar, todas
+    # combinadas em OR entre si e com o mesmo comportamento do filtro
+    # de Perfil/Status em Gerenciar Usuarios: nenhuma marcada = nao
+    # filtra (todos os RADs passam); qualquer combinacao de marcadas =
+    # RAD aparece se bater com QUALQUER uma delas.
+    #   - servico_areas: lista de codigos de area (geral,infra,...) --
+    #     RAD aparece se tiver qualquer servico daquela(s) area(s).
+    #   - servico_ids: lista de IDs de CatServico especificos.
+    #   - servico_outros=1: RAD aparece se tiver o servico "Outros"
+    #     marcado -- tratado como item solto na tela (fora de
+    #     qualquer area), mesmo o dado no banco guardando area='geral'
+    #     para esse registro.
+    servico_areas = params.get('servico_areas')
+    servico_ids = params.get('servico_ids')
+    servico_outros = params.get('servico_outros') == '1'
+
+    if servico_areas or servico_ids or servico_outros:
+        condicao_servico = Q(pk__in=[])  # base vazia, cada trecho abaixo soma em OR
+
+        if servico_areas:
+            areas = [a for a in servico_areas.split(',') if a]
+            if areas:
+                condicao_servico |= Q(servicos__servico__area__in=areas)
+
+        if servico_ids:
+            ids = [int(i) for i in servico_ids.split(',') if i.isdigit()]
+            if ids:
+                condicao_servico |= Q(servicos__servico_id__in=ids)
+
+        if servico_outros:
+            condicao_servico |= Q(servicos__servico__nome='Outros')
+
+        queryset = queryset.filter(condicao_servico).distinct()
+
     return queryset
 
 

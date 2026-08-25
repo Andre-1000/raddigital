@@ -555,6 +555,66 @@ h1, h2, h3 {
 }
 
 /*
+  Árvore de filtro -- usada em Consultar RADs para o filtro "Serviço
+  executado" (21/08/2026): grupos por Área (Geral, Infra, Corretiva,
+  Mecanizada, AMV), cada um com os serviços específicos daquela área
+  logo abaixo, mais um item solto ("Outros") fora de qualquer área.
+  Mesma lógica de combinação dos filtros de Perfil/Status em Gerenciar
+  Usuários: nenhum marcado = todos; múltiplos marcados = qualquer um
+  serve (OR). Marcar só a Área já filtra sozinha (equivale a "qualquer
+  serviço desta área"); marcar um serviço específico refina mais.
+*/
+.arvore-filtro {
+  border: 1px solid var(--cor-linha);
+  border-radius: var(--raio-pequeno);
+  padding: 0.75rem 0.9rem;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.arvore-filtro__grupo {
+  margin-bottom: 0.6rem;
+}
+.arvore-filtro__grupo:last-child {
+  margin-bottom: 0;
+}
+.arvore-filtro__area {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  min-height: 32px;
+}
+.arvore-filtro__filhos {
+  margin: 0.15rem 0 0 1.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.arvore-filtro__filhos label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 400;
+  cursor: pointer;
+  min-height: 30px;
+}
+.arvore-filtro__solto {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 32px;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--cor-linha);
+  margin-top: 0.4rem;
+}
+
+/*
   Tabela administrativa (Gestão de Colaboradores, Gestão de Usuários):
   visual mais moderno que uma tabela HTML padrão, mas continua sendo
   uma <table> semântica. Cor de texto explícita pelo mesmo motivo do

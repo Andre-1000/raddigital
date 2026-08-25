@@ -137,6 +137,18 @@
       </div>
     </div>
 
+    <!-- 21/08/2026: Serviço executado -- Área (Geral, Infra, Corretiva,
+         Mecanizada, AMV) com os serviços específicos daquela área logo
+         abaixo, mais "Outros" solto fora de qualquer área. Populado via
+         JS a partir de /catalogos/todos/ (campo 'servicos'). Marcar só
+         a Área já filtra sozinha; marcar um serviço específico refina
+         mais; nenhum marcado = não filtra por serviço (mesma lógica de
+         Perfil/Status em Gerenciar Usuários). -->
+    <div class="campo" style="margin-top:0.5rem;">
+      <label>Serviço executado</label>
+      <div class="arvore-filtro" id="arvore-filtro-servicos"></div>
+    </div>
+
     <div class="linha-acoes">
       <button type="button" class="botao botao--primaria" id="botao-filtrar">Pesquisar</button>
       <button type="button" class="botao botao--secundaria" id="botao-limpar-filtros">Limpar filtros</button>
@@ -240,10 +252,62 @@
           'nome',
           (l) => l.nome
         );
+
+        popularArvoreServicos(catalogos.servicos);
       } catch (erro) {
         // Falha ao carregar catalogos nao deve travar a tela de consulta;
         // os filtros por texto continuam funcionando normalmente.
       }
+    }
+
+    // 21/08/2026: monta a árvore Área -> Serviços específicos, mais o
+    // item solto "Outros" (que no banco tem area='geral', mas na tela
+    // fica fora de qualquer área, por pedido do cliente).
+    const ORDEM_AREAS = ['geral', 'infra', 'corretiva', 'mecanizada', 'amv'];
+    const ROTULO_AREA = {
+      geral: 'Geral', infra: 'Infra', corretiva: 'Corretiva',
+      mecanizada: 'Mecanizada', amv: 'AMV',
+    };
+
+    function popularArvoreServicos(servicos) {
+      const container = document.getElementById('arvore-filtro-servicos');
+      const porArea = {};
+      let servicoOutrosId = null;
+
+      servicos.forEach(function (servico) {
+        if (servico.nome === 'Outros') {
+          servicoOutrosId = servico.id;
+          return;
+        }
+        if (!porArea[servico.area]) porArea[servico.area] = [];
+        porArea[servico.area].push(servico);
+      });
+
+      let html = '';
+      ORDEM_AREAS.forEach(function (area) {
+        const servicosDaArea = porArea[area];
+        if (!servicosDaArea || servicosDaArea.length === 0) return;
+
+        html += `<div class="arvore-filtro__grupo">
+          <label class="arvore-filtro__area">
+            <input type="checkbox" class="checkbox-area-servico" value="${area}"> ${ROTULO_AREA[area] || area}
+          </label>
+          <div class="arvore-filtro__filhos">`;
+        servicosDaArea.forEach(function (servico) {
+          html += `<label>
+            <input type="checkbox" class="checkbox-servico-especifico" value="${servico.id}"> ${servico.nome}
+          </label>`;
+        });
+        html += `</div></div>`;
+      });
+
+      if (servicoOutrosId !== null) {
+        html += `<label class="arvore-filtro__solto">
+          <input type="checkbox" id="filtro-servico-outros"> Outros
+        </label>`;
+      }
+
+      container.innerHTML = html;
     }
 
     // Busca de Tecnico: mesma lista e mesmo padrao visual usado no
@@ -338,6 +402,27 @@
         definirSeExistir('filtro-status-exportacao', 'status_exportacao');
       }
 
+      // Servico executado: coleta as areas marcadas, os servicos
+      // especificos marcados, e se "Outros" esta marcado.
+      const areasMarcadas = Array.from(
+        document.querySelectorAll('.checkbox-area-servico:checked')
+      ).map((el) => el.value);
+      if (areasMarcadas.length > 0) {
+        parametros.set('servico_areas', areasMarcadas.join(','));
+      }
+
+      const servicosMarcados = Array.from(
+        document.querySelectorAll('.checkbox-servico-especifico:checked')
+      ).map((el) => el.value);
+      if (servicosMarcados.length > 0) {
+        parametros.set('servico_ids', servicosMarcados.join(','));
+      }
+
+      const campoOutros = document.getElementById('filtro-servico-outros');
+      if (campoOutros && campoOutros.checked) {
+        parametros.set('servico_outros', '1');
+      }
+
       return parametros;
     }
 
@@ -414,6 +499,14 @@
       });
       document.getElementById('filtro-login-usuario-busca').value = '';
       document.getElementById('resultados-login-usuario').innerHTML = '';
+
+      // Desmarca todos os checkboxes da árvore de Serviço executado.
+      document.querySelectorAll(
+        '.checkbox-area-servico:checked, .checkbox-servico-especifico:checked'
+      ).forEach((el) => { el.checked = false; });
+      const campoOutros = document.getElementById('filtro-servico-outros');
+      if (campoOutros) campoOutros.checked = false;
+
       // "Limpar filtros" so reseta os campos -- nao dispara pesquisa
       // sozinho, mesma logica de "nao carregar nada sem criterio".
       aviso.innerHTML = '';
