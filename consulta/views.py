@@ -309,6 +309,41 @@ def _amv_resumo(rad):
     return blocos
 
 
+def _canaleta_resumo(rad):
+    """
+    21/08/2026: bloco "Anomalias" (Canaleta) -- achado em auditoria:
+    era preenchido no formulario, validado e salvo no banco
+    corretamente, mas nunca aparecia de volta em nenhum lugar (nem na
+    tela de Consulta, nem na exportacao Word/Excel). Retorna None
+    quando o RAD nao tem esse bloco (servico "Inspecao de Canaleta"
+    nao selecionado) -- e sempre 1-para-1 com o RAD (RadCanaleta e
+    OneToOneField), nunca uma lista, ao contrario do bloco AMV.
+    """
+    canaleta = getattr(rad, 'canaleta', None)
+    if canaleta is None:
+        return None
+    return {
+        'grau_criticidade': canaleta.get_grau_criticidade_display(),
+        'necessita_cautela': canaleta.necessita_cautela,
+        'justificativa': canaleta.justificativa,
+        'anomalias': [a.get_anomalia_display() for a in canaleta.anomalias.all()],
+        'lados': [l.get_lado_display() for l in canaleta.lados.all()],
+        'dimensoes': [
+            {
+                'ordem': d.ordem,
+                'largura_inicial': str(d.largura_inicial),
+                'largura_final': str(d.largura_final),
+                'altura_inicial': str(d.altura_inicial),
+                'altura_final': str(d.altura_final),
+                'comprimento': str(d.comprimento),
+                'km_poste_inicial': d.km_poste_inicial,
+                'km_poste_final': d.km_poste_final,
+            }
+            for d in canaleta.dimensoes.all()
+        ],
+    }
+
+
 def nome_de_quem_preencheu(rad):
     """
     Nome completo de quem preencheu o RAD (22/07/2026) -- usado no
@@ -461,9 +496,10 @@ def exportar_excel(request):
     """
     queryset = Rad.objects.select_related(
         'local_inicial', 'local_final', 'tipo_manutencao', 'usuario',
-        'motivo_atraso_inicio', 'motivo_atraso_termino',
+        'motivo_atraso_inicio', 'motivo_atraso_termino', 'canaleta',
     ).prefetch_related(
         'linhas', 'vias', 'equipes', 'servicos__servico', 'amv_blocos__mch', 'colaboradores',
+        'canaleta__anomalias', 'canaleta__lados', 'canaleta__dimensoes',
     ).order_by('numero_rad')
 
     queryset = _aplicar_filtros(queryset, request.GET)
@@ -565,6 +601,9 @@ def detalhe_rad(request, numero_rad):
         rad = Rad.objects.select_related(
             'local_inicial', 'local_final', 'tipo_manutencao', 'usuario',
             'motivo_atraso_inicio', 'motivo_atraso_termino', 'usuario_cancelamento',
+            'canaleta',
+        ).prefetch_related(
+            'canaleta__anomalias', 'canaleta__lados', 'canaleta__dimensoes',
         ).get(numero_rad=numero_rad)
     except Rad.DoesNotExist:
         return JsonResponse({'erro': 'RAD nao encontrado.'}, status=404)
@@ -639,6 +678,7 @@ def detalhe_rad(request, numero_rad):
                 'observacoes_gerais': rad.observacoes_gerais,
                 'colaboradores': _colaboradores_resumo(rad),
                 'amv': _amv_resumo(rad),
+                'canaleta': _canaleta_resumo(rad),
                 'anexos': _anexos_resumo(rad),
                 'login_usuario': rad.usuario.login,
                 'preenchido_por_nome': nome_de_quem_preencheu(rad),

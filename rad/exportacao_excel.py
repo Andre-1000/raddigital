@@ -46,6 +46,15 @@ COLUNAS = [
     ('servicos', 'Serviços'),
     ('mchs', 'MCHs (Bloco AMV)'),
     ('colaboradores', 'Colaboradores'),
+    # 21/08/2026: bloco "Anomalias" (Canaleta) -- so tem valor quando o
+    # servico "Inspeção de Canaleta" foi selecionado nesse RAD; vazio
+    # para os demais.
+    ('canaleta_grau_criticidade', 'Canaleta - Grau de Criticidade'),
+    ('canaleta_necessita_cautela', 'Canaleta - Necessita Cautela'),
+    ('canaleta_anomalias', 'Canaleta - Anomalias'),
+    ('canaleta_lados', 'Canaleta - Lado'),
+    ('canaleta_justificativa', 'Canaleta - Justificativa'),
+    ('canaleta_dimensoes', 'Canaleta - Dimensões'),
     ('login_usuario', 'Login de Quem Preencheu'),
     ('dispositivo', 'Dispositivo'),
     ('data_sincronizacao', 'Data de Sincronização'),
@@ -68,6 +77,47 @@ def _sem_timezone(valor_datetime):
     if valor_datetime is None:
         return None
     return django_timezone.localtime(valor_datetime).replace(tzinfo=None)
+
+
+def _campos_canaleta(rad):
+    """
+    21/08/2026: achata o bloco Canaleta (achado em auditoria -- estava
+    sendo salvo no banco mas nunca reaparecia em lugar nenhum) em
+    texto para as colunas do Excel. RadCanaleta e OneToOneField (no
+    maximo 1 por RAD) -- se o RAD nao tiver esse bloco, todas as
+    colunas ficam vazias, sem erro.
+    """
+    canaleta = getattr(rad, 'canaleta', None)
+    if canaleta is None:
+        return {
+            'canaleta_grau_criticidade': '',
+            'canaleta_necessita_cautela': '',
+            'canaleta_anomalias': '',
+            'canaleta_lados': '',
+            'canaleta_justificativa': '',
+            'canaleta_dimensoes': '',
+        }
+
+    linhas_dimensao = []
+    for d in canaleta.dimensoes.all():
+        km = (
+            f' (Km {d.km_poste_inicial} - {d.km_poste_final})'
+            if d.km_poste_inicial or d.km_poste_final else ''
+        )
+        linhas_dimensao.append(
+            f'L:{d.largura_inicial}-{d.largura_final} '
+            f'A:{d.altura_inicial}-{d.altura_final} '
+            f'C:{d.comprimento}{km}'
+        )
+
+    return {
+        'canaleta_grau_criticidade': canaleta.get_grau_criticidade_display(),
+        'canaleta_necessita_cautela': 'Sim' if canaleta.necessita_cautela else 'Não',
+        'canaleta_anomalias': '; '.join(a.get_anomalia_display() for a in canaleta.anomalias.all()),
+        'canaleta_lados': '; '.join(l.get_lado_display() for l in canaleta.lados.all()),
+        'canaleta_justificativa': canaleta.justificativa or '',
+        'canaleta_dimensoes': '; '.join(linhas_dimensao),
+    }
 
 
 def _linha_para_rad(rad):
@@ -101,6 +151,7 @@ def _linha_para_rad(rad):
         'servicos': '; '.join(rad.servicos.values_list('servico__nome', flat=True)),
         'mchs': '; '.join(amv.mch.identificacao for amv in rad.amv_blocos.all()),
         'colaboradores': '; '.join(c.nome for c in rad.colaboradores.all()),
+        **_campos_canaleta(rad),
         'login_usuario': rad.usuario_id,
         'dispositivo': rad.get_dispositivo_display(),
         'data_sincronizacao': _sem_timezone(rad.data_sincronizacao),

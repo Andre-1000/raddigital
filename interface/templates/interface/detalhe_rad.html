@@ -5,13 +5,42 @@
 <style>
   .container-app { max-width: var(--largura-app-administrativa); }
 
-  .titulo-secao {
-    color: var(--cor-atencao);
-    font-size: 1.05rem;
-    font-weight: 700;
-    margin: 1.25rem 0 0.75rem;
+  /*
+    21/08/2026 (revisado): redesenho visual da tela -- antes, todas as
+    secoes ficavam empilhadas dentro de um unico cartao grande, sem
+    nenhuma separacao visual entre "Identificação", "Localização",
+    "Horários" etc além do título laranja de cada uma. Com a
+    quantidade de campos que um RAD tem, isso virava um bloco denso
+    difícil de escanear.
+
+    Agora cada seção vira um .secao-detalhe própria, com uma linha
+    fina embaixo separando da próxima -- leve o bastante para não
+    competir com o conteúdo, mas suficiente para o olho identificar
+    onde uma seção termina e a outra começa. O título deixa de ser
+    laranja+grande (que competia com o conteúdo em atenção visual) e
+    vira um rótulo pequeno, maiúsculo, espaçado -- o mesmo padrão
+    "rótulo de seção" já usado em outras telas do sistema.
+  */
+  .secao-detalhe {
+    padding: 1.1rem 0;
+    border-bottom: 1px solid var(--cor-linha);
   }
-  .titulo-secao:first-child { margin-top: 0; }
+  .secao-detalhe:first-child {
+    padding-top: 0;
+  }
+  .secao-detalhe:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .titulo-secao {
+    color: var(--cor-tinta-suave);
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 0 0 0.9rem;
+  }
 
   .grade-dados .campo-leitura {
     margin-bottom: 0;
@@ -44,6 +73,25 @@
     padding: 0 0.9rem;
     font-size: 0.85rem;
   }
+
+  /* Bloco AMV e Canaleta (21/08/2026): cada bloco/linha vira um
+     mini-cartão com borda leve dentro do cartão principal -- mesmo
+     espírito de "linha fina, clean" pedido, aplicado a listas que se
+     repetem (um bloco AMV por MCH; uma linha por medida da Canaleta). */
+  .subcartao {
+    border: 1px solid var(--cor-linha);
+    border-radius: var(--raio-pequeno);
+    padding: 0.9rem 1rem;
+  }
+  .subcartao + .subcartao {
+    margin-top: 0.75rem;
+  }
+  .subcartao__titulo {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--cor-tinta-suave);
+    margin: 0 0 0.6rem;
+  }
 </style>
 {% endblock %}
 
@@ -58,6 +106,21 @@
 
   <div class="cartao" id="cartao-dados" style="display:none;">
     <div id="secoes-dados"></div>
+  </div>
+
+  <!-- 21/08/2026: bloco AMV -- achado em auditoria: os dados existem
+       na API (backend/consulta/views.py::_amv_resumo) desde sempre,
+       mas nunca eram renderizados aqui. Um bloco por MCH verificada. -->
+  <div class="cartao" id="cartao-amv" style="margin-top:1rem; display:none;">
+    <h2 class="titulo-secao">Bloco AMV</h2>
+    <div id="lista-amv-detalhe"></div>
+  </div>
+
+  <!-- 21/08/2026: bloco Anomalias (Canaleta) -- mesmo achado: dados
+       existiam no banco, nunca apareciam aqui. No máximo 1 por RAD. -->
+  <div class="cartao" id="cartao-canaleta" style="margin-top:1rem; display:none;">
+    <h2 class="titulo-secao">Anomalias (Canaleta)</h2>
+    <div id="conteudo-canaleta"></div>
   </div>
 
   <div class="cartao" id="cartao-colaboradores" style="margin-top:1rem; display:none;">
@@ -130,7 +193,8 @@
     const avisoDetalhe = document.getElementById('aviso-detalhe');
 
     // Campos agrupados em secoes -- cada secao vira um bloco com
-    // titulo laranja + grade propria, para nao misturar tipos de dado
+    // titulo + grade propria, separado da proxima secao por uma linha
+    // fina (.secao-detalhe, ver CSS), para nao misturar tipos de dado
     // diferentes num unico bloco vertical.
     const SECOES = [
       {
@@ -243,10 +307,13 @@
         const chavesPresentes = Object.keys(secao.campos).filter((chave) => chave in dados && dados[chave]);
         if (chavesPresentes.length === 0) return; // secao inteira desabilitada, ou (VPM001) sem nenhuma descricao preenchida
 
+        const secaoEl = document.createElement('div');
+        secaoEl.className = 'secao-detalhe';
+
         const titulo = document.createElement('h2');
         titulo.className = 'titulo-secao';
         titulo.textContent = secao.titulo;
-        container.appendChild(titulo);
+        secaoEl.appendChild(titulo);
 
         const grade = document.createElement('div');
         grade.className = 'grade-campos grade-dados';
@@ -259,8 +326,134 @@
           `;
           grade.appendChild(bloco);
         });
-        container.appendChild(grade);
+        secaoEl.appendChild(grade);
+
+        container.appendChild(secaoEl);
       });
+    }
+
+    // ---- Bloco AMV (21/08/2026) ------------------------------------
+    // Um sub-cartão por MCH verificada nesse RAD (pode haver várias).
+    function renderizarAmv(blocosAmv) {
+      const cartao = document.getElementById('cartao-amv');
+      const container = document.getElementById('lista-amv-detalhe');
+      if (!blocosAmv || blocosAmv.length === 0) return;
+      cartao.style.display = '';
+
+      blocosAmv.forEach(function (bloco, indice) {
+        const item = document.createElement('div');
+        item.className = 'subcartao';
+
+        const titulo = document.createElement('p');
+        titulo.className = 'subcartao__titulo';
+        titulo.textContent = `MCH ${indice + 1} de ${blocosAmv.length} — ${bloco.identificacao_mch}`;
+        item.appendChild(titulo);
+
+        const grade = document.createElement('div');
+        grade.className = 'grade-campos grade-dados';
+
+        const camposBloco = [
+          ['Modelo', bloco.modelo_mch],
+          ['Via', bloco.via_mch],
+          ['UR', bloco.ur_mch],
+          ['Local', bloco.local_mch],
+          ['Linha', bloco.linha_mch],
+          ['Tipos de Defeito', bloco.tipos_defeito],
+          ['Ações', bloco.acoes],
+        ];
+        if (bloco.desc_outros_tipo_defeito) {
+          camposBloco.push(['Descrição — Outro Defeito', bloco.desc_outros_tipo_defeito]);
+        }
+        if (bloco.desc_outros_acao) {
+          camposBloco.push(['Descrição — Outra Ação', bloco.desc_outros_acao]);
+        }
+
+        camposBloco.forEach(function ([rotulo, valor]) {
+          const campo = document.createElement('div');
+          campo.className = 'campo-leitura';
+          campo.innerHTML = `
+            <span class="campo-leitura__rotulo">${rotulo}</span>
+            <span class="campo-leitura__valor">${formatarValor(valor)}</span>
+          `;
+          grade.appendChild(campo);
+        });
+
+        item.appendChild(grade);
+        container.appendChild(item);
+      });
+    }
+
+    // ---- Bloco Anomalias / Canaleta (21/08/2026) --------------------
+    // No máximo 1 por RAD (diferente do AMV, que pode repetir).
+    function renderizarCanaleta(canaleta) {
+      const cartao = document.getElementById('cartao-canaleta');
+      const container = document.getElementById('conteudo-canaleta');
+      if (!canaleta) return;
+      cartao.style.display = '';
+
+      const grade = document.createElement('div');
+      grade.className = 'grade-campos grade-dados';
+
+      const campos = [
+        ['Grau de Criticidade', canaleta.grau_criticidade],
+        ['Necessita Cautela', canaleta.necessita_cautela],
+        ['Anomalias', canaleta.anomalias],
+        ['Lado', canaleta.lados],
+      ];
+      if (canaleta.justificativa) {
+        campos.push(['Justificativa', canaleta.justificativa]);
+      }
+      campos.forEach(function ([rotulo, valor]) {
+        const campo = document.createElement('div');
+        campo.className = 'campo-leitura';
+        campo.innerHTML = `
+          <span class="campo-leitura__rotulo">${rotulo}</span>
+          <span class="campo-leitura__valor">${formatarValor(valor)}</span>
+        `;
+        grade.appendChild(campo);
+      });
+      container.appendChild(grade);
+
+      if (canaleta.dimensoes && canaleta.dimensoes.length > 0) {
+        const tituloDimensoes = document.createElement('p');
+        tituloDimensoes.className = 'subcartao__titulo';
+        tituloDimensoes.style.marginTop = '1rem';
+        tituloDimensoes.textContent = 'Dimensões';
+        container.appendChild(tituloDimensoes);
+
+        canaleta.dimensoes.forEach(function (linha) {
+          const item = document.createElement('div');
+          item.className = 'subcartao';
+
+          const tituloLinha = document.createElement('p');
+          tituloLinha.className = 'subcartao__titulo';
+          tituloLinha.textContent = `Linha ${linha.ordem}`;
+          item.appendChild(tituloLinha);
+
+          const gradeLinha = document.createElement('div');
+          gradeLinha.className = 'grade-campos grade-campos--compacta grade-dados';
+          const camposLinha = [
+            ['Largura Inicial (m)', linha.largura_inicial],
+            ['Largura Final (m)', linha.largura_final],
+            ['Altura Inicial (m)', linha.altura_inicial],
+            ['Altura Final (m)', linha.altura_final],
+            ['Comprimento (m)', linha.comprimento],
+            ['Km/Poste Inicial', linha.km_poste_inicial],
+            ['Km/Poste Final', linha.km_poste_final],
+          ];
+          camposLinha.forEach(function ([rotulo, valor]) {
+            const campo = document.createElement('div');
+            campo.className = 'campo-leitura';
+            campo.innerHTML = `
+              <span class="campo-leitura__rotulo">${rotulo}</span>
+              <span class="campo-leitura__valor">${formatarValor(valor)}</span>
+            `;
+            gradeLinha.appendChild(campo);
+          });
+          item.appendChild(gradeLinha);
+          container.appendChild(item);
+        });
+      }
     }
 
     function renderizarColaboradores(colaboradores) {
@@ -368,6 +561,8 @@
 
         renderizarCampos(dados);
         document.getElementById('cartao-dados').style.display = '';
+        renderizarAmv(dados.amv);
+        renderizarCanaleta(dados.canaleta);
         renderizarColaboradores(dados.colaboradores);
         renderizarAnexos(dados.anexos);
 
