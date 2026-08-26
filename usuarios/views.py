@@ -123,7 +123,12 @@ def login(request):
 
     return JsonResponse(
         {
-            'token': token.token,
+            # 25/08/2026: token.token agora e o HASH gravado no banco --
+            # o valor de verdade (o que o cliente deve usar no header
+            # Authorization dai em diante) vem de valor_plano, que so
+            # existe em memoria neste exato momento (ver
+            # usuarios/models.py::Token.gerar_para).
+            'token': token.valor_plano,
             'validade': token.validade.isoformat(),
             'login': usuario.login,
             'perfis': usuario.lista_perfis,

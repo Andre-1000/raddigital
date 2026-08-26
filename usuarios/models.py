@@ -14,6 +14,7 @@ existente recebia token valido sem provar identidade nenhuma). Ver
 `email`, `senha_hash`, `tentativas_login_falhas`, `bloqueado_ate` abaixo
 e o model `TokenRedefinicaoSenha`.
 """
+import hashlib
 import secrets
 from datetime import timedelta
 
@@ -21,6 +22,27 @@ from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
 from django.db import models
 from django.utils import timezone
+
+
+def hash_token(valor_texto_plano):
+    """
+    25/08/2026 (achado de auditoria de seguranca): tokens de sessao
+    eram gravados em TEXTO PURO no banco -- diferente da senha (ja
+    hasheada desde 30/07/2026). Se o banco vazasse, cada token ali
+    dava acesso direto a conta correspondente, sem precisar quebrar
+    nada.
+
+    SHA-256 simples (sem salt) e suficiente aqui -- e a tecnica padrao
+    para tokens de API/sessao (diferente de senha humana, que precisa
+    de salt+custo computacional contra forca bruta porque tem baixa
+    entropia). O token em si ja e gerado com secrets.token_urlsafe(48)
+    -- alta entropia, quebrar o hash por forca bruta e inviavel na
+    pratica. Sem salt tambem preserva a busca O(1) por indice unico
+    (Token.objects.get(token=hash)) -- com salt, cada hash seria
+    diferente a cada vez, exigindo iterar TODOS os tokens do banco a
+    cada requisicao pra comparar um por um.
+    """
+    return hashlib.sha256(valor_texto_plano.encode()).hexdigest()
 
 
 class Usuario(models.Model):
@@ -137,6 +159,17 @@ class Token(models.Model):
     """
     Token de autenticacao (sessao). Validade de 7 dias (RG-AUTH-003).
     Validado localmente no dispositivo quando offline (RG-AUTH-007).
+
+    25/08/2026: o campo `token` guarda o HASH (SHA-256, ver hash_token
+    acima) do valor real, nunca o valor em texto puro -- mesma logica
+    de protecao ja aplicada a Usuario.senha_hash. O valor em texto
+    puro so existe em memoria, no momento da criacao (ver
+    Token.gerar_para → atributo `valor_plano`, no proprio objeto
+    Python, nunca gravado no banco), tempo suficiente para devolver ao
+    cliente uma unica vez na resposta do login. Depois disso, nem o
+    proprio sistema consegue recuperar o valor original -- so
+    confirmar se um valor recebido bate com o hash guardado, exatamente
+    como ja funciona com senha.
     """
 
     usuario = models.ForeignKey(
@@ -179,14 +212,24 @@ class Token(models.Model):
         """
         Gera um novo token com validade de VALIDADE_TOKEN_DIAS dias
         (RG-AUTH-003). Valor unico e nao previsivel (Modelo Logico 6.3).
+
+        25/08/2026: grava o HASH no banco (campo `token`), e devolve o
+        valor em texto puro apenas no atributo `valor_plano` do objeto
+        retornado -- que existe so em memoria, nunca e salvo. Quem
+        chama este metodo (usuarios/views.py::login) deve usar
+        `.valor_plano` pra devolver o token ao cliente, nunca `.token`
+        (que a partir de agora e o hash, inutil pra autenticar).
         """
         dias = getattr(settings, 'VALIDADE_TOKEN_DIAS', 7)
-        return cls.objects.create(
+        valor_plano = secrets.token_urlsafe(48)
+        token = cls.objects.create(
             usuario=usuario,
-            token=secrets.token_urlsafe(48),
+            token=hash_token(valor_plano),
             validade=timezone.now() + timedelta(days=dias),
             dispositivo=dispositivo,
         )
+        token.valor_plano = valor_plano
+        return token
 
 
 class TokenRedefinicaoSenha(models.Model):
@@ -197,6 +240,12 @@ class TokenRedefinicaoSenha(models.Model):
 
     Serve tambem como fluxo de "definir minha primeira senha" para
     usuarios legados que nunca tiveram senha (ver Usuario.senha_hash).
+
+    Nota (25/08/2026): este token continua em texto puro no banco,
+    diferente de Token (sessao) acima -- risco bem menor aqui, porque
+    a validade e de so 1 hora e cada token e de uso unico (usado=True
+    apos a primeira utilizacao). Se quiser o mesmo tratamento de hash
+    aplicado aqui tambem, e uma mudanca separada.
     """
 
     usuario = models.ForeignKey(

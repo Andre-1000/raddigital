@@ -8,12 +8,18 @@ token enviado no cabecalho:
     Authorization: Token <valor-do-token>
 
 Referencia: EFD secao 3.9 (AUTENTICACAO) e secao 4 (MATRIZ DE PERMISSOES).
+
+25/08/2026: o valor recebido do cliente e hasheado (hash_token) antes
+de consultar o banco -- o campo Token.token guarda o HASH, nao mais o
+valor em texto puro (ver usuarios/models.py::Token para o raciocinio
+completo). O cliente continua enviando o valor original de sempre; a
+mudanca e so nesta comparacao, invisivel pro resto do sistema.
 """
 import functools
 
 from django.http import JsonResponse
 
-from .models import Token
+from .models import Token, hash_token
 
 
 def _extrair_token(request):
@@ -38,7 +44,7 @@ def requer_token(view_func):
             )
 
         try:
-            token = Token.objects.select_related('usuario').get(token=valor_token)
+            token = Token.objects.select_related('usuario').get(token=hash_token(valor_token))
         except Token.DoesNotExist:
             return JsonResponse({'erro': 'Token invalido.'}, status=401)
 
