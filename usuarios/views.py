@@ -5,9 +5,15 @@ Login com senha (30/07/2026 -- ver nota em models.py e CLAUDE.md sobre
 o achado de seguranca corrigido). Gestao de usuarios (EFD secao 4.4).
 Supervisor gerencia Usuarios e Supervisores (PRM-015 a PRM-020).
 Administrador gerencia todos (PRM-021 a PRM-024).
+
+25/08/2026: endpoint definir_senha_temporaria -- solucao para quando o
+envio de e-mail (SMTP) esta fora do ar/mal configurado e "Esqueci minha
+senha" nao chega para ninguem. Exclusivo do Administrador.
 """
 import json
 import re
+import secrets
+import string
 from datetime import timedelta
 
 from django.conf import settings
@@ -414,6 +420,76 @@ def confirmar_redefinicao_senha(request):
     TokenRedefinicaoSenha.objects.filter(usuario=usuario, usado=False).exclude(id=token.id).update(usado=True)
 
     return JsonResponse({'sucesso': True})
+
+
+def _gerar_senha_temporaria():
+    """
+    25/08/2026. Gera uma senha aleatoria de 12 caracteres (letras
+    maiusculas, minusculas e digitos) -- passa facil nas regras de
+    usuarios/validadores_senha.py (minimo 8, nao so numeros, nao
+    comum). Usada por definir_senha_temporaria, para o Administrador
+    nao precisar (nem poder) escolher a senha de outra pessoa a dedo.
+    """
+    alfabeto = string.ascii_uppercase + string.ascii_lowercase + string.digits
+    while True:
+        senha = ''.join(secrets.choice(alfabeto) for _ in range(12))
+        if not senha.isdigit():  # praticamente impossivel dar so digito em 12 chars, mas garante
+            return senha
+
+
+@csrf_exempt
+@require_POST
+@requer_token
+@requer_perfil(UsuarioPerfil.ADMINISTRADOR)
+def definir_senha_temporaria(request, id_usuario):
+    """
+    POST /usuarios/administrar/<id>/definir-senha-temporaria/
+    25/08/2026. Exclusivo do Administrador -- via de emergencia para
+    quando "Esqueci minha senha" nao chega (ex.: SMTP mal configurado
+    ou fora do ar). Gera uma senha aleatoria de 12 caracteres, define
+    ela como a senha da pessoa, e devolve essa senha na resposta UMA
+    UNICA VEZ (nunca fica salva em texto puro nem reaparece depois) --
+    cabe ao Administrador repassar por um canal fora do sistema
+    (telefone, presencial), nunca por e-mail (o mesmo canal que esta
+    com problema) ou mensagem sem criptografia.
+
+    Zera tambem tentativas_login_falhas/bloqueado_ate, para a pessoa
+    conseguir entrar de primeira com a senha nova, mesmo que estivesse
+    bloqueada por tentativas erradas anteriores.
+
+    So Administrador (nao Supervisor): e um bypass direto do fluxo
+    normal de prova de identidade (link por e-mail), entao fica restrito
+    ao mesmo nivel de quem ja pode gerenciar sessoes/exportacoes
+    sensiveis.
+    """
+    try:
+        usuario = Usuario.objects.prefetch_related('perfis').get(id=id_usuario)
+    except Usuario.DoesNotExist:
+        return JsonResponse({'erro': 'Usuario nao encontrado.'}, status=404)
+
+    solicitante = request.usuario_rad
+    if not _pode_gerenciar(usuario, solicitante):
+        return JsonResponse(
+            {'erro': 'Você não tem permissão para definir a senha deste usuário.'},
+            status=403,
+        )
+
+    senha_temporaria = _gerar_senha_temporaria()
+
+    usuario.definir_senha(senha_temporaria)
+    usuario.tentativas_login_falhas = 0
+    usuario.bloqueado_ate = None
+    usuario.save(update_fields=['senha_hash', 'tentativas_login_falhas', 'bloqueado_ate'])
+
+    # Invalida qualquer link de "esqueci minha senha" pendente dessa
+    # pessoa -- evita que um link antigo (que pode nem ter chegado,
+    # dado o motivo de existir esta rota) ainda funcione depois.
+    TokenRedefinicaoSenha.objects.filter(usuario=usuario, usado=False).update(usado=True)
+
+    return JsonResponse({
+        'login': usuario.login,
+        'senha_temporaria': senha_temporaria,
+    })
 
 
 # ---------------------------------------------------------------------------

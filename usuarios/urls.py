@@ -25,4 +25,9 @@ urlpatterns = [
     path('administrar/criar/', views.criar, name='criar'),
     path('administrar/<int:id_usuario>/editar/', views.editar, name='editar'),
     path('administrar/<int:id_usuario>/excluir/', views.excluir, name='excluir'),
+    # 25/08/2026: definir senha temporaria -- exclusivo do
+    # Administrador, via de emergencia enquanto o envio de e-mail
+    # (SMTP) nao estiver funcionando (ver usuarios/views.py para
+    # detalhes e justificativa).
+    path('administrar/<int:id_usuario>/definir-senha-temporaria/', views.definir_senha_temporaria, name='definir_senha_temporaria'),
 ]

@@ -104,6 +104,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const ICONE_ATIVAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>';
   const ICONE_DESATIVAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.9" y1="4.9" x2="19.1" y2="19.1"></line></svg>';
   const ICONE_EXCLUIR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
+  const ICONE_SENHA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"></circle><path d="m21 2-9.6 9.6"></path><path d="m15.5 7.5 3 3L22 7l-3-3"></path></svg>';
 
   // -------------------------------------------------------------
   // Modal: Como importar
@@ -261,6 +262,15 @@ document.addEventListener('DOMContentLoaded', function () {
       ? pessoa.perfis.map(seloPerfil).join('')
       : '<span class="texto-suave" style="font-size:0.85rem;">Sem login</span>';
 
+    const botaoSenhaTemp = souAdministrador && pessoa.usuario_id
+      ? html`
+        <button type="button" class="botao botao--secundaria botao-icone botao-senha-temporaria"
+                title="Definir senha temporária"
+                data-usuario-id="${pessoa.usuario_id}" data-nome="${escapar(pessoa.nome)}">
+          ${ICONE_SENHA}
+        </button>`
+      : '';
+
     const botoesAcao = podeGerenciarAdmin
       ? html`
         <button type="button" class="botao botao--secundaria botao-icone botao-editar-perfis"
@@ -276,6 +286,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 data-id="${pessoa.id}" data-ativo="${pessoa.ativo}">
           ${pessoa.ativo ? ICONE_DESATIVAR : ICONE_ATIVAR}
         </button>
+        ${botaoSenhaTemp}
         <button type="button" class="botao botao--perigo botao-icone botao-excluir"
                 title="Excluir definitivamente"
                 data-id="${pessoa.id}" data-nome="${escapar(pessoa.nome)}">
@@ -336,6 +347,9 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     corpoTabela.querySelectorAll('.botao-alternar-status').forEach((botao) => {
       botao.addEventListener('click', () => alternarStatus(botao.dataset));
+    });
+    corpoTabela.querySelectorAll('.botao-senha-temporaria').forEach((botao) => {
+      botao.addEventListener('click', () => definirSenhaTemporaria(botao.dataset));
     });
     corpoTabela.querySelectorAll('.botao-excluir').forEach((botao) => {
       botao.addEventListener('click', () => abrirModalExcluir(botao.dataset));
@@ -529,6 +543,59 @@ document.addEventListener('DOMContentLoaded', function () {
     } finally {
       botao.disabled = false;
     }
+  });
+
+  // -------------------------------------------------------------
+  // Senha temporária (25/08/2026, exclusivo do Administrador) --
+  // via de emergência quando "Esqueci minha senha" não chega (SMTP
+  // fora do ar/mal configurado). Pede confirmação (window.confirm --
+  // ação sensível o bastante pra merecer uma pausa, mas simples o
+  // bastante pra não precisar de um modal próprio só pra isso), gera
+  // a senha no backend, e mostra ela UMA VEZ no modal de resultado.
+  // -------------------------------------------------------------
+  const modalSenhaTemporaria = document.getElementById('modal-senha-temporaria');
+  const avisoCopiarSenhaTemp = document.getElementById('aviso-copiar-senha-temp');
+
+  async function definirSenhaTemporaria(dataset) {
+    const confirmou = window.confirm(
+      `Definir uma nova senha temporária para ${dataset.nome}? A senha atual dessa pessoa deixa de funcionar imediatamente.`
+    );
+    if (!confirmou) return;
+
+    try {
+      const resposta = await RadAuth.requisicaoAutenticada(
+        `/usuarios/administrar/${dataset.usuarioId}/definir-senha-temporaria/`,
+        { method: 'POST' }
+      );
+      const dados = await resposta.json();
+
+      if (!resposta.ok) {
+        mostrarAviso(avisoLista, dados.erro || 'Não foi possível gerar a senha temporária.', 'erro');
+        return;
+      }
+
+      document.getElementById('nome-pessoa-senha-temp').textContent = dataset.nome;
+      document.getElementById('valor-senha-temporaria').textContent = dados.senha_temporaria;
+      avisoCopiarSenhaTemp.innerHTML = '';
+      modalSenhaTemporaria.style.display = 'flex';
+    } catch (erro) {
+      mostrarAviso(avisoLista, 'Erro de conexão ao gerar a senha temporária.', 'erro');
+    }
+  }
+
+  document.getElementById('botao-copiar-senha-temporaria').addEventListener('click', async function () {
+    const valor = document.getElementById('valor-senha-temporaria').textContent;
+    try {
+      await navigator.clipboard.writeText(valor);
+      avisoCopiarSenhaTemp.innerHTML = '<div class="aviso aviso--sucesso">Copiado.</div>';
+    } catch (erro) {
+      avisoCopiarSenhaTemp.innerHTML = '<div class="aviso aviso--erro">Não foi possível copiar automaticamente — selecione o texto manualmente.</div>';
+    }
+  });
+
+  document.getElementById('botao-fechar-senha-temporaria').addEventListener('click', function () {
+    modalSenhaTemporaria.style.display = 'none';
+    document.getElementById('valor-senha-temporaria').textContent = '';
   });
 
   // -------------------------------------------------------------

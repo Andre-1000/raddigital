@@ -308,6 +308,32 @@
     </div>
   </div>
 </div>
+
+<!-- Modal: senha temporaria gerada (25/08/2026) -->
+<div id="modal-senha-temporaria"
+     style="display:none; position:fixed; inset:0; background:rgba(28,31,30,0.5);
+            z-index:30; align-items:center; justify-content:center; padding:1rem;">
+  <div class="cartao" style="max-width:420px; width:100%;">
+    <h2 style="font-size:1.05rem;">Senha temporária — <span id="nome-pessoa-senha-temp"></span></h2>
+    <p class="texto-suave" style="font-size:0.85rem;">
+      Essa senha só aparece <strong>uma vez</strong>, agora. Repasse por telefone ou
+      pessoalmente — nunca por e-mail (o mesmo canal que motivou usar esta opção) nem
+      por mensagem sem criptografia. A pessoa pode trocá-la depois em "Trocar senha".
+    </p>
+    <div style="display:flex; align-items:center; gap:0.5rem; margin:0.75rem 0;">
+      <code id="valor-senha-temporaria"
+            style="flex:1; background:var(--cor-fundo-suave); padding:0.75rem 1rem; border-radius:var(--raio-pequeno);
+                   font-size:1.1rem; font-weight:700; letter-spacing:0.03em; text-align:center;"></code>
+      <button type="button" class="botao botao--secundaria" id="botao-copiar-senha-temporaria" style="width:auto; min-height:44px; padding:0 1rem;">
+        Copiar
+      </button>
+    </div>
+    <div id="aviso-copiar-senha-temp"></div>
+    <button type="button" class="botao botao--primaria" id="botao-fechar-senha-temporaria" style="margin-top:0.5rem;">
+      Fechar
+    </button>
+  </div>
+</div>
 {% endblock %}
 
 {% block script_extra %}
