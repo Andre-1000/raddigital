@@ -196,8 +196,8 @@
     // varios campos aqui sao texto livre digitado por quem preenche o
     // RAD (observacoes, descricao tecnica, justificativas, nome de
     // colaborador, nome de arquivo anexado) e eram inseridos direto no
-    // HTML via innerHTML, sem escapar. Alguem podia digitar algo como
-    // "<script>...</script>" num campo de texto livre, e esse codigo
+    // HTML via innerHTML, sem escapar. Alguem podia digitar um bloco
+    // de codigo malicioso num campo de texto livre, e esse codigo
     // rodaria de verdade na tela de quem abrisse o RAD depois --
     // grave porque o token de sessao fica acessivel via JS
     // (localStorage), entao um script assim conseguiria rouba-lo.
