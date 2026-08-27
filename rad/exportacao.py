@@ -135,13 +135,22 @@ def _campos_do_relatorio(rad):
 
 
 def gerar_mensagem_copiar(rad):
-    """RG-EXP-013: mensagem estruturada para a área de transferência."""
+    """
+    RG-EXP-013: mensagem estruturada para a área de transferência.
+
+    27/08/2026: formatada para colar direto no WhatsApp -- rótulos em
+    negrito (*texto*, um asterisco só -- é o formato real do WhatsApp;
+    dois asteriscos "**" não vira negrito lá, aparece literal) e cada
+    campo separado por uma linha de sublinhados, para ficar fácil de
+    escanear numa conversa.
+    """
     desabilitados = campos_desabilitados()
     campos = _campos_do_relatorio(rad)
-    corpo = '\n\n'.join(
-        f'{rotulo}: {valor}' for chave, rotulo, valor in campos if chave not in desabilitados
-    )
-    return f'RAD - (Relatório de Atividade Diária)\n\n{corpo}'
+    linhas = [
+        f'*{rotulo}:* {valor}' for chave, rotulo, valor in campos if chave not in desabilitados
+    ]
+    corpo = '\n___________\n'.join(linhas)
+    return f'*RAD - (Relatório de Atividade Diária)*\n___________\n{corpo}'
 
 
 def gerar_pdf_bytes(rad):

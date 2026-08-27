@@ -122,9 +122,13 @@ const ExportarCliente = (function () {
   }
 
   function gerarMensagemCopiar(rascunho, catalogos) {
+    // 27/08/2026: mesmo formato do backend (rad/exportacao.py::gerar_mensagem_copiar)
+    // -- rótulos em negrito real do WhatsApp (*texto*, um asterisco
+    // só) e cada campo separado por uma linha de sublinhados.
     const campos = montarCampos(rascunho, catalogos);
-    const corpo = campos.map(([_chave, rotulo, valor]) => `${rotulo}: ${valor}`).join('\n\n');
-    return `RAD - (Relatório de Atividade Diária)\n\n${corpo}`;
+    const linhas = campos.map(([_chave, rotulo, valor]) => `*${rotulo}:* ${valor}`);
+    const corpo = linhas.join('\n___________\n');
+    return `*RAD - (Relatório de Atividade Diária)*\n___________\n${corpo}`;
   }
 
   function gerarPdfBlob(rascunho, catalogos) {
