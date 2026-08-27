@@ -362,6 +362,21 @@ def solicitar_redefinicao_senha(request):
     if usuario is None:
         return resposta_generica
 
+    # 25/08/2026: limite de solicitacoes por CONTA (nao por IP) numa
+    # janela de tempo -- protege quem recebe o e-mail de ser spamado
+    # por alguem repetindo este POST, sem precisar identificar quem
+    # esta pedindo (o atacante pode trocar de IP, mas o alvo continua
+    # sendo o mesmo e-mail). Resposta continua identica -- nao revela
+    # se o limite foi atingido, so silenciosamente para de enviar.
+    maximo = getattr(settings, 'MAXIMO_SOLICITACOES_REDEFINICAO_SENHA', 3)
+    janela_minutos = getattr(settings, 'JANELA_REDEFINICAO_SENHA_MINUTOS', 60)
+    solicitacoes_recentes = TokenRedefinicaoSenha.objects.filter(
+        usuario=usuario,
+        criado_em__gte=timezone.now() - timedelta(minutes=janela_minutos),
+    ).count()
+    if solicitacoes_recentes >= maximo:
+        return resposta_generica
+
     token = TokenRedefinicaoSenha.gerar_para(usuario)
     try:
         enviar_email_redefinicao_senha(usuario, token.token)
