@@ -227,6 +227,32 @@
     <p id="mensagem-inicial-sessoes" class="texto-suave centro" style="margin-top:2rem;">
       Clique em "Pesquisar" para ver todas as sessões ativas, ou digite um nome/matrícula para filtrar.
     </p>
+
+    <!-- 25/08/2026: historico de auditoria de "Definir senha
+         temporaria" -- quem gerou senha pra quem, e quando. Carregado
+         uma vez, junto com a primeira abertura desta aba. -->
+    <div class="cartao" style="margin-top:1.5rem;">
+      <h2 style="font-size:1rem;">Histórico de senhas temporárias</h2>
+      <p class="texto-suave" style="font-size:0.85rem; margin-top:-0.5rem;">
+        Registro de toda vez que um Administrador gerou uma senha temporária para outra pessoa.
+      </p>
+      <div id="aviso-log-senha-temp"></div>
+      <div class="tabela-wrap" style="margin-top:0.75rem;">
+        <table class="tabela">
+          <thead>
+            <tr>
+              <th>Administrador</th>
+              <th>Para</th>
+              <th>Quando</th>
+            </tr>
+          </thead>
+          <tbody id="corpo-tabela-log-senha-temp"></tbody>
+        </table>
+      </div>
+      <p id="mensagem-vazia-log-senha-temp" class="texto-suave centro" style="display:none; margin-top:1rem;">
+        Nenhuma senha temporária foi gerada ainda.
+      </p>
+    </div>
   </div>
 
 </div>

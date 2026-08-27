@@ -30,4 +30,8 @@ urlpatterns = [
     # (SMTP) nao estiver funcionando (ver usuarios/views.py para
     # detalhes e justificativa).
     path('administrar/<int:id_usuario>/definir-senha-temporaria/', views.definir_senha_temporaria, name='definir_senha_temporaria'),
+    # 25/08/2026: historico de auditoria de quem gerou senha
+    # temporaria pra quem (LogSenhaTemporaria) -- exclusivo do
+    # Administrador.
+    path('administrar/log-senha-temporaria/', views.listar_log_senha_temporaria, name='listar_log_senha_temporaria'),
 ]

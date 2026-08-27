@@ -41,6 +41,10 @@ def hash_token(valor_texto_plano):
     (Token.objects.get(token=hash)) -- com salt, cada hash seria
     diferente a cada vez, exigindo iterar TODOS os tokens do banco a
     cada requisicao pra comparar um por um.
+
+    25/08/2026 (revisado): mesma funcao reaproveitada por
+    TokenRedefinicaoSenha (ver classe abaixo), que ate esta revisao
+    ainda gravava o valor em texto puro.
     """
     return hashlib.sha256(valor_texto_plano.encode()).hexdigest()
 
@@ -241,11 +245,13 @@ class TokenRedefinicaoSenha(models.Model):
     Serve tambem como fluxo de "definir minha primeira senha" para
     usuarios legados que nunca tiveram senha (ver Usuario.senha_hash).
 
-    Nota (25/08/2026): este token continua em texto puro no banco,
-    diferente de Token (sessao) acima -- risco bem menor aqui, porque
-    a validade e de so 1 hora e cada token e de uso unico (usado=True
-    apos a primeira utilizacao). Se quiser o mesmo tratamento de hash
-    aplicado aqui tambem, e uma mudanca separada.
+    25/08/2026: mesma protecao aplicada ao Token de sessao -- o campo
+    `token` guarda o HASH (ver hash_token no topo do arquivo), nunca o
+    valor em texto puro. O valor de verdade so existe em memoria no
+    momento da criacao (atributo `valor_plano`), tempo suficiente para
+    ir dentro do e-mail (ver usuarios/servicos_email.py) -- depois
+    disso, nem o sistema consegue recupera-lo, so confirmar se um
+    valor recebido bate com o hash guardado.
     """
 
     usuario = models.ForeignKey(
@@ -280,11 +286,62 @@ class TokenRedefinicaoSenha(models.Model):
 
     @classmethod
     def gerar_para(cls, usuario, horas_validade=1):
-        return cls.objects.create(
+        """
+        25/08/2026: grava o HASH no banco (campo `token`) e devolve o
+        valor em texto puro apenas no atributo `valor_plano` do objeto
+        retornado. Quem chama este metodo (usuarios/views.py::
+        solicitar_redefinicao_senha) deve usar `.valor_plano` pra
+        montar o link do e-mail, nunca `.token`.
+        """
+        valor_plano = secrets.token_urlsafe(48)
+        token = cls.objects.create(
             usuario=usuario,
-            token=secrets.token_urlsafe(48),
+            token=hash_token(valor_plano),
             validade=timezone.now() + timedelta(hours=horas_validade),
         )
+        token.valor_plano = valor_plano
+        return token
+
+
+class LogSenhaTemporaria(models.Model):
+    """
+    25/08/2026 (achado de auditoria de seguranca): registro de toda vez
+    que um Administrador gera uma senha temporaria para outra pessoa
+    (ver usuarios/views.py::definir_senha_temporaria) -- via de
+    emergencia usada quando "Esqueci minha senha" nao chega por
+    e-mail. Sem esse registro, nao havia como saber depois quem gerou
+    senha pra quem, nem quando.
+
+    Guarda tanto a FK quanto um snapshot do login de cada lado
+    (administrador e usuario_alvo) -- assim o historico continua
+    legivel mesmo que um dos dois usuarios seja excluido depois
+    (on_delete=SET_NULL na FK, mas o snapshot em texto permanece).
+    """
+
+    administrador = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='logs_senha_temporaria_gerada',
+    )
+    administrador_login_snapshot = models.CharField(max_length=100)
+    usuario_alvo = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='logs_senha_temporaria_recebida',
+    )
+    usuario_alvo_login_snapshot = models.CharField(max_length=100)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'log_senha_temporaria'
+        verbose_name = 'Log de Senha Temporária'
+        verbose_name_plural = 'Logs de Senha Temporária'
+        ordering = ['-criado_em']
+
+    def __str__(self):
+        return f'{self.administrador_login_snapshot} -> {self.usuario_alvo_login_snapshot} em {self.criado_em:%d/%m/%Y %H:%M}'
 
 
 class TentativaLoginAdmin(models.Model):

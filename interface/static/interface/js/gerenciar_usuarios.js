@@ -686,6 +686,47 @@ document.addEventListener('DOMContentLoaded', function () {
       if (evento.key === 'Enter') pesquisarSessoes();
     });
 
+    // -----------------------------------------------------------
+    // Histórico de senhas temporárias (25/08/2026) -- auditoria de
+    // quem gerou senha temporária pra quem. Carregado junto com a
+    // primeira abertura da aba Sessões, sem precisar de botão
+    // próprio (volume baixo, uso de emergência).
+    // -----------------------------------------------------------
+    const avisoLogSenhaTemp = document.getElementById('aviso-log-senha-temp');
+    const corpoTabelaLogSenhaTemp = document.getElementById('corpo-tabela-log-senha-temp');
+    const mensagemVaziaLogSenhaTemp = document.getElementById('mensagem-vazia-log-senha-temp');
+
+    function linhaLogSenhaTemp(entrada) {
+      return html`
+        <tr>
+          <td>${escapar(entrada.administrador)}</td>
+          <td>${escapar(entrada.usuario_alvo)}</td>
+          <td>${formatarDataHora(entrada.criado_em)}</td>
+        </tr>`;
+    }
+
+    async function carregarLogSenhaTemporaria() {
+      limparAviso(avisoLogSenhaTemp);
+      try {
+        const resposta = await RadAuth.requisicaoAutenticada('/usuarios/administrar/log-senha-temporaria/');
+        if (!resposta.ok) {
+          mostrarAviso(avisoLogSenhaTemp, 'Não foi possível carregar o histórico.', 'erro');
+          return;
+        }
+        const dados = await resposta.json();
+
+        if (dados.entradas.length === 0) {
+          corpoTabelaLogSenhaTemp.innerHTML = '';
+          mensagemVaziaLogSenhaTemp.style.display = '';
+          return;
+        }
+        mensagemVaziaLogSenhaTemp.style.display = 'none';
+        corpoTabelaLogSenhaTemp.innerHTML = dados.entradas.map(linhaLogSenhaTemp).join('');
+      } catch (erro) {
+        mostrarAviso(avisoLogSenhaTemp, 'Erro de conexão ao carregar o histórico.', 'erro');
+      }
+    }
+
     // Carrega a lista completa assim que a aba "Sessões" é aberta pela
     // primeira vez -- não precisa esperar a pessoa clicar em
     // "Pesquisar" de novo se ela só quer ver "quem está online agora".
@@ -694,6 +735,7 @@ document.addEventListener('DOMContentLoaded', function () {
       if (!sessoesJaCarregadas) {
         sessoesJaCarregadas = true;
         pesquisarSessoes();
+        carregarLogSenhaTemporaria();
       }
     });
   }

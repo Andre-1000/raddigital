@@ -8,7 +8,8 @@ Administrador gerencia todos (PRM-021 a PRM-024).
 
 25/08/2026: endpoint definir_senha_temporaria -- solucao para quando o
 envio de e-mail (SMTP) esta fora do ar/mal configurado e "Esqueci minha
-senha" nao chega para ninguem. Exclusivo do Administrador.
+senha" nao chega para ninguem. Exclusivo do Administrador. Cada uso
+fica registrado em LogSenhaTemporaria (auditoria).
 """
 import json
 import re
@@ -25,7 +26,14 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_http_methods
 
 from .decorators import requer_perfil, requer_token
-from .models import Token, TokenRedefinicaoSenha, Usuario, UsuarioPerfil
+from .models import (
+    LogSenhaTemporaria,
+    Token,
+    TokenRedefinicaoSenha,
+    Usuario,
+    UsuarioPerfil,
+    hash_token,
+)
 from .servicos_email import enviar_email_redefinicao_senha
 from .validadores_senha import validar_senha
 
@@ -379,7 +387,10 @@ def solicitar_redefinicao_senha(request):
 
     token = TokenRedefinicaoSenha.gerar_para(usuario)
     try:
-        enviar_email_redefinicao_senha(usuario, token.token)
+        # 25/08/2026: token.token agora e o HASH gravado no banco -- o
+        # e-mail precisa do valor de verdade, que so existe em
+        # valor_plano (ver usuarios/models.py::TokenRedefinicaoSenha.gerar_para).
+        enviar_email_redefinicao_senha(usuario, token.valor_plano)
     except Exception as erro:
         # 30/07/2026: a resposta pro CLIENTE continua generica de
         # proposito (evita enumeracao de contas) -- mas o erro real
@@ -412,7 +423,12 @@ def confirmar_redefinicao_senha(request):
     if not valor_token:
         return JsonResponse({'erro': 'Link inválido.'}, status=400)
 
-    token = TokenRedefinicaoSenha.objects.select_related('usuario').filter(token=valor_token).first()
+    # 25/08/2026: TokenRedefinicaoSenha.token agora guarda o HASH --
+    # hasheia o valor recebido do link antes de buscar, mesma tecnica
+    # ja usada para o token de sessao (ver usuarios/decorators.py).
+    token = TokenRedefinicaoSenha.objects.select_related('usuario').filter(
+        token=hash_token(valor_token)
+    ).first()
     if token is None or not token.valido:
         return JsonResponse(
             {'erro': 'Este link é inválido ou já expirou. Solicite um novo em "Esqueci minha senha".'},
@@ -481,6 +497,12 @@ def definir_senha_temporaria(request, id_usuario):
     normal de prova de identidade (link por e-mail), entao fica restrito
     ao mesmo nivel de quem ja pode gerenciar sessoes/exportacoes
     sensiveis.
+
+    25/08/2026 (revisado): cada uso fica registrado em
+    LogSenhaTemporaria -- antes disso, nao havia como saber depois
+    quem gerou senha pra quem, nem quando (achado de auditoria de
+    seguranca -- ver tela "Sessões" em Gerenciar Usuários, que agora
+    mostra esse historico).
     """
     try:
         usuario = Usuario.objects.prefetch_related('perfis').get(id=id_usuario)
@@ -506,9 +528,39 @@ def definir_senha_temporaria(request, id_usuario):
     # dado o motivo de existir esta rota) ainda funcione depois.
     TokenRedefinicaoSenha.objects.filter(usuario=usuario, usado=False).update(usado=True)
 
+    LogSenhaTemporaria.objects.create(
+        administrador=solicitante,
+        administrador_login_snapshot=solicitante.login,
+        usuario_alvo=usuario,
+        usuario_alvo_login_snapshot=usuario.login,
+    )
+
     return JsonResponse({
         'login': usuario.login,
         'senha_temporaria': senha_temporaria,
+    })
+
+
+@requer_token
+@requer_perfil(UsuarioPerfil.ADMINISTRADOR)
+def listar_log_senha_temporaria(request):
+    """
+    GET /usuarios/administrar/log-senha-temporaria/
+    25/08/2026. Exclusivo do Administrador -- historico de auditoria de
+    quem gerou senha temporaria pra quem (ver definir_senha_temporaria
+    acima). Mostra os 100 mais recentes -- volume esperado e baixo (uso
+    de emergencia, nao uma acao do dia a dia).
+    """
+    entradas = LogSenhaTemporaria.objects.select_related('administrador', 'usuario_alvo')[:100]
+    return JsonResponse({
+        'entradas': [
+            {
+                'administrador': entrada.administrador_login_snapshot,
+                'usuario_alvo': entrada.usuario_alvo_login_snapshot,
+                'criado_em': entrada.criado_em.isoformat(),
+            }
+            for entrada in entradas
+        ]
     })
 
 
