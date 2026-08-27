@@ -31,6 +31,17 @@
     const aviso = document.getElementById('aviso-meus-rads');
     const mensagemVazia = document.getElementById('mensagem-vazia');
 
+    // 26/08/2026 (auditoria de seguranca -- defesa em profundidade):
+    // numero_sa ja e validado no backend como somente digitos
+    // (VLD-028), entao nao carrega risco real de XSS hoje -- mas
+    // escapamos aqui mesmo assim, seguindo o mesmo padrao aplicado em
+    // detalhe_rad.html e rad_form.js, caso essa regra mude no futuro.
+    function escapar(texto) {
+      const div = document.createElement('div');
+      div.textContent = texto ?? '';
+      return div.innerHTML;
+    }
+
     function seloStatus(status) {
       const classe = status === 'cancelado' ? 'selo--offline' : 'selo--online';
       return `<span class="selo ${classe}">${status}</span>`;
@@ -61,18 +72,18 @@
           item.style.textDecoration = 'none';
           item.href = `/consultar/${rad.numero_rad}/`;
           const blocoDispositivo = RadAuth.temPerfil('supervisor', 'administrador')
-            ? `<div><span class="texto-suave" style="font-size:0.78rem;">Dispositivo</span><br>${rad.dispositivo}</div>`
+            ? `<div><span class="texto-suave" style="font-size:0.78rem;">Dispositivo</span><br>${escapar(rad.dispositivo)}</div>`
             : '';
           item.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center;">
-              <strong>${rad.numero_rad}</strong>
+              <strong>${escapar(rad.numero_rad)}</strong>
               ${seloStatus(rad.status)}
             </div>
             <div class="grade-campos" style="margin-top:0.6rem; gap:0.4rem 1rem;">
-              <div><span class="texto-suave" style="font-size:0.78rem;">OS</span><br>${rad.numero_os}</div>
-              <div><span class="texto-suave" style="font-size:0.78rem;">N° SA</span><br>${rad.numero_sa}</div>
-              <div><span class="texto-suave" style="font-size:0.78rem;">Data de execução</span><br>${rad.data_preenchimento}</div>
-              <div><span class="texto-suave" style="font-size:0.78rem;">Horário real</span><br>${rad.hora_real_inicio}</div>
+              <div><span class="texto-suave" style="font-size:0.78rem;">OS</span><br>${escapar(rad.numero_os)}</div>
+              <div><span class="texto-suave" style="font-size:0.78rem;">N° SA</span><br>${escapar(rad.numero_sa)}</div>
+              <div><span class="texto-suave" style="font-size:0.78rem;">Data de execução</span><br>${escapar(rad.data_preenchimento)}</div>
+              <div><span class="texto-suave" style="font-size:0.78rem;">Horário real</span><br>${escapar(rad.hora_real_inicio)}</div>
               ${blocoDispositivo}
             </div>
           `;

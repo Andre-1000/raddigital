@@ -10,6 +10,20 @@ document.addEventListener('DOMContentLoaded', async function () {
   const statusRascunho = document.getElementById('status-rascunho');
   const avisoFormulario = document.getElementById('aviso-formulario');
 
+  // 26/08/2026 (achado de auditoria de seguranca -- XSS armazenado):
+  // nome de colaborador (cadastro, pode vir de importacao CSV feita
+  // por um Administrador) e detalhes de MCH (catalogo) sao inseridos
+  // no HTML deste formulario -- sem escapar, um nome ou valor de
+  // catalogo malicioso rodaria como codigo na tela de QUALQUER pessoa
+  // que buscasse esse colaborador/MCH em qualquer RAD novo. Mesmo
+  // padrao de correcao ja aplicado em detalhe_rad.html e
+  // gerenciar_usuarios.js.
+  function escapar(texto) {
+    const div = document.createElement('div');
+    div.textContent = texto ?? '';
+    return div.innerHTML;
+  }
+
   let rascunho = await RadDB.obterRascunho(sessao.login);
   const jaExistiaRascunho = rascunho !== null;
   if (!rascunho) {
@@ -21,10 +35,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
   }
   if (!rascunho.amv_blocos) {
-    // 30/07/2026: migracao defensiva de rascunhos antigos que ainda
-    // estejam salvos no formato singular (rascunho.amv) no
-    // IndexedDB de algum dispositivo -- converte pra lista, sem
-    // perder o que a pessoa ja tinha preenchido.
     if (rascunho.amv && rascunho.amv.id_mch) {
       rascunho.amv_blocos = [rascunho.amv];
     } else {
@@ -36,11 +46,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     rascunho.anexos = { fotos_intervencao_verificada: [], fotos_acao_realizada: [], pdf: [] };
   }
   if (!rascunho.canaleta_dimensoes) {
-    // 14/08/2026: migracao defensiva de rascunhos antigos que ainda
-    // tenham os 5 campos fixos antigos (canaleta_largura_inicial etc,
-    // um unico conjunto de medidas) salvos no IndexedDB -- converte
-    // pra lista de 1 linha, sem perder o que a pessoa ja tinha
-    // preenchido. Mesmo padrao ja usado acima para amv_blocos.
     const tinhaAlgumaDimensaoAntiga = !!(
       rascunho.canaleta_largura_inicial || rascunho.canaleta_largura_final ||
       rascunho.canaleta_altura_inicial || rascunho.canaleta_altura_final ||
@@ -61,10 +66,6 @@ document.addEventListener('DOMContentLoaded', async function () {
           km_poste_inicial: '', km_poste_final: '',
         }];
   }
-  // 14/08/2026: rascunhos que ja tinham canaleta_dimensoes (versao
-  // anterior desta mesma funcionalidade, sem os campos de Km/Poste)
-  // ganham os 2 campos novos com valor vazio, sem perder o resto da
-  // linha ja preenchida.
   rascunho.canaleta_dimensoes.forEach(function (linha) {
     if (linha.km_poste_inicial === undefined) linha.km_poste_inicial = '';
     if (linha.km_poste_final === undefined) linha.km_poste_final = '';
@@ -397,13 +398,6 @@ document.addEventListener('DOMContentLoaded', async function () {
   }
   atualizarVisibilidadeNumeroFalha();
 
-  // 30/07/2026: os campos de comentario de foto (desc_foto_1..4)
-  // deixaram de ter caixas fixas aqui -- agora moram no bloco Anexos,
-  // acionados por botao (ver atualizarComentariosFotos, mais abaixo,
-  // e a secao "Comentarios das fotos"). ehVpm001Selecionado()
-  // continua aqui porque tambem e usada por atualizarVisibilidadeNumeroFalha
-  // (nao, so por comentarios -- mas fica perto do resto da logica de
-  // Tipo de Manutencao por clareza).
   function ehVpm001Selecionado() {
     return nomeDoTipoSelecionado() === 'VPM001';
   }
@@ -686,16 +680,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
   }
 
-  // 30/07/2026: Servicos Executados agora e organizado em blocos
-  // expansiveis (Geral, Infra, Corretiva, Mecanizada) -- cada grupo
-  // comeca fechado e o usuario clica pra expandir e ver os servicos
-  // daquele grupo. Usa o elemento nativo <details>/<summary> do HTML:
-  // ganha comportamento de clique/teclado de graca, sem precisar
-  // escrever logica de abrir/fechar na mao. "Outros" fica de fora dos
-  // grupos, sempre visivel no final (e um catch-all, nao uma
-  // categoria). Um grupo que ja tem servico selecionado comeca aberto
-  // (RG: nunca esconder uma selecao existente do usuario sem ele
-  // pedir), e o cabecalho mostra quantos estao marcados mesmo fechado.
   const ROTULOS_GRUPO_SERVICO = {
     geral: 'Geral',
     infra: 'Infra',
@@ -740,7 +724,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       const itensDoGrupo = servicosOrdenados.filter(
         (s) => (s.area || 'geral') === chaveGrupo && s.nome !== 'Outros'
       );
-      if (itensDoGrupo.length === 0) return; // grupo sem nenhum servico ativo: nem aparece
+      if (itensDoGrupo.length === 0) return;
 
       const detalhes = document.createElement('details');
       detalhes.className = 'grupo-servicos';
@@ -769,8 +753,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         corpo.appendChild(linha);
       });
 
-      // Comeca aberto se ja tem algo marcado -- nunca esconder uma
-      // selecao existente sem o usuario pedir.
       detalhes.open = itensDoGrupo.some((s) => valoresSelecionados.includes(s.id));
 
       containerEl.appendChild(detalhes);
@@ -827,11 +809,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     return algumServicoSelecionadoTem('requer_canaleta');
   }
 
-  // 30/07/2026: limite de fotos configuravel (Configuracoes -> Limites
-  // de Fotos), e varia conforme a area do(s) servico(s) selecionado(s)
-  // -- Infra permite mais fotos que o padrao (Geral e demais areas).
-  // limitesFotos vem do mesmo pacote offline dos demais catalogos
-  // (RadDB.obterCatalogo), entao funciona sem conexao tambem.
   function servicoInfraSelecionado() {
     return servicos.some((s) => s.area === 'infra' && rascunho.servicos.includes(s.id));
   }
@@ -842,12 +819,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     return item ? item.limite : ValidadoresArquivos.LIMITE_FOTOS_POR_CATEGORIA;
   }
 
-  // Declarados aqui (antes de atualizarVisibilidadeServicos, que ja e
-  // chamada mais abaixo) para que a primeira chamada nao quebre por
-  // referenciar algo ainda nao declarado. atualizadoresLimiteFoto
-  // comeca vazio e e populado depois, quando os grupos de anexo forem
-  // configurados (configurarGrupoAnexo) -- chamar .forEach nele antes
-  // disso e inofensivo (so nao faz nada ainda).
   const atualizadoresLimiteFoto = [];
   const rotuloLimiteIntervencao = document.getElementById('rotulo-limite-intervencao');
   const rotuloLimiteAcao = document.getElementById('rotulo-limite-acao');
@@ -868,11 +839,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
   }
 
-  // 30/07/2026: Bloco AMV agora suporta varios blocos (um por MCH
-  // verificada nesse RAD, ate MAXIMO_BLOCOS_AMV). Nao ha mais campos
-  // fixos no HTML (campo-mch, lista-tipos-defeito etc.) -- cada bloco
-  // e criado inteiramente por JS dentro de #container-blocos-amv, com
-  // seus proprios elementos, independentes dos outros blocos.
   const MAXIMO_BLOCOS_AMV = 16;
   const containerBlocosAmv = document.getElementById('container-blocos-amv');
   const botaoAdicionarMch = document.getElementById('botao-adicionar-mch');
@@ -905,8 +871,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     cabecalho.appendChild(titulo);
 
     if (indice > 0) {
-      // O primeiro bloco nunca e removivel -- precisa de ao menos 1
-      // enquanto "Manutencao em AMV" estiver selecionado (VLD-020).
       const botaoRemover = document.createElement('button');
       botaoRemover.type = 'button';
       botaoRemover.className = 'botao botao--perigo';
@@ -924,7 +888,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
     cartao.appendChild(cabecalho);
 
-    // --- Identificacao MCH ---
     const campoMchGrupo = document.createElement('div');
     campoMchGrupo.className = 'campo';
     const idListaMch = `lista-mch-${indice}`;
@@ -956,12 +919,16 @@ document.addEventListener('DOMContentLoaded', async function () {
         return;
       }
       const detalhes = montarDetalhesMchTexto(bloco.id_mch);
+      // 26/08/2026 (achado de auditoria -- XSS armazenado): valores de
+      // MCH vem do catalogo (CatMch), controlado pelo Administrador --
+      // escapar() aqui e defesa em profundidade, caso uma importacao
+      // de catalogo acabe trazendo algo inesperado.
       detalhesMchEl.innerHTML = `
-        <div><span class="texto-suave" style="font-size:0.8rem;">Modelo</span><br><strong>${detalhes.modelo}</strong></div>
-        <div><span class="texto-suave" style="font-size:0.8rem;">Via</span><br><strong>${detalhes.via}</strong></div>
-        <div><span class="texto-suave" style="font-size:0.8rem;">UR</span><br><strong>${detalhes.ur}</strong></div>
-        <div><span class="texto-suave" style="font-size:0.8rem;">Local</span><br><strong>${detalhes.local}</strong></div>
-        <div><span class="texto-suave" style="font-size:0.8rem;">Linha</span><br><strong>${detalhes.linha}</strong></div>
+        <div><span class="texto-suave" style="font-size:0.8rem;">Modelo</span><br><strong>${escapar(detalhes.modelo)}</strong></div>
+        <div><span class="texto-suave" style="font-size:0.8rem;">Via</span><br><strong>${escapar(detalhes.via)}</strong></div>
+        <div><span class="texto-suave" style="font-size:0.8rem;">UR</span><br><strong>${escapar(detalhes.ur)}</strong></div>
+        <div><span class="texto-suave" style="font-size:0.8rem;">Local</span><br><strong>${escapar(detalhes.local)}</strong></div>
+        <div><span class="texto-suave" style="font-size:0.8rem;">Linha</span><br><strong>${escapar(detalhes.linha)}</strong></div>
       `;
       detalhesMchEl.style.display = 'flex';
     }
@@ -976,7 +943,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
     cartao.appendChild(campoMchGrupo);
 
-    // --- Tipo de Defeito ---
     const grupoDefeito = document.createElement('div');
     grupoDefeito.className = 'campo';
     grupoDefeito.innerHTML = '<label>Tipo de Defeito</label>';
@@ -1019,7 +985,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     atualizarVisibilidadeOutrosDefeito();
     cartao.appendChild(grupoDefeito);
 
-    // --- Acoes ---
     const grupoAcoes = document.createElement('div');
     grupoAcoes.className = 'campo';
     grupoAcoes.innerHTML = '<label>Ações</label>';
@@ -1081,16 +1046,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     salvarRascunhoAgora();
   });
 
-  // 30/07/2026: Bloco Canaleta ("Anomalias") -- ao contrario do AMV,
-  // nao se repete (no maximo 1 bloco por RAD). Listas de opcao fixas
-  // (nao vem de catalogo do banco, ver rad/models.py::RadCanaleta).
-  // 14/08/2026: Vegetacao/Lastro/Lixo/Dormentes/Entulho/Terra viraram
-  // sub-opcoes, condicionadas a "Obstruida" estar marcada -- deixam de
-  // aparecer (e sao limpas) quando Obstruida e desmarcada. Grau de
-  // Criticidade Media/Alta/Critica passou a exigir Justificativa.
-  // Dimensoes passou de um conjunto fixo de 5 campos para uma lista de
-  // ate MAXIMO_DIMENSOES_CANALETA linhas repetiveis, com um botao "+"
-  // pra adicionar linha -- mesmo padrao ja usado no bloco AMV.
   const blocoCanaleta = document.getElementById('bloco-canaleta');
   const listaCanaletaAnomaliasEl = document.getElementById('lista-canaleta-anomalias');
   const grupoCanaletaObstrucao = document.getElementById('grupo-canaleta-obstrucao');
@@ -1125,10 +1080,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     { valor: 'esquerdo', rotulo: 'Esquerdo' },
     { valor: 'entrevia', rotulo: 'Entrevia' },
   ];
-  // 14/08/2026: 5 campos numericos + 2 campos de texto (Km/Poste
-  // Inicial/Final, mesma mascara XX/XX - XX/XX do Km/Poste geral do
-  // RAD) -- 'tipo' diferencia como cada input e criado e tratado em
-  // renderizarLinhasDimensoesCanaleta.
   const CAMPOS_DIMENSAO_CANALETA = [
     ['largura_inicial', 'Largura Inicial (m)', 'numero'],
     ['largura_final', 'Largura Final (m)', 'numero'],
@@ -1153,11 +1104,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     salvarRascunhoAgora();
   }
 
-  // Obstruida so mostra as sub-opcoes de tipo de obstrucao quando
-  // marcada -- ao desmarcar, qualquer sub-opcao ja marcada e limpa (RG:
-  // nao faz sentido guardar "Vegetação" selecionada se a canaleta nao
-  // esta mais marcada como Obstruida -- mesmo principio de "ultima
-  // caixa so obrigatoria/visivel quando a anterior estiver marcada").
   function atualizarVisibilidadeSubAnomaliasCanaleta() {
     const obstruidaMarcada = rascunho.canaleta_anomalias.includes('obstruida');
     grupoCanaletaObstrucao.style.display = obstruidaMarcada ? '' : 'none';
@@ -1179,8 +1125,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
   }
 
-  // Justificativa so aparece (e so e exigida no backend, VLD-045)
-  // quando o Grau de Criticidade e Media, Alta ou Critica.
   function atualizarVisibilidadeJustificativaCanaleta() {
     const exige = GRAUS_CRITICIDADE_EXIGEM_JUSTIFICATIVA.includes(rascunho.canaleta_grau_criticidade);
     grupoCanaletaJustificativa.style.display = exige ? '' : 'none';
@@ -1204,8 +1148,6 @@ document.addEventListener('DOMContentLoaded', async function () {
       cabecalho.appendChild(titulo);
 
       if (rascunho.canaleta_dimensoes.length > 1) {
-        // So pode remover se sobrar ao menos 1 linha -- Dimensões
-        // continua obrigatória (VLD-042).
         const botaoRemover = document.createElement('button');
         botaoRemover.type = 'button';
         botaoRemover.className = 'botao botao--perigo';
@@ -1244,9 +1186,6 @@ document.addEventListener('DOMContentLoaded', async function () {
             salvarRascunhoAgora();
           });
         } else {
-          // Km/Poste da linha -- texto livre com a mesma mascara
-          // XX/XX - XX/XX do campo Km/Poste geral do RAD
-          // (aplicarMascaraKmPoste, definida mais acima).
           input.type = 'text';
           input.inputMode = 'numeric';
           input.placeholder = 'XX/XX - XX/XX';
@@ -1375,9 +1314,6 @@ document.addEventListener('DOMContentLoaded', async function () {
       limparCampoTerceiros('campo-terceiros-volume', 'terceiros_volume');
     }
 
-    // 30/07/2026: a area do(s) servico(s) selecionado(s) pode mudar o
-    // limite de fotos (Infra permite mais) -- reflete isso na tela
-    // toda vez que a selecao de servicos mudar.
     atualizarLimitesDeFotoNaTela();
   }
 
@@ -1437,10 +1373,15 @@ document.addEventListener('DOMContentLoaded', async function () {
       linha.style.alignItems = 'center';
 
       const rotuloTipo = pessoa.tipo === 'colaborador' ? 'Colaborador' : 'Participante';
-      const registro = pessoa.registro_empresa ? ` · Registro ${pessoa.registro_empresa}` : '';
+      const registro = pessoa.registro_empresa ? ` · Registro ${escapar(pessoa.registro_empresa)}` : '';
+      // 26/08/2026 (achado de auditoria -- XSS armazenado): nome de
+      // colaborador vem do cadastro (pode ter sido importado via CSV
+      // por um Administrador) -- sem escapar, um nome malicioso
+      // afetaria qualquer pessoa que buscasse esse colaborador em
+      // qualquer RAD novo daqui pra frente.
       linha.innerHTML = `
         <div>
-          <strong>${pessoa.nome}</strong>
+          <strong>${escapar(pessoa.nome)}</strong>
           <div class="texto-suave" style="font-size:0.8rem;">${rotuloTipo}${registro}</div>
         </div>
       `;
@@ -1546,13 +1487,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     avisoColaboradores.innerHTML = '';
     blocoNovoParticipante.style.display = 'none';
   });
-
-  // 30/07/2026: registra os "atualizadores" de cada grupo de anexo com
-  // limite dinamico, pra poder chama-los de novo quando a selecao de
-  // servicos mudar (ex.: usuario marca um servico Infra depois de ja
-  // ter aberto a tela -- o limite precisa refletir isso na hora).
-  // (atualizadoresLimiteFoto, rotulos e funcoes ja declarados mais
-  // acima, antes de atualizarVisibilidadeServicos.)
 
   function configurarGrupoAnexo(opcoes) {
     const {
@@ -1674,15 +1608,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     ehFoto: false,
   });
 
-  // 30/07/2026: Comentarios das fotos -- 4 botoes ("Foto 1".."Foto 4"),
-  // cada um abre/fecha uma caixa de texto propria (desc_foto_1..4).
-  // Mesmos campos que ja existiam so para VPM001 (22/07/2026) -- agora
-  // sempre disponiveis, com obrigatoriedade condicional:
-  //   - VPM001 selecionado: os 4 ficam sempre abertos e obrigatorios,
-  //     sem poder fechar (a exigencia e imposta no backend por
-  //     VLD-033, mas a tela ja deixa isso visualmente claro).
-  //   - Qualquer outro Tipo de Manutencao: cada botao liga/desliga sua
-  //     caixa independentemente, tudo opcional.
   const ROTULOS_COMENTARIO_FOTO = {
     desc_foto_1: 'Foto 1',
     desc_foto_2: 'Foto 2',
@@ -1693,9 +1618,6 @@ document.addEventListener('DOMContentLoaded', async function () {
   const camposComentariosFotos = document.getElementById('campos-comentarios-fotos');
   const rotuloComentariosObrigatorio = document.getElementById('rotulo-comentarios-fotos-obrigatorio');
 
-  // Estado de "aberto/fechado" de cada caixa, independente de ter
-  // texto -- assim reabrir a tela mantem visivel um campo que a
-  // pessoa abriu mas ainda nao escreveu nada.
   const comentarioFotoAberto = {
     desc_foto_1: !!rascunho.desc_foto_1,
     desc_foto_2: !!rascunho.desc_foto_2,
@@ -1719,7 +1641,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       chip.className = 'chip';
       chip.textContent = ROTULOS_COMENTARIO_FOTO[chave];
       chip.setAttribute('aria-pressed', aberto ? 'true' : 'false');
-      if (obrigatorio) chip.disabled = true; // nao da pra fechar um campo obrigatorio
+      if (obrigatorio) chip.disabled = true;
       chip.addEventListener('click', function () {
         if (obrigatorio) return;
         comentarioFotoAberto[chave] = !comentarioFotoAberto[chave];
@@ -1805,11 +1727,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     document.getElementById('resultados-responsavel-atividade'),
     'responsavel_atividade'
   );
-  // Operador CCM (30/07/2026): dois pares Nome+Hora -- Abertura e
-  // Entrega. Regra: o nome digitado na Abertura preenche
-  // automaticamente a Entrega, mas o usuario pode editar a Entrega
-  // depois -- a partir dai, o auto-preenchimento para (mesmo padrao
-  // ja usado para a data de termino em recalcularHorarios acima).
   const campoCcmAberturaNome = document.getElementById('campo-operador-ccm-abertura-nome');
   const campoCcmAberturaHora = document.getElementById('campo-operador-ccm-abertura-hora');
   const campoCcmEntregaNome = document.getElementById('campo-operador-ccm-entrega-nome');
@@ -2033,7 +1950,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   function renderizarErrosSincronizacao(erros) {
     const itens = erros
-      .map((e) => `<li>${e.mensagem || e.campo}</li>`)
+      .map((e) => `<li>${escapar(e.mensagem || e.campo)}</li>`)
       .join('');
     listaErrosSincronizacao.innerHTML = `
       <div class="aviso aviso--erro">
