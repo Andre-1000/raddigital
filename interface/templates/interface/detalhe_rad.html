@@ -192,6 +192,24 @@
 
     const avisoDetalhe = document.getElementById('aviso-detalhe');
 
+    // 26/08/2026 (achado de auditoria de seguranca -- XSS armazenado):
+    // varios campos aqui sao texto livre digitado por quem preenche o
+    // RAD (observacoes, descricao tecnica, justificativas, nome de
+    // colaborador, nome de arquivo anexado) e eram inseridos direto no
+    // HTML via innerHTML, sem escapar. Alguem podia digitar algo como
+    // "<script>...</script>" num campo de texto livre, e esse codigo
+    // rodaria de verdade na tela de quem abrisse o RAD depois --
+    // grave porque o token de sessao fica acessivel via JS
+    // (localStorage), entao um script assim conseguiria rouba-lo.
+    // escapar() usa o proprio navegador (via .textContent) pra
+    // neutralizar qualquer caractere especial de HTML antes de
+    // inserir o valor -- mesmo padrao ja usado em gerenciar_usuarios.js.
+    function escapar(texto) {
+      const div = document.createElement('div');
+      div.textContent = texto ?? '';
+      return div.innerHTML;
+    }
+
     // Campos agrupados em secoes -- cada secao vira um bloco com
     // titulo + grade propria, separado da proxima secao por uma linha
     // fina (.secao-detalhe, ver CSS), para nao misturar tipos de dado
@@ -294,9 +312,9 @@
 
     function formatarValor(valor) {
       if (valor === null || valor === undefined || valor === '') return 'N/A';
-      if (Array.isArray(valor)) return valor.length ? valor.join(', ') : 'N/A';
+      if (Array.isArray(valor)) return valor.length ? escapar(valor.join(', ')) : 'N/A';
       if (typeof valor === 'boolean') return valor ? 'Sim' : 'Não';
-      return String(valor);
+      return escapar(String(valor));
     }
 
     function renderizarCampos(dados) {
@@ -346,6 +364,8 @@
 
         const titulo = document.createElement('p');
         titulo.className = 'subcartao__titulo';
+        // textContent (nao innerHTML) -- o proprio navegador ja
+        // escapa automaticamente, sem precisar de escapar() aqui.
         titulo.textContent = `MCH ${indice + 1} de ${blocosAmv.length} — ${bloco.identificacao_mch}`;
         item.appendChild(titulo);
 
@@ -464,8 +484,8 @@
       colaboradores.forEach(function (pessoa) {
         const linha = document.createElement('div');
         const rotuloTipo = pessoa.tipo === 'colaborador' ? 'Colaborador' : 'Participante';
-        const registro = pessoa.registro_empresa ? ` · Registro ${pessoa.registro_empresa}` : '';
-        linha.innerHTML = `<strong>${pessoa.nome}</strong><div class="texto-suave" style="font-size:0.8rem;">${rotuloTipo}${registro}</div>`;
+        const registro = pessoa.registro_empresa ? ` · Registro ${escapar(pessoa.registro_empresa)}` : '';
+        linha.innerHTML = `<strong>${escapar(pessoa.nome)}</strong><div class="texto-suave" style="font-size:0.8rem;">${rotuloTipo}${registro}</div>`;
         container.appendChild(linha);
       });
     }
@@ -514,12 +534,12 @@
         const linha = document.createElement('div');
         linha.className = 'cartao item-anexo';
         linha.style.padding = '0.75rem 1rem';
-        const categoria = anexo.categoria_foto ? ` — ${anexo.categoria_foto}` : '';
+        const categoria = anexo.categoria_foto ? ` — ${escapar(anexo.categoria_foto)}` : '';
         const tamanhoKb = Math.round(anexo.tamanho_bytes / 1024);
         linha.innerHTML = `
           <div>
-            <strong>${anexo.nome_original}</strong>
-            <div class="texto-suave" style="font-size:0.8rem;">${anexo.tipo_arquivo}${categoria} · ${tamanhoKb}KB</div>
+            <strong>${escapar(anexo.nome_original)}</strong>
+            <div class="texto-suave" style="font-size:0.8rem;">${escapar(anexo.tipo_arquivo)}${categoria} · ${tamanhoKb}KB</div>
           </div>
           <div class="item-anexo__botoes">
             <button type="button" class="botao botao--secundaria botao-ver-anexo">Ver</button>
@@ -581,7 +601,7 @@
         if (dados.justificativa_cancelamento) {
           const avisoCancelado = document.createElement('div');
           avisoCancelado.className = 'aviso aviso--atencao';
-          avisoCancelado.innerHTML = `<strong>RAD cancelado</strong> por ${dados.login_cancelamento} em ${dados.data_cancelamento}.<br>Justificativa: ${dados.justificativa_cancelamento}`;
+          avisoCancelado.innerHTML = `<strong>RAD cancelado</strong> por ${escapar(dados.login_cancelamento)} em ${escapar(dados.data_cancelamento)}.<br>Justificativa: ${escapar(dados.justificativa_cancelamento)}`;
           avisoDetalhe.appendChild(avisoCancelado);
         }
       } catch (erro) {
@@ -616,7 +636,7 @@
         const resposta = await RadAuth.requisicaoAutenticada(url);
         if (!resposta.ok) {
           const corpo = await resposta.json().catch(function () { return {}; });
-          avisoExportar.innerHTML = `<div class="aviso aviso--erro">${corpo.erro || 'Não foi possível gerar o arquivo.'}</div>`;
+          avisoExportar.innerHTML = `<div class="aviso aviso--erro">${escapar(corpo.erro || 'Não foi possível gerar o arquivo.')}</div>`;
           return;
         }
         const blob = await resposta.blob();
