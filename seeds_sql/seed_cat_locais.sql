@@ -1,7 +1,7 @@
 -- ============================================================
 -- SEED: cat_locais
 -- Sistema RAD — Locais disponíveis (CAT-002)
--- Total: 70 locais (40 ativos: estações + pátios; 30 inativos:
+-- Total: 72 locais (42 ativos: estações + pátios; 30 inativos:
 -- cabines, subestações, terminais, VSE, ALMOX -- desativados em
 -- 22/07/2026, ver rad, colaboradores desta decisao)
 -- Categorias: estacao, patio, cabine, subestacao, terminal, vse, almox
@@ -14,6 +14,9 @@
 -- apagaria em cascata TODOS os RADs ja sincronizados, pois a tabela
 -- rad tem FK para cat_locais. UPSERT atualiza os dados sem destruir
 -- nada que dependa desta tabela.
+--
+-- 27/08/2026: adicionados SGU (Eng. Sebastião Gualberto) e ETR
+-- (Eng. Trindade), como estacoes ativas -- pedido direto do cliente.
 -- ============================================================
 
 INSERT INTO cat_locais (sigla, nome, categoria, ativo) VALUES
@@ -47,6 +50,8 @@ INSERT INTO cat_locais (sigla, nome, categoria, ativo) VALUES
   ('EGO', 'Eng. Goulart', 'estacao', TRUE),
   ('GCE', 'Guarulhos CECAP', 'estacao', TRUE),
   ('AGU', 'Aeroporto Guarulhos', 'estacao', TRUE),
+  ('SGU', 'Eng. Sebastião Gualberto', 'estacao', TRUE),
+  ('ETR', 'Eng. Trindade', 'estacao', TRUE),
   ('PAT 001', 'Patio Luz', 'patio', TRUE),
   ('PAT 003', 'Patio Eng São Paulo', 'patio', TRUE),
   ('PAT 005', 'Patio para Lastros e Dormentes', 'patio', TRUE),
@@ -92,4 +97,4 @@ ON CONFLICT (sigla) DO UPDATE SET
   categoria = EXCLUDED.categoria,
   ativo = EXCLUDED.ativo;
 
--- Total: 70 registros (40 ativos, 30 inativos)
+-- Total: 72 registros (42 ativos, 30 inativos)
