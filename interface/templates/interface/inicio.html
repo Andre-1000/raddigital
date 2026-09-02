@@ -68,6 +68,11 @@
       <span class="cartao-acao__descricao">Buscar, filtrar e revisar RADs enviados</span>
     </a>
 
+    <a href="{% url 'interface:dashboard' %}" class="cartao cartao--interativo cartao-acao" id="link-dashboard" style="display:none;">
+      <span class="cartao-acao__rotulo">Dashboard</span>
+      <span class="cartao-acao__descricao">Números e gráficos sobre os RADs sincronizados</span>
+    </a>
+
     <a href="{% url 'interface:meus_rads' %}" class="cartao cartao--interativo cartao-acao">
       <span class="cartao-acao__rotulo">RADs Preenchidos</span>
       <span class="cartao-acao__descricao">Ver os RADs que você mesmo preencheu</span>
@@ -101,6 +106,7 @@
 
     if (RadAuth.temPerfil('supervisor', 'administrador')) {
       document.getElementById('link-consultar').style.display = '';
+      document.getElementById('link-dashboard').style.display = '';
       document.getElementById('link-gerenciar-usuarios').style.display = '';
     }
     if (RadAuth.temPerfil('administrador')) {

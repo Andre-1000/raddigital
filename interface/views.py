@@ -60,6 +60,16 @@ def tela_configuracoes(request):
     return render(request, 'interface/configuracoes.html')
 
 
+def tela_dashboard(request):
+    """
+    28/08/2026. Painel com números e gráficos agregados sobre RADs
+    sincronizados -- Supervisor e Administrador (mesmo padrão de
+    tela_consulta). O guard real está nos endpoints da API
+    (dashboard/views.py, @requer_perfil(SUPERVISOR, ADMINISTRADOR)).
+    """
+    return render(request, 'interface/dashboard.html')
+
+
 def tela_novo_rad(request):
     return render(request, 'interface/novo_rad.html')
 

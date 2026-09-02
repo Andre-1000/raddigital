@@ -1,0 +1,215 @@
+{% extends "interface/base.html" %}
+{% load static %}
+{% block titulo %}Dashboard — Sistema RAD{% endblock %}
+
+{% block cabecalho_extra %}
+<style>
+  .container-app { max-width: var(--largura-app-administrativa); }
+
+  .grupo-filtro { margin-bottom: 0.9rem; }
+  .grupo-filtro__titulo {
+    font-weight: 600;
+    font-size: 0.85rem;
+    margin: 0 0 0.4rem;
+    color: var(--cor-tinta-suave);
+  }
+  .grupo-filtro__opcoes {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  .grupo-filtro__opcoes label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+    min-height: 32px;
+    font-size: 0.92rem;
+  }
+
+  .grade-metricas {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-top: 1rem;
+  }
+  .cartao-metrica {
+    background: var(--cor-superficie);
+    border: 1px solid var(--cor-linha);
+    border-radius: var(--raio);
+    padding: 1rem 1.1rem;
+  }
+  .cartao-metrica__rotulo {
+    font-size: 0.75rem;
+    color: var(--cor-tinta-suave);
+    margin-bottom: 0.3rem;
+  }
+  .cartao-metrica__valor {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--cor-tinta);
+  }
+
+  .grade-graficos {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 12px;
+    margin-top: 12px;
+  }
+  @media (max-width: 720px) {
+    .grade-graficos { grid-template-columns: 1fr; }
+  }
+  .cartao-grafico__titulo {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--cor-tinta);
+    margin: 0 0 0.75rem;
+  }
+
+  .barra-horizontal {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .barra-horizontal__rotulo {
+    font-size: 0.78rem;
+    color: var(--cor-tinta-suave);
+    width: 90px;
+    flex-shrink: 0;
+  }
+  .barra-horizontal__trilha {
+    flex: 1;
+    background: var(--cor-fundo-suave);
+    border-radius: 4px;
+    height: 12px;
+    overflow: hidden;
+  }
+  .barra-horizontal__preenchimento {
+    background: var(--cor-tinta);
+    height: 12px;
+    border-radius: 4px;
+  }
+  .barra-horizontal__valor {
+    font-size: 0.78rem;
+    color: var(--cor-tinta-suave);
+    width: 28px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+</style>
+{% endblock %}
+
+{% block cabecalho_hero_corpo %}
+<div class="cabecalho-hero__corpo">
+  <div class="cabecalho-hero__rotulo">Painel administrativo</div>
+  <h1 class="cabecalho-hero__titulo">Dashboard</h1>
+  <p class="cabecalho-hero__subtitulo">Números e gráficos sobre os RADs sincronizados. Abre com os últimos 30 dias — ajuste os filtros e clique em Pesquisar para refinar.</p>
+</div>
+{% endblock %}
+
+{% block conteudo %}
+<div id="conteudo-protegido" style="display:none;">
+
+  <div class="cartao">
+    <div class="grade-campos">
+      <div class="campo">
+        <label for="filtro-data-de">Data — de</label>
+        <input type="date" id="filtro-data-de">
+      </div>
+      <div class="campo">
+        <label for="filtro-data-ate">Data — até</label>
+        <input type="date" id="filtro-data-ate">
+      </div>
+      <div class="campo">
+        <label for="filtro-pessoa-busca">Pessoa que preencheu</label>
+        <input type="text" id="filtro-pessoa-busca" autocomplete="off" placeholder="Buscar por nome ou matrícula…">
+        <input type="hidden" id="filtro-pessoa-login">
+        <div class="pilha" id="resultados-pessoa" style="margin-top:0.5rem;"></div>
+      </div>
+      <div class="campo">
+        <label for="filtro-linha">Linha</label>
+        <select id="filtro-linha">
+          <option value="">Todas</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label for="filtro-via">Via</label>
+        <select id="filtro-via">
+          <option value="">Todas</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label for="filtro-local-busca">Local (inicial ou final)</label>
+        <input type="text" id="filtro-local-busca" autocomplete="off" placeholder="Buscar local…">
+        <input type="hidden" id="filtro-local-sigla">
+        <div class="pilha" id="resultados-local" style="margin-top:0.5rem;"></div>
+      </div>
+      <div class="campo">
+        <label for="filtro-tipo-manutencao">Tipo de manutenção</label>
+        <select id="filtro-tipo-manutencao">
+          <option value="">Todos</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Serviço executado: Área (macro, múltipla) + Subcategoria (micro,
+         dependente das áreas marcadas). 28/08/2026: diferente do
+         Consultar RADs -- aqui Área aceita várias ao mesmo tempo, e
+         "Outros" entra como mais uma opção de área (não fica solto). -->
+    <div class="grade-campos" style="margin-top:0.5rem;">
+      <div class="campo">
+        <label>Serviço executado — Área</label>
+        <div class="arvore-filtro__filhos" id="lista-areas-servico" style="border:1px solid var(--cor-linha); border-radius:var(--raio-pequeno); padding:0.6rem 0.75rem;"></div>
+      </div>
+      <div class="campo" id="campo-subcategoria-servico" style="display:none;">
+        <label>Subcategoria</label>
+        <div class="arvore-filtro__filhos" id="lista-subcategoria-servico" style="border:1px solid var(--cor-linha); border-radius:var(--raio-pequeno); padding:0.6rem 0.75rem;"></div>
+      </div>
+    </div>
+
+    <div class="linha-acoes" style="margin-top:0.75rem;">
+      <button type="button" class="botao botao--primaria" id="botao-pesquisar">Pesquisar</button>
+      <button type="button" class="botao botao--secundaria" id="botao-limpar-filtros">Limpar filtros</button>
+      <button type="button" class="botao botao--secundaria" id="botao-exportar-excel" style="display:none;">Exportar Excel</button>
+    </div>
+  </div>
+
+  <div id="aviso-dashboard" style="margin-top:1rem;"></div>
+
+  <div class="grade-metricas">
+    <div class="cartao-metrica">
+      <div class="cartao-metrica__rotulo">Total de RADs</div>
+      <div class="cartao-metrica__valor" id="metrica-total-rads">—</div>
+    </div>
+    <div class="cartao-metrica">
+      <div class="cartao-metrica__rotulo">Atraso no término</div>
+      <div class="cartao-metrica__valor" id="metrica-atraso-termino">—</div>
+    </div>
+    <div class="cartao-metrica">
+      <div class="cartao-metrica__rotulo">Duração média real</div>
+      <div class="cartao-metrica__valor" id="metrica-duracao-media">—</div>
+    </div>
+    <div class="cartao-metrica">
+      <div class="cartao-metrica__rotulo">Colaboradores ativos</div>
+      <div class="cartao-metrica__valor" id="metrica-colaboradores-ativos">—</div>
+    </div>
+  </div>
+
+  <div class="grade-graficos">
+    <div class="cartao">
+      <p class="cartao-grafico__titulo">RADs por dia</p>
+      <div id="grafico-rads-por-dia"></div>
+    </div>
+    <div class="cartao">
+      <p class="cartao-grafico__titulo">RADs por área</p>
+      <div id="grafico-rads-por-area"></div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block script_extra %}
+<script src="{% static 'interface/js/dashboard.js' %}"></script>
+{% endblock %}

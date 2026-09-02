@@ -34,6 +34,7 @@ urlpatterns = [
     path('colaboradores/', include('colaboradores.urls')),
     path('configuracoes/', include('configuracoes.urls')),
     path('catalogos/', include('catalogos.urls')),
+    path('dashboard/', include('dashboard.urls')),
     path('', include('interface.urls')),
 ]
 

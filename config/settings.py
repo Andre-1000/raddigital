@@ -72,6 +72,7 @@ INSTALLED_APPS = [
     'consulta',
     'colaboradores',
     'configuracoes',
+    'dashboard',
     'interface',
 ]
 
@@ -102,6 +103,18 @@ BLOQUEIO_ADMIN_MINUTOS = int(os.getenv('BLOQUEIO_ADMIN_MINUTOS', 15))
 # 30/07/2026: URL publica do site, usada pra montar o link do e-mail de
 # redefinicao de senha (usuarios/servicos_email.py). Sem barra no final.
 URL_BASE_SITE = os.getenv('URL_BASE_SITE', 'https://raddigital.onrender.com')
+
+# 25/08/2026 (achado de auditoria de seguranca): rate limit no
+# "Esqueci minha senha" -- sem isso, alguem podia repetir o POST pro
+# mesmo e-mail indefinidamente, nao pra descobrir senha nenhuma (o
+# link so prova identidade, nunca revela a senha), mas pra spamar a
+# caixa de entrada da pessoa. Limite por conta (nao por IP): o que
+# importa aqui e proteger o DESTINATARIO do e-mail, nao identificar o
+# solicitante -- um atacante pode trocar de IP a vontade, mas o
+# e-mail-alvo continua sendo o mesmo. Ver usuarios/views.py::
+# solicitar_redefinicao_senha.
+MAXIMO_SOLICITACOES_REDEFINICAO_SENHA = int(os.getenv('MAXIMO_SOLICITACOES_REDEFINICAO_SENHA', 3))
+JANELA_REDEFINICAO_SENHA_MINUTOS = int(os.getenv('JANELA_REDEFINICAO_SENHA_MINUTOS', 60))
 
 # 30/07/2026: envio de e-mail (redefinicao de senha). Sem as variaveis
 # EMAIL_* no .env, cai no backend "console" -- imprime o e-mail no log
