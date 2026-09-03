@@ -435,13 +435,14 @@
       return parametros;
     }
 
-    async function carregarLista() {
+    async function carregarLista(pagina) {
       aviso.innerHTML = '';
       mensagemVazia.style.display = 'none';
       mensagemAntesDePesquisar.style.display = 'none';
       lista.innerHTML = '';
 
       const parametros = montarParametrosFiltro();
+      parametros.set('pagina', pagina || 1);
 
       try {
         const resposta = await RadAuth.requisicaoAutenticada(`/consulta/rads/?${parametros.toString()}`);
@@ -482,11 +483,61 @@
           lista.appendChild(item);
         });
 
+        // 04/09/2026: antes era so um texto informativo -- agora tem
+        // botoes de verdade pra mudar de pagina, sem precisar mexer
+        // nos filtros de novo. "Anterior" comeca desabilitado na
+        // pagina 1, "Proxima" desabilita na ultima pagina.
         if (dados.total_paginas > 1) {
+          const navegacaoPaginas = document.createElement('div');
+          navegacaoPaginas.style.display = 'flex';
+          navegacaoPaginas.style.justifyContent = 'center';
+          navegacaoPaginas.style.alignItems = 'center';
+          navegacaoPaginas.style.gap = '0.75rem';
+          navegacaoPaginas.style.marginTop = '0.5rem';
+          navegacaoPaginas.style.flexWrap = 'wrap';
+
+          const botaoAnterior = document.createElement('button');
+          botaoAnterior.type = 'button';
+          botaoAnterior.className = 'botao botao--secundaria';
+          botaoAnterior.style.width = 'auto';
+          botaoAnterior.style.minHeight = '36px';
+          botaoAnterior.style.padding = '0 1rem';
+          botaoAnterior.style.fontSize = '0.85rem';
+          botaoAnterior.textContent = '← Anterior';
+          botaoAnterior.disabled = dados.pagina_atual <= 1;
+          botaoAnterior.addEventListener('click', function () {
+            carregarLista(dados.pagina_atual - 1);
+            lista.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+
+          const infoPaginas = document.createElement('span');
+          infoPaginas.className = 'texto-suave';
+          infoPaginas.style.fontSize = '0.85rem';
+          infoPaginas.textContent = `${dados.total_encontrado} RAD(s) — página ${dados.pagina_atual} de ${dados.total_paginas}`;
+
+          const botaoProxima = document.createElement('button');
+          botaoProxima.type = 'button';
+          botaoProxima.className = 'botao botao--secundaria';
+          botaoProxima.style.width = 'auto';
+          botaoProxima.style.minHeight = '36px';
+          botaoProxima.style.padding = '0 1rem';
+          botaoProxima.style.fontSize = '0.85rem';
+          botaoProxima.textContent = 'Próxima →';
+          botaoProxima.disabled = dados.pagina_atual >= dados.total_paginas;
+          botaoProxima.addEventListener('click', function () {
+            carregarLista(dados.pagina_atual + 1);
+            lista.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+
+          navegacaoPaginas.appendChild(botaoAnterior);
+          navegacaoPaginas.appendChild(infoPaginas);
+          navegacaoPaginas.appendChild(botaoProxima);
+          lista.appendChild(navegacaoPaginas);
+        } else if (dados.total_encontrado > 0) {
           const infoPaginas = document.createElement('p');
           infoPaginas.className = 'texto-suave centro';
           infoPaginas.style.fontSize = '0.85rem';
-          infoPaginas.textContent = `${dados.total_encontrado} RAD(s) encontrado(s) — mostrando página ${dados.pagina_atual} de ${dados.total_paginas}`;
+          infoPaginas.textContent = `${dados.total_encontrado} RAD(s) encontrado(s)`;
           lista.appendChild(infoPaginas);
         }
       } catch (erro) {
@@ -525,7 +576,9 @@
       mensagemAntesDePesquisar.style.display = '';
     }
 
-    document.getElementById('botao-filtrar').addEventListener('click', carregarLista);
+    document.getElementById('botao-filtrar').addEventListener('click', function () {
+      carregarLista(1);
+    });
     document.getElementById('botao-limpar-filtros').addEventListener('click', limparFiltros);
 
     // ---- Exportar Excel (21/08/2026, exclusivo do Administrador) -------
@@ -565,7 +618,7 @@
           aviso.innerHTML = '<div class="aviso aviso--sucesso">Exportação gerada. Os RADs incluídos foram marcados como exportados.</div>';
           // Recarrega a lista para refletir o novo status de exportação
           // nos selos, caso o filtro de status_exportacao esteja ativo.
-          await carregarLista();
+          await carregarLista(1);
         } catch (erro) {
           aviso.innerHTML = '<div class="aviso aviso--erro">Erro de conexão ao exportar.</div>';
         } finally {
