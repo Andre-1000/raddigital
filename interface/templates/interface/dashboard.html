@@ -29,7 +29,7 @@
 
   .grade-metricas {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 12px;
     margin-top: 1rem;
   }
@@ -39,25 +39,40 @@
     border-radius: var(--raio);
     padding: 1rem 1.1rem;
   }
+  .cartao-metrica__cabecalho {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.3rem;
+  }
   .cartao-metrica__rotulo {
     font-size: 0.75rem;
     color: var(--cor-tinta-suave);
-    margin-bottom: 0.3rem;
   }
   .cartao-metrica__valor {
     font-size: 1.5rem;
     font-weight: 700;
     color: var(--cor-tinta);
   }
+  .botao-alternar-unidade {
+    background: var(--cor-fundo-suave);
+    border: none;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--cor-tinta-suave);
+    padding: 3px 9px;
+    cursor: pointer;
+  }
 
-  .grade-graficos {
+  .grade-paineis {
     display: grid;
     grid-template-columns: 1.3fr 1fr;
     gap: 12px;
     margin-top: 12px;
   }
   @media (max-width: 720px) {
-    .grade-graficos { grid-template-columns: 1fr; }
+    .grade-paineis { grid-template-columns: 1fr; }
   }
   .cartao-grafico__titulo {
     font-size: 0.85rem;
@@ -75,8 +90,11 @@
   .barra-horizontal__rotulo {
     font-size: 0.78rem;
     color: var(--cor-tinta-suave);
-    width: 90px;
+    width: 110px;
     flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .barra-horizontal__trilha {
     flex: 1;
@@ -93,9 +111,45 @@
   .barra-horizontal__valor {
     font-size: 0.78rem;
     color: var(--cor-tinta-suave);
-    width: 28px;
+    width: 24px;
     text-align: right;
     flex-shrink: 0;
+  }
+
+  /* Tabela com scroll -- Top motivos de atraso */
+  .tabela-scroll-wrap {
+    max-height: 260px;
+    overflow-y: auto;
+    border: 1px solid var(--cor-linha);
+    border-radius: var(--raio-pequeno);
+  }
+  .tabela-scroll {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+  .tabela-scroll thead th {
+    position: sticky;
+    top: 0;
+    background: var(--cor-fundo-suave);
+    color: var(--cor-tinta-suave);
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .tabela-scroll td {
+    padding: 0.5rem 0.75rem;
+    border-top: 1px solid var(--cor-linha);
+  }
+  .tabela-scroll td:last-child {
+    text-align: right;
+    font-weight: 600;
+  }
+
+  .grafico-linha-wrap {
+    overflow-x: auto;
   }
 </style>
 {% endblock %}
@@ -154,9 +208,7 @@
     </div>
 
     <!-- Serviço executado: Área (macro, múltipla) + Subcategoria (micro,
-         dependente das áreas marcadas). 28/08/2026: diferente do
-         Consultar RADs -- aqui Área aceita várias ao mesmo tempo, e
-         "Outros" entra como mais uma opção de área (não fica solto). -->
+         dependente das áreas marcadas). -->
     <div class="grade-campos" style="margin-top:0.5rem;">
       <div class="campo">
         <label>Serviço executado — Área</label>
@@ -183,28 +235,59 @@
       <div class="cartao-metrica__valor" id="metrica-total-rads">—</div>
     </div>
     <div class="cartao-metrica">
-      <div class="cartao-metrica__rotulo">Atraso no término</div>
+      <div class="cartao-metrica__cabecalho">
+        <span class="cartao-metrica__rotulo">Atraso no término</span>
+        <button type="button" class="botao-alternar-unidade" id="botao-alternar-atraso">Ver Nº</button>
+      </div>
       <div class="cartao-metrica__valor" id="metrica-atraso-termino">—</div>
-    </div>
-    <div class="cartao-metrica">
-      <div class="cartao-metrica__rotulo">Duração média real</div>
-      <div class="cartao-metrica__valor" id="metrica-duracao-media">—</div>
-    </div>
-    <div class="cartao-metrica">
-      <div class="cartao-metrica__rotulo">Colaboradores ativos</div>
-      <div class="cartao-metrica__valor" id="metrica-colaboradores-ativos">—</div>
     </div>
   </div>
 
-  <div class="grade-graficos">
+  <div class="grade-paineis">
     <div class="cartao">
       <p class="cartao-grafico__titulo">RADs por dia</p>
-      <div id="grafico-rads-por-dia"></div>
+      <div class="grafico-linha-wrap">
+        <div id="grafico-rads-por-dia"></div>
+      </div>
     </div>
     <div class="cartao">
       <p class="cartao-grafico__titulo">RADs por área</p>
       <div id="grafico-rads-por-area"></div>
     </div>
+  </div>
+
+  <div class="grade-paineis">
+    <div class="cartao">
+      <p class="cartao-grafico__titulo">Top motivos de atraso no término</p>
+      <div class="tabela-scroll-wrap">
+        <table class="tabela-scroll">
+          <thead><tr><th>Motivo</th><th>Qtd.</th></tr></thead>
+          <tbody id="tabela-motivos-atraso"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="cartao">
+      <p class="cartao-grafico__titulo">Top 10 locais com mais RAD</p>
+      <div id="grafico-top-locais"></div>
+    </div>
+  </div>
+
+  <div class="grade-paineis">
+    <div class="cartao">
+      <p class="cartao-grafico__titulo">Top 10 usuários que mais preencheram RAD</p>
+      <div id="grafico-top-usuarios"></div>
+    </div>
+    <div class="cartao">
+      <p class="cartao-grafico__titulo">MCH mais recorrente (Bloco AMV)</p>
+      <div id="grafico-top-mch"></div>
+    </div>
+  </div>
+
+  <!-- 03/09/2026: so aparece quando o servico especifico "Inspeção de
+       Canaleta" esta marcado no filtro Subcategoria (ver dashboard.js). -->
+  <div class="cartao" id="cartao-canaleta-criticidade" style="margin-top:12px; display:none;">
+    <p class="cartao-grafico__titulo">Anomalias (Canaleta) por grau de criticidade</p>
+    <div id="grafico-canaleta-criticidade"></div>
   </div>
 
 </div>

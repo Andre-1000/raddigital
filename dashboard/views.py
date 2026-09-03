@@ -1,6 +1,6 @@
 """
 Views do app dashboard -- paineis agregados sobre RADs sincronizados,
-para Supervisor e Administrador (28/08/2026).
+para Supervisor e Administrador (28/08/2026, ampliado 03/09/2026).
 
 Reaproveita a mesma logica de filtro de Servico Executado (macro/micro/
 outros) ja usada em consulta/views.py::_aplicar_filtros -- mesmo
@@ -21,7 +21,23 @@ abrir a tela e o frontend (dashboard.js), enviando data_de/data_ate
 explicitos na primeira chamada. O backend so aplica o que receber.
 
 Conta apenas RADs com status Sincronizado -- RADs cancelados nao
-entram nos calculos (nao fazem sentido nas metricas de duracao/atraso).
+entram nos calculos (nao fazem sentido nas metricas de duracao/atraso;
+decisao do cliente de nao analisar cancelamento aqui, volume baixo).
+
+03/09/2026: ampliado com analises adicionais, todas usando dados que
+ja existiam no sistema, sem nenhum campo novo:
+  - Top motivos de atraso no termino (lista completa, nao so top N --
+    o cliente pediu lista com scroll, nao um recorte).
+  - Top 10 locais com mais RAD (inicial + final somados, sem
+    distinguir -- mesma logica do filtro 'local').
+  - Top 10 usuarios que mais preencheram RAD.
+  - MCH mais recorrente no bloco AMV.
+  - Bloco Anomalias (Canaleta) por grau de criticidade -- sempre
+    calculado aqui, mas o FRONTEND decide se mostra esse painel (so
+    quando o servico especifico "Inspecao de Canaleta" estiver
+    marcado no filtro de Servico Executado -- decisao do cliente).
+  - percentual_atraso_termino ganhou irmao total_atraso_termino (o
+    card agora alterna entre % e numero absoluto).
 """
 from django.db.models import Avg, Count, Q
 from django.http import HttpResponse, JsonResponse
@@ -29,7 +45,7 @@ from django.utils import timezone
 
 from colaboradores.models import ColaboradorCadastro
 from comum.datas import parse_data
-from rad.models import Rad
+from rad.models import Rad, RadAmv, RadCanaleta
 from usuarios.decorators import requer_perfil, requer_token
 from usuarios.models import UsuarioPerfil
 
@@ -81,6 +97,42 @@ def _aplicar_filtros(queryset, params):
     return queryset.distinct()
 
 
+def _top_locais(queryset, limite=10):
+    """
+    03/09/2026. Soma ocorrencias de cada local, tanto como Local
+    Inicial quanto Local Final -- um RAD que usa o mesmo local nos
+    dois papeis conta 2x para esse local (faz sentido: o local
+    apareceu em 2 "pontas" de atividade), mas cada papel e contado
+    separadamente porque sao consultas independentes (nao da pra somar
+    direto no banco sem duplicar via JOIN).
+    """
+    contagem = {}
+
+    for item in queryset.values('local_inicial__sigla', 'local_inicial__nome').annotate(
+        total=Count('id_rad', distinct=True)
+    ):
+        chave = (item['local_inicial__sigla'], item['local_inicial__nome'])
+        contagem[chave] = contagem.get(chave, 0) + item['total']
+
+    for item in queryset.values('local_final__sigla', 'local_final__nome').annotate(
+        total=Count('id_rad', distinct=True)
+    ):
+        chave = (item['local_final__sigla'], item['local_final__nome'])
+        contagem[chave] = contagem.get(chave, 0) + item['total']
+
+    lista = [
+        {'sigla': sigla, 'nome': nome, 'total': total}
+        for (sigla, nome), total in contagem.items()
+    ]
+    lista.sort(key=lambda item: -item['total'])
+    return lista[:limite]
+
+
+def _nome_de_usuario(login):
+    colaborador = ColaboradorCadastro.objects.filter(usuario__login=login).only('nome').first()
+    return colaborador.nome if colaborador else login
+
+
 @requer_token
 @requer_perfil(UsuarioPerfil.SUPERVISOR, UsuarioPerfil.ADMINISTRADOR)
 def dados(request):
@@ -95,17 +147,11 @@ def dados(request):
     total = queryset.count()
 
     if total > 0:
-        atrasados_termino = queryset.filter(atraso_termino=True).count()
-        percentual_atraso = round((atrasados_termino / total) * 100, 1)
-        duracao_media = queryset.aggregate(media=Avg('duracao_real_min'))['media']
-        duracao_media = round(duracao_media) if duracao_media is not None else 0
+        total_atraso_termino = queryset.filter(atraso_termino=True).count()
+        percentual_atraso = round((total_atraso_termino / total) * 100, 1)
     else:
+        total_atraso_termino = 0
         percentual_atraso = 0
-        duracao_media = 0
-
-    # Colaboradores ativos: cadastro atual, nao filtrado por data --
-    # e uma foto de "agora", nao do periodo pesquisado.
-    colaboradores_ativos = ColaboradorCadastro.objects.filter(ativo=True).count()
 
     rads_por_dia = list(
         queryset.values('data_preenchimento')
@@ -120,11 +166,60 @@ def dados(request):
         .order_by('servicos__servico__area')
     )
 
+    # Top motivos de atraso no termino -- LISTA COMPLETA (o cliente
+    # pediu com barra de rolagem, nao um recorte de top N). Motivo do
+    # atraso no INICIO nao existe mais no formulario (decisao de
+    # negocio de 22/07/2026), entao so ha dado para termino.
+    motivos_atraso = list(
+        queryset.filter(atraso_termino=True, motivo_atraso_termino__isnull=False)
+        .values('motivo_atraso_termino__nome')
+        .annotate(total=Count('id_rad', distinct=True))
+        .order_by('-total')
+    )
+
+    top_locais = _top_locais(queryset)
+
+    top_usuarios_bruto = list(
+        queryset.values('usuario__login')
+        .annotate(total=Count('id_rad', distinct=True))
+        .order_by('-total')[:10]
+    )
+    top_usuarios = [
+        {'login': item['usuario__login'], 'nome': _nome_de_usuario(item['usuario__login']), 'total': item['total']}
+        for item in top_usuarios_bruto
+    ]
+
+    top_mch_defeito = list(
+        RadAmv.objects.filter(rad__in=queryset)
+        .values('mch__identificacao')
+        .annotate(total=Count('id', distinct=True))
+        .order_by('-total')[:10]
+    )
+
+    # Canaleta por grau de criticidade -- sempre calculado aqui; o
+    # FRONTEND decide se mostra esse painel (so quando o servico
+    # especifico "Inspecao de Canaleta" estiver marcado no filtro,
+    # decisao do cliente).
+    rotulos_criticidade = dict(RadCanaleta.GRAU_CRITICIDADE_CHOICES)
+    canaleta_por_criticidade_bruto = list(
+        queryset.filter(canaleta__isnull=False)
+        .values('canaleta__grau_criticidade')
+        .annotate(total=Count('id_rad', distinct=True))
+        .order_by('canaleta__grau_criticidade')
+    )
+    canaleta_por_criticidade = [
+        {
+            'grau': item['canaleta__grau_criticidade'],
+            'rotulo': rotulos_criticidade.get(item['canaleta__grau_criticidade'], item['canaleta__grau_criticidade']),
+            'total': item['total'],
+        }
+        for item in canaleta_por_criticidade_bruto
+    ]
+
     return JsonResponse({
         'total_rads': total,
         'percentual_atraso_termino': percentual_atraso,
-        'duracao_media_real_min': duracao_media,
-        'colaboradores_ativos': colaboradores_ativos,
+        'total_atraso_termino': total_atraso_termino,
         'rads_por_dia': [
             {'data': item['data_preenchimento'].isoformat(), 'total': item['total']}
             for item in rads_por_dia
@@ -133,6 +228,17 @@ def dados(request):
             {'area': item['servicos__servico__area'], 'total': item['total']}
             for item in rads_por_area
         ],
+        'motivos_atraso': [
+            {'motivo': item['motivo_atraso_termino__nome'], 'total': item['total']}
+            for item in motivos_atraso
+        ],
+        'top_locais': top_locais,
+        'top_usuarios': top_usuarios,
+        'top_mch_defeito': [
+            {'mch': item['mch__identificacao'], 'total': item['total']}
+            for item in top_mch_defeito
+        ],
+        'canaleta_por_criticidade': canaleta_por_criticidade,
     })
 
 

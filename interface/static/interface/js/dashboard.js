@@ -1,8 +1,9 @@
 /*
- * Dashboard -- paineis agregados sobre RADs sincronizados (28/08/2026).
- * Acesso: Supervisor e Administrador. Abre sozinho com os ultimos 30
- * dias; qualquer outro ajuste de filtro so recalcula ao clicar em
- * "Pesquisar" (mesmo padrao usado no resto do sistema).
+ * Dashboard -- paineis agregados sobre RADs sincronizados (28/08/2026,
+ * ampliado 03/09/2026). Acesso: Supervisor e Administrador. Abre
+ * sozinho com os ultimos 30 dias; qualquer outro ajuste de filtro so
+ * recalcula ao clicar em "Pesquisar" (mesmo padrao usado no resto do
+ * sistema).
  */
 document.addEventListener('DOMContentLoaded', async function () {
   if (!RadAuth.exigirSessao()) return;
@@ -35,7 +36,9 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   // ---------------------------------------------------------------
   // Catálogos: popula Linha, Via, Tipo de Manutenção e a árvore de
-  // Serviço executado (Área + Subcategoria).
+  // Serviço executado (Área + Subcategoria). Também guarda o ID do
+  // serviço "Inspeção de Canaleta" -- usado para decidir se mostra o
+  // painel de Canaleta por criticidade (03/09/2026).
   // ---------------------------------------------------------------
   const ROTULO_AREA = {
     geral: 'Geral', infra: 'Infra', corretiva: 'Corretiva',
@@ -45,6 +48,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   let locais = [];
   let servicosPorArea = {};
+  let idServicoInspecaoCanaleta = null;
 
   function popularSelect(id, itens, valorChave, rotuloFn) {
     const select = document.getElementById(id);
@@ -80,8 +84,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     const campoSubcategoria = document.getElementById('campo-subcategoria-servico');
     const listaSubcategoria = document.getElementById('lista-subcategoria-servico');
 
-    // Nenhuma área marcada (fora "Outros") = todos os micro visíveis.
-    // Uma ou mais marcadas = só os micro dentro dessas áreas.
     const areasParaMostrar = areasMarcadas.length > 0 ? areasMarcadas : Object.keys(servicosPorArea);
 
     if (areasParaMostrar.length === 0) {
@@ -126,11 +128,10 @@ document.addEventListener('DOMContentLoaded', async function () {
       });
       popularAreasServico();
       atualizarSubcategoria();
+
+      const servicoCanaleta = catalogos.servicos.find((s) => s.nome === 'Inspeção de Canaleta');
+      idServicoInspecaoCanaleta = servicoCanaleta ? String(servicoCanaleta.id) : null;
     } catch (erro) {
-      // 29/08/2026: antes este catch engolia o erro em silencio --
-      // corrigido apos um bug real (lista de Area vazia) ficar
-      // impossivel de diagnosticar por causa disso. Agora sempre
-      // aparece no console (F12) e um aviso visivel na tela.
       console.error('Erro ao carregar catalogos do dashboard:', erro);
       mostrarAviso('Erro ao carregar os catálogos dos filtros. Veja o console (F12) para detalhes.', 'erro');
     }
@@ -226,8 +227,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   }
 
   // ---------------------------------------------------------------
-  // Parâmetros de filtro (data, pessoa, linha, via, local, tipo,
-  // serviço executado)
+  // Parâmetros de filtro
   // ---------------------------------------------------------------
   function montarParametrosFiltro() {
     const parametros = new URLSearchParams();
@@ -257,13 +257,13 @@ document.addEventListener('DOMContentLoaded', async function () {
   }
 
   // ---------------------------------------------------------------
-  // Gráficos (SVG simples, sem biblioteca externa)
+  // Gráfico de linha "RADs por dia" -- com número acima de cada
+  // ponto, grade horizontal (eixo Y) e vertical (uma por dia) e
+  // rótulo de data embaixo de cada dia (03/09/2026).
   // ---------------------------------------------------------------
   function renderizarGraficoLinha(radsPorDia, dataDe, dataAte) {
     const container = document.getElementById('grafico-rads-por-dia');
 
-    // Preenche os dias sem RAD com zero, para o eixo ficar
-    // proporcional ao tempo (nao so aos dias com dado).
     const mapa = {};
     radsPorDia.forEach(function (item) { mapa[item.data] = item.total; });
 
@@ -287,44 +287,76 @@ document.addEventListener('DOMContentLoaded', async function () {
       return;
     }
 
+    const pxPorDia = 44;
+    const margemEsquerda = 30;
+    const margemInferior = 46;
+    const margemSuperior = 22;
+    const alturaUtil = 90;
+    const altura = margemSuperior + alturaUtil + margemInferior;
+    const largura = margemEsquerda + dias.length * pxPorDia + 10;
+
     const maximo = Math.max(...dias.map((d) => d.total), 1);
-    const largura = 560;
-    const altura = 110;
+
+    function escalaY(valor) {
+      return margemSuperior + alturaUtil - (valor / maximo) * alturaUtil;
+    }
+
     const pontos = dias.map(function (d, indice) {
-      const x = dias.length > 1 ? (indice / (dias.length - 1)) * largura : 0;
-      const y = altura - (d.total / maximo) * (altura - 10) - 5;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    }).join(' ');
+      return {
+        x: margemEsquerda + indice * pxPorDia + pxPorDia / 2,
+        y: escalaY(d.total),
+        total: d.total,
+        data: d.data,
+      };
+    });
+
+    const linhaPontos = pontos.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+
+    const ticksY = maximo >= 2 ? [0, Math.round(maximo / 2), maximo] : [0, maximo];
+    const gridHorizontal = ticksY.map(function (valor) {
+      const y = escalaY(valor);
+      return `
+        <line x1="${margemEsquerda}" y1="${y.toFixed(1)}" x2="${largura - 5}" y2="${y.toFixed(1)}" stroke="var(--cor-linha)" stroke-width="1"/>
+        <text x="0" y="${(y + 3).toFixed(1)}" font-size="9" fill="var(--cor-tinta-suave)">${valor}</text>
+      `;
+    }).join('');
+
+    const gridVertical = pontos.map(function (p) {
+      const dataFormatada = p.data.split('-').slice(1).reverse().join('/'); // dd/mm
+      return `
+        <line x1="${p.x}" y1="${margemSuperior}" x2="${p.x}" y2="${margemSuperior + alturaUtil}" stroke="var(--cor-linha)" stroke-width="0.5" stroke-dasharray="2,2"/>
+        <text x="${p.x}" y="${(p.y - 8).toFixed(1)}" font-size="9" fill="var(--cor-tinta)" text-anchor="middle" font-weight="700">${p.total}</text>
+        <circle cx="${p.x}" cy="${p.y.toFixed(1)}" r="2.5" fill="var(--cor-primaria)"/>
+        <text x="${p.x}" y="${(margemSuperior + alturaUtil + 14).toFixed(1)}" font-size="8.5" fill="var(--cor-tinta-suave)" text-anchor="end" transform="rotate(-45 ${p.x} ${(margemSuperior + alturaUtil + 14).toFixed(1)})">${dataFormatada}</text>
+      `;
+    }).join('');
 
     container.innerHTML = `
-      <svg viewBox="0 0 ${largura} ${altura}" style="width:100%; height:110px;">
-        <polyline points="${pontos}" fill="none" stroke="var(--cor-primaria)" stroke-width="2"/>
+      <svg viewBox="0 0 ${largura} ${altura}" style="width:${largura}px; height:${altura}px; max-width:none; display:block;">
+        ${gridHorizontal}
+        ${gridVertical}
+        <polyline points="${linhaPontos}" fill="none" stroke="var(--cor-primaria)" stroke-width="2"/>
       </svg>
-      <div style="display:flex; justify-content:space-between; font-size:0.72rem; color:var(--cor-tinta-suave); margin-top:0.3rem;">
-        <span>${escapar(dias[0].data.split('-').reverse().join('/'))}</span>
-        <span>${escapar(dias[dias.length - 1].data.split('-').reverse().join('/'))}</span>
-      </div>
     `;
   }
 
-  const ROTULO_AREA_GRAFICO = {
-    geral: 'Geral', infra: 'Infra', corretiva: 'Corretiva', mecanizada: 'Mecanizada', amv: 'AMV',
-  };
-
-  function renderizarGraficoArea(radsPorArea) {
-    const container = document.getElementById('grafico-rads-por-area');
-    if (!radsPorArea || radsPorArea.length === 0) {
+  // ---------------------------------------------------------------
+  // Listas em barra horizontal (reaproveitada por RADs por área, Top
+  // locais, Top usuários, Top MCH e Canaleta por criticidade)
+  // ---------------------------------------------------------------
+  function renderizarListaBarras(idContainer, itens, rotuloFn) {
+    const container = document.getElementById(idContainer);
+    if (!itens || itens.length === 0) {
       container.innerHTML = '<p class="texto-suave" style="font-size:0.85rem;">Sem dados no período.</p>';
       return;
     }
-
-    const maximo = Math.max(...radsPorArea.map((i) => i.total), 1);
-    container.innerHTML = radsPorArea.map(function (item) {
-      const rotulo = ROTULO_AREA_GRAFICO[item.area] || item.area;
+    const maximo = Math.max(...itens.map((i) => i.total), 1);
+    container.innerHTML = itens.map(function (item) {
+      const rotulo = rotuloFn(item);
       const percentual = Math.round((item.total / maximo) * 100);
       return `
         <div class="barra-horizontal">
-          <span class="barra-horizontal__rotulo">${escapar(rotulo)}</span>
+          <span class="barra-horizontal__rotulo" title="${escapar(rotulo)}">${escapar(rotulo)}</span>
           <div class="barra-horizontal__trilha">
             <div class="barra-horizontal__preenchimento" style="width:${percentual}%;"></div>
           </div>
@@ -333,6 +365,42 @@ document.addEventListener('DOMContentLoaded', async function () {
       `;
     }).join('');
   }
+
+  const ROTULO_AREA_GRAFICO = {
+    geral: 'Geral', infra: 'Infra', corretiva: 'Corretiva', mecanizada: 'Mecanizada', amv: 'AMV',
+  };
+
+  function renderizarTabelaMotivos(motivos) {
+    const tbody = document.getElementById('tabela-motivos-atraso');
+    if (!motivos || motivos.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="2" class="texto-suave" style="text-align:center;">Sem atrasos no período.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = motivos.map(function (item) {
+      return `<tr><td>${escapar(item.motivo)}</td><td>${item.total}</td></tr>`;
+    }).join('');
+  }
+
+  // ---------------------------------------------------------------
+  // Card "Atraso no término" -- alterna entre % e Nº absoluto
+  // (03/09/2026).
+  // ---------------------------------------------------------------
+  let mostrarAtrasoComoNumero = false;
+  let ultimoResultado = null;
+
+  function atualizarCardAtraso() {
+    if (!ultimoResultado) return;
+    const valorEl = document.getElementById('metrica-atraso-termino');
+    valorEl.textContent = mostrarAtrasoComoNumero
+      ? ultimoResultado.total_atraso_termino
+      : `${ultimoResultado.percentual_atraso_termino}%`;
+  }
+
+  document.getElementById('botao-alternar-atraso').addEventListener('click', function () {
+    mostrarAtrasoComoNumero = !mostrarAtrasoComoNumero;
+    this.textContent = mostrarAtrasoComoNumero ? 'Ver %' : 'Ver Nº';
+    atualizarCardAtraso();
+  });
 
   // ---------------------------------------------------------------
   // Pesquisar
@@ -351,17 +419,34 @@ document.addEventListener('DOMContentLoaded', async function () {
         return;
       }
       const dados = await resposta.json();
+      ultimoResultado = dados;
 
       document.getElementById('metrica-total-rads').textContent = dados.total_rads;
-      document.getElementById('metrica-atraso-termino').textContent = `${dados.percentual_atraso_termino}%`;
-      document.getElementById('metrica-duracao-media').textContent = `${dados.duracao_media_real_min} min`;
-      document.getElementById('metrica-colaboradores-ativos').textContent = dados.colaboradores_ativos;
+      atualizarCardAtraso();
 
       const dataDe = document.getElementById('filtro-data-de').value;
       const dataAte = document.getElementById('filtro-data-ate').value;
       renderizarGraficoLinha(dados.rads_por_dia, dataDe, dataAte);
-      renderizarGraficoArea(dados.rads_por_area);
+
+      renderizarListaBarras('grafico-rads-por-area', dados.rads_por_area, (i) => ROTULO_AREA_GRAFICO[i.area] || i.area);
+      renderizarTabelaMotivos(dados.motivos_atraso);
+      renderizarListaBarras('grafico-top-locais', dados.top_locais, (i) => `${i.sigla} - ${i.nome}`);
+      renderizarListaBarras('grafico-top-usuarios', dados.top_usuarios, (i) => i.nome);
+      renderizarListaBarras('grafico-top-mch', dados.top_mch_defeito, (i) => i.mch);
+
+      // Painel de Canaleta por criticidade so aparece quando o
+      // servico especifico "Inspeção de Canaleta" esta marcado no
+      // filtro de Subcategoria (decisao do cliente).
+      const idsMicroMarcados = Array.from(
+        document.querySelectorAll('.checkbox-subcategoria-servico:checked')
+      ).map((el) => el.value);
+      const mostrarCanaleta = idServicoInspecaoCanaleta && idsMicroMarcados.includes(idServicoInspecaoCanaleta);
+      document.getElementById('cartao-canaleta-criticidade').style.display = mostrarCanaleta ? '' : 'none';
+      if (mostrarCanaleta) {
+        renderizarListaBarras('grafico-canaleta-criticidade', dados.canaleta_por_criticidade, (i) => i.rotulo);
+      }
     } catch (erro) {
+      console.error('Erro ao pesquisar dashboard:', erro);
       mostrarAviso('Erro de conexão ao carregar o dashboard.', 'erro');
     } finally {
       botao.disabled = false;
@@ -384,8 +469,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     document.querySelectorAll('.checkbox-area-servico:checked, .checkbox-subcategoria-servico:checked')
       .forEach((el) => { el.checked = false; });
     atualizarSubcategoria();
-    // Datas voltam para os ultimos 30 dias, nao ficam vazias -- o
-    // dashboard sempre precisa de um periodo pra fazer sentido.
     definirPeriodoPadrao();
   });
 
