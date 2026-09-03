@@ -353,17 +353,35 @@ class RadAmv(models.Model):
     (RG: o mesmo tecnico pode verificar mais de uma MCH na mesma
     atividade, cada uma com seu proprio defeito/acao). UR e Linha nao
     sao editaveis pelo usuario; Modelo, Via e Local sao.
+
+    04/09/2026: `mch` e os campos copiados dela (modelo/via/ur/local/
+    linha) passaram a ser opcionais -- criado o par
+    mch_nao_cadastrada/desc_mch_nao_cadastrada como via alternativa
+    para quando a MCH verificada em campo ainda nao existe no
+    catalogo. Regra (CheckConstraint abaixo): OU um bloco tem `mch`
+    preenchida e `mch_nao_cadastrada=False`, OU tem
+    `mch_nao_cadastrada=True` com `mch` vazia -- nunca os dois ao
+    mesmo tempo, nunca nenhum dos dois.
     """
 
     rad = models.ForeignKey(
         Rad, on_delete=models.CASCADE, related_name='amv_blocos', db_column='id_rad'
     )
-    mch = models.ForeignKey(CatMch, on_delete=models.PROTECT, db_column='id_mch')
-    modelo_mch = models.CharField(max_length=100)
-    via_mch = models.CharField(max_length=20)
-    ur_mch = models.CharField(max_length=50)
-    local_mch = models.CharField(max_length=100)
-    linha_mch = models.CharField(max_length=10)
+    mch = models.ForeignKey(
+        CatMch, on_delete=models.PROTECT, db_column='id_mch', null=True, blank=True
+    )
+    modelo_mch = models.CharField(max_length=100, null=True, blank=True)
+    via_mch = models.CharField(max_length=20, null=True, blank=True)
+    ur_mch = models.CharField(max_length=50, null=True, blank=True)
+    local_mch = models.CharField(max_length=100, null=True, blank=True)
+    linha_mch = models.CharField(max_length=10, null=True, blank=True)
+    # 04/09/2026: escape hatch para MCH ainda nao cadastrada no
+    # catalogo -- ver docstring da classe. desc_mch_nao_cadastrada e
+    # texto livre, ate 50 caracteres (mesmo limite de
+    # responsavel_atividade), validado em rad/validadores.py::
+    # _validar_bloco_amv.
+    mch_nao_cadastrada = models.BooleanField(default=False)
+    desc_mch_nao_cadastrada = models.CharField(max_length=50, null=True, blank=True)
     # 22/07/2026: preenchidos so quando "Outros" e selecionado em Tipo
     # de Defeito / Acoes (ver catalogos.models.CatTipoDefeitoAmv/
     # CatAcaoAmv.requer_descricao) -- mesmo padrao de outros_servico_desc.
@@ -377,9 +395,19 @@ class RadAmv(models.Model):
         verbose_name = 'Bloco AMV'
         verbose_name_plural = 'Blocos AMV'
         ordering = ['id']
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(mch_nao_cadastrada=False, mch__isnull=False)
+                    | models.Q(mch_nao_cadastrada=True, mch__isnull=True)
+                ),
+                name='chk_rad_amv_mch_xor_nao_cadastrada',
+            )
+        ]
 
     def __str__(self):
-        return f'AMV de {self.rad.numero_rad} ({self.mch.identificacao})'
+        identificacao = self.mch.identificacao if self.mch else f'não cadastrada: {self.desc_mch_nao_cadastrada}'
+        return f'AMV de {self.rad.numero_rad} ({identificacao})'
 
 
 class RadAmvDefeito(models.Model):

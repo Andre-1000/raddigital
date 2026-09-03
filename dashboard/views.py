@@ -211,8 +211,12 @@ def dados(request):
         for item in top_usuarios_bruto
     ]
 
+    # 04/09/2026: exclui blocos com mch_nao_cadastrada=True -- este
+    # ranking e sobre MCHs do catalogo que aparecem com frequencia;
+    # descricoes de texto livre (uma por bloco, quase sempre unicas)
+    # nao fazem sentido como "recorrente".
     top_mch_defeito = list(
-        RadAmv.objects.filter(rad__in=queryset)
+        RadAmv.objects.filter(rad__in=queryset, mch__isnull=False)
         .values('mch__identificacao')
         .annotate(total=Count('id', distinct=True))
         .order_by('-total')[:10]

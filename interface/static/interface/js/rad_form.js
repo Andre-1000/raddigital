@@ -845,7 +845,10 @@ document.addEventListener('DOMContentLoaded', async function () {
   const contadorBlocosAmv = document.getElementById('contador-blocos-amv');
 
   function criarBlocoAmvVazio() {
-    return { id_mch: null, tipos_defeito: [], acoes: [], desc_outros_tipo_defeito: '', desc_outros_acao: '' };
+    return {
+      id_mch: null, tipos_defeito: [], acoes: [], desc_outros_tipo_defeito: '', desc_outros_acao: '',
+      mch_nao_cadastrada: false, desc_mch_nao_cadastrada: '',
+    };
   }
 
   function montarDetalhesMchTexto(idMch) {
@@ -934,6 +937,68 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
     atualizarDetalhesMch();
     campoMchGrupo.appendChild(detalhesMchEl);
+
+    // 04/09/2026: checkbox "MCH não cadastrada" -- via alternativa
+    // para quando a MCH verificada em campo ainda nao existe no
+    // catalogo. Quando marcado, desabilita a busca de MCH (que fica
+    // sem sentido nesse caso) e libera um campo de texto livre (ate
+    // 50 caracteres) que passa a ser obrigatorio no lugar dela -- ver
+    // rad/validadores.py::_validar_bloco_amv. As duas exigencias
+    // (MCH do catalogo OU descricao) nunca coexistem no mesmo bloco.
+    const grupoMchNaoCadastrada = document.createElement('div');
+    grupoMchNaoCadastrada.style.marginTop = '0.6rem';
+
+    const labelMchNaoCadastrada = document.createElement('label');
+    labelMchNaoCadastrada.style.display = 'flex';
+    labelMchNaoCadastrada.style.alignItems = 'center';
+    labelMchNaoCadastrada.style.gap = '0.4rem';
+    labelMchNaoCadastrada.style.cursor = 'pointer';
+    labelMchNaoCadastrada.style.minHeight = 'var(--alvo-toque)';
+
+    const checkboxMchNaoCadastrada = document.createElement('input');
+    checkboxMchNaoCadastrada.type = 'checkbox';
+    checkboxMchNaoCadastrada.checked = !!bloco.mch_nao_cadastrada;
+    labelMchNaoCadastrada.appendChild(checkboxMchNaoCadastrada);
+    labelMchNaoCadastrada.appendChild(document.createTextNode('MCH não cadastrada'));
+    grupoMchNaoCadastrada.appendChild(labelMchNaoCadastrada);
+
+    const grupoDescMchNaoCadastrada = document.createElement('div');
+    grupoDescMchNaoCadastrada.style.marginTop = '0.5rem';
+    grupoDescMchNaoCadastrada.innerHTML = '<label>Descreva a MCH</label>';
+    const campoDescMchNaoCadastrada = document.createElement('input');
+    campoDescMchNaoCadastrada.type = 'text';
+    campoDescMchNaoCadastrada.maxLength = 50;
+    campoDescMchNaoCadastrada.value = bloco.desc_mch_nao_cadastrada || '';
+    campoDescMchNaoCadastrada.addEventListener('input', function () {
+      bloco.desc_mch_nao_cadastrada = campoDescMchNaoCadastrada.value;
+      salvarRascunhoAgora();
+    });
+    grupoDescMchNaoCadastrada.appendChild(campoDescMchNaoCadastrada);
+    grupoMchNaoCadastrada.appendChild(grupoDescMchNaoCadastrada);
+
+    function atualizarEstadoMchNaoCadastrada() {
+      const marcado = checkboxMchNaoCadastrada.checked;
+      inputMch.disabled = marcado;
+      grupoDescMchNaoCadastrada.style.display = marcado ? '' : 'none';
+      if (marcado) {
+        bloco.id_mch = null;
+        inputMch.value = '';
+        detalhesMchEl.style.display = 'none';
+      } else {
+        bloco.desc_mch_nao_cadastrada = '';
+        campoDescMchNaoCadastrada.value = '';
+        atualizarDetalhesMch();
+      }
+    }
+
+    checkboxMchNaoCadastrada.addEventListener('change', function () {
+      bloco.mch_nao_cadastrada = checkboxMchNaoCadastrada.checked;
+      atualizarEstadoMchNaoCadastrada();
+      salvarRascunhoAgora();
+    });
+
+    campoMchGrupo.appendChild(grupoMchNaoCadastrada);
+    atualizarEstadoMchNaoCadastrada();
 
     inputMch.addEventListener('change', function () {
       const mchEncontrada = mchs.find((m) => m.identificacao === inputMch.value.trim());

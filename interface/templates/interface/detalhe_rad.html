@@ -366,21 +366,33 @@
         titulo.className = 'subcartao__titulo';
         // textContent (nao innerHTML) -- o proprio navegador ja
         // escapa automaticamente, sem precisar de escapar() aqui.
-        titulo.textContent = `MCH ${indice + 1} de ${blocosAmv.length} — ${bloco.identificacao_mch}`;
+        // 04/09/2026: quando mch_nao_cadastrada e True,
+        // identificacao_mch vem null do backend -- usa o texto livre
+        // digitado no lugar, com um rotulo deixando claro que nao e
+        // uma MCH do catalogo.
+        const identificacaoExibida = bloco.mch_nao_cadastrada
+          ? `MCH não cadastrada — ${bloco.desc_mch_nao_cadastrada}`
+          : bloco.identificacao_mch;
+        titulo.textContent = `MCH ${indice + 1} de ${blocosAmv.length} — ${identificacaoExibida}`;
         item.appendChild(titulo);
 
         const grade = document.createElement('div');
         grade.className = 'grade-campos grade-dados';
 
-        const camposBloco = [
-          ['Modelo', bloco.modelo_mch],
-          ['Via', bloco.via_mch],
-          ['UR', bloco.ur_mch],
-          ['Local', bloco.local_mch],
-          ['Linha', bloco.linha_mch],
-          ['Tipos de Defeito', bloco.tipos_defeito],
-          ['Ações', bloco.acoes],
-        ];
+        // 04/09/2026: Modelo/Via/UR/Local/Linha so existem quando a
+        // MCH veio do catalogo -- omitidos (em vez de mostrar "N/A"
+        // em cada um) quando mch_nao_cadastrada, ja que nao fazem
+        // sentido nesse caso.
+        const camposBloco = bloco.mch_nao_cadastrada
+          ? []
+          : [
+              ['Modelo', bloco.modelo_mch],
+              ['Via', bloco.via_mch],
+              ['UR', bloco.ur_mch],
+              ['Local', bloco.local_mch],
+              ['Linha', bloco.linha_mch],
+            ];
+        camposBloco.push(['Tipos de Defeito', bloco.tipos_defeito], ['Ações', bloco.acoes]);
         if (bloco.desc_outros_tipo_defeito) {
           camposBloco.push(['Descrição — Outro Defeito', bloco.desc_outros_tipo_defeito]);
         }

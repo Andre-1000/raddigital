@@ -388,6 +388,12 @@ def _validar_bloco_amv(payload, erros):
     mais de uma MCH no mesmo RAD, cada uma com seu proprio defeito e
     acao. Exige ao menos 1 bloco completo, no maximo
     LIMITE_BLOCOS_AMV.
+
+    04/09/2026: cada bloco pode satisfazer a Identificação MCH de duas
+    formas -- id_mch (MCH cadastrada no catalogo, fluxo normal) OU
+    mch_nao_cadastrada=True com desc_mch_nao_cadastrada preenchida
+    (MCH ainda nao cadastrada, ate 50 caracteres). As duas nunca se
+    misturam no mesmo bloco -- ver rad/models.py::RadAmv.
     """
     servicos_ids = payload.get('servicos') or []
     amv_selecionado = CatServico.objects.filter(
@@ -413,7 +419,28 @@ def _validar_bloco_amv(payload, erros):
 
     for indice, bloco in enumerate(blocos):
         prefixo = f'amv_blocos[{indice}]'
-        if not bloco.get('id_mch'):
+        # 04/09/2026: MCH nao cadastrada -- via alternativa quando a
+        # MCH verificada em campo ainda nao existe no catalogo. Quando
+        # marcada, a descricao de texto livre (ate 50 caracteres) vira
+        # obrigatoria NO LUGAR da Identificação MCH -- as duas regras
+        # nunca coexistem no mesmo bloco.
+        if bloco.get('mch_nao_cadastrada'):
+            desc = bloco.get('desc_mch_nao_cadastrada')
+            if not desc or not str(desc).strip():
+                erros.append(
+                    _erro(
+                        'VLD-020', f'{prefixo}.desc_mch_nao_cadastrada',
+                        f'Descreva a MCH não cadastrada no bloco {indice + 1}.',
+                    )
+                )
+            elif len(str(desc)) > 50:
+                erros.append(
+                    _erro(
+                        'VLD-020', f'{prefixo}.desc_mch_nao_cadastrada',
+                        f'A descrição da MCH não cadastrada deve ter no máximo 50 caracteres (bloco {indice + 1}).',
+                    )
+                )
+        elif not bloco.get('id_mch'):
             erros.append(
                 _erro('VLD-020', f'{prefixo}.id_mch', f'Selecione a Identificação MCH no bloco {indice + 1}.')
             )

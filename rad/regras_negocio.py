@@ -294,21 +294,44 @@ def _criar_relacionamentos(rad, payload):
     # bloco vira um RadAmv proprio, com seus RadAmvDefeito/RadAmvAcao
     # apontando so pra ELE (nao mais pro Rad direto), pra nao misturar
     # defeitos/acoes de MCHs diferentes no mesmo RAD.
+    #
+    # 04/09/2026: um bloco agora pode vir com mch_nao_cadastrada=True
+    # em vez de id_mch -- validar_payload_sincronizacao ja garantiu
+    # (VLD-020) que nesse caso desc_mch_nao_cadastrada esta preenchida.
+    # Os campos copiados da MCH (modelo/via/ur/local/linha) ficam None
+    # nesse caso, ja que nao ha uma MCH real de onde copiar.
     for bloco in payload.get('amv_blocos') or []:
-        if not bloco.get('id_mch'):
+        mch_nao_cadastrada = bool(bloco.get('mch_nao_cadastrada'))
+        if not mch_nao_cadastrada and not bloco.get('id_mch'):
             continue
-        mch = CatMch.objects.get(id=bloco['id_mch'])
-        amv = RadAmv.objects.create(
-            rad=rad,
-            mch=mch,
-            modelo_mch=mch.modelo,
-            via_mch=mch.via,
-            ur_mch=mch.ur,
-            local_mch=mch.local_amv,
-            linha_mch=mch.linha,
-            desc_outros_tipo_defeito=bloco.get('desc_outros_tipo_defeito') or None,
-            desc_outros_acao=bloco.get('desc_outros_acao') or None,
-        )
+
+        if mch_nao_cadastrada:
+            amv = RadAmv.objects.create(
+                rad=rad,
+                mch=None,
+                modelo_mch=None,
+                via_mch=None,
+                ur_mch=None,
+                local_mch=None,
+                linha_mch=None,
+                mch_nao_cadastrada=True,
+                desc_mch_nao_cadastrada=bloco.get('desc_mch_nao_cadastrada') or None,
+                desc_outros_tipo_defeito=bloco.get('desc_outros_tipo_defeito') or None,
+                desc_outros_acao=bloco.get('desc_outros_acao') or None,
+            )
+        else:
+            mch = CatMch.objects.get(id=bloco['id_mch'])
+            amv = RadAmv.objects.create(
+                rad=rad,
+                mch=mch,
+                modelo_mch=mch.modelo,
+                via_mch=mch.via,
+                ur_mch=mch.ur,
+                local_mch=mch.local_amv,
+                linha_mch=mch.linha,
+                desc_outros_tipo_defeito=bloco.get('desc_outros_tipo_defeito') or None,
+                desc_outros_acao=bloco.get('desc_outros_acao') or None,
+            )
         RadAmvDefeito.objects.bulk_create(
             [
                 RadAmvDefeito(amv=amv, tipo_defeito_id=id_defeito)

@@ -149,7 +149,14 @@ def _linha_para_rad(rad):
         'vias': '; '.join(rad.vias.values_list('via__nome', flat=True)),
         'equipes': '; '.join(rad.equipes.values_list('equipe_id', flat=True)),
         'servicos': '; '.join(rad.servicos.values_list('servico__nome', flat=True)),
-        'mchs': '; '.join(amv.mch.identificacao for amv in rad.amv_blocos.all()),
+        # 04/09/2026: um bloco AMV pode ter mch=None (via "MCH não
+        # cadastrada") -- nesse caso mostra o texto livre digitado no
+        # lugar da identificação real, prefixado para ficar claro que
+        # não é uma MCH do catálogo.
+        'mchs': '; '.join(
+            (amv.mch.identificacao if amv.mch else f'Não cadastrada: {amv.desc_mch_nao_cadastrada}')
+            for amv in rad.amv_blocos.all()
+        ),
         'colaboradores': '; '.join(c.nome for c in rad.colaboradores.all()),
         **_campos_canaleta(rad),
         'login_usuario': rad.usuario_id,

@@ -174,7 +174,15 @@ def _linha_resumo(rad):
         # bloco) -- a listagem mostra so o primeiro, com a contagem
         # total pra sinalizar que tem mais. O detalhe do RAD mostra
         # todos.
-        'identificacao_mch': primeiro_amv.mch.identificacao if primeiro_amv else None,
+        # 04/09/2026: o primeiro bloco pode ter mch=None (via
+        # "MCH não cadastrada") -- nesse caso identificacao_mch cai
+        # em None e o texto livre digitado aparece em
+        # desc_mch_nao_cadastrada, ao inves de quebrar com AttributeError.
+        'identificacao_mch': (
+            primeiro_amv.mch.identificacao if primeiro_amv and primeiro_amv.mch else None
+        ),
+        'mch_nao_cadastrada': bool(primeiro_amv.mch_nao_cadastrada) if primeiro_amv else False,
+        'desc_mch_nao_cadastrada': primeiro_amv.desc_mch_nao_cadastrada if primeiro_amv else None,
         'linha_mch': primeiro_amv.linha_mch if primeiro_amv else None,
         'total_blocos_amv': len(blocos_amv),
         'login_usuario': rad.usuario.login,
@@ -289,12 +297,19 @@ def _amv_resumo(rad):
     """
     30/07/2026: um RAD pode ter varios blocos AMV (um por MCH
     verificada) -- retorna uma LISTA, nao mais um unico objeto.
+
+    04/09/2026: um bloco pode ter mch=None quando mch_nao_cadastrada
+    for True -- identificacao_mch cai em None nesse caso, e o texto
+    livre digitado fica em desc_mch_nao_cadastrada. O frontend decide
+    qual mostrar.
     """
     blocos = []
     for amv in rad.amv_blocos.all():
         blocos.append(
             {
-                'identificacao_mch': amv.mch.identificacao,
+                'identificacao_mch': amv.mch.identificacao if amv.mch else None,
+                'mch_nao_cadastrada': amv.mch_nao_cadastrada,
+                'desc_mch_nao_cadastrada': amv.desc_mch_nao_cadastrada,
                 'modelo_mch': amv.modelo_mch,
                 'via_mch': amv.via_mch,
                 'ur_mch': amv.ur_mch,
