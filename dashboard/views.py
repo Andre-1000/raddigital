@@ -46,7 +46,7 @@ from django.utils import timezone
 
 from colaboradores.models import ColaboradorCadastro
 from comum.datas import parse_data
-from rad.models import Rad, RadAmv, RadCanaleta
+from rad.models import Rad, RadAmv, RadCanaleta, RadCanaletaAnomalia
 from usuarios.decorators import requer_perfil, requer_token
 from usuarios.models import UsuarioPerfil
 
@@ -238,6 +238,28 @@ def dados(request):
         for item in canaleta_por_criticidade_bruto
     ]
 
+    # 04/09/2026: segundo indicador do bloco Anomalias -- quantidade de
+    # cada TIPO de anomalia (Limpa, Obstruída, Ausente, Quebrada,
+    # Vegetação, Lastro, Lixo, Dormentes, Entulho, Terra). Um RAD pode
+    # ter varias anomalias marcadas ao mesmo tempo -- cada uma conta
+    # para o proprio tipo (nao e mutuamente exclusivo, entao a soma
+    # dos totais pode passar do numero de RADs com Canaleta).
+    rotulos_anomalia = dict(RadCanaletaAnomalia.ANOMALIA_CHOICES)
+    canaleta_por_anomalia_bruto = list(
+        RadCanaletaAnomalia.objects.filter(canaleta__rad__in=queryset)
+        .values('anomalia')
+        .annotate(total=Count('id', distinct=True))
+        .order_by('-total')
+    )
+    canaleta_por_anomalia = [
+        {
+            'anomalia': item['anomalia'],
+            'rotulo': rotulos_anomalia.get(item['anomalia'], item['anomalia']),
+            'total': item['total'],
+        }
+        for item in canaleta_por_anomalia_bruto
+    ]
+
     return JsonResponse({
         'total_rads': total,
         'percentual_atraso_termino': percentual_atraso,
@@ -258,6 +280,7 @@ def dados(request):
             for item in top_mch_defeito
         ],
         'canaleta_por_criticidade': canaleta_por_criticidade,
+        'canaleta_por_anomalia': canaleta_por_anomalia,
     })
 
 

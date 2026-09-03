@@ -74,6 +74,17 @@
   @media (max-width: 720px) {
     .grade-paineis { grid-template-columns: 1fr; }
   }
+  /* 04/09/2026: correcao de layout -- por padrao, um item de grid CSS
+     nao encolhe abaixo da largura do seu conteudo (min-width: auto),
+     entao um grafico largo (RADs por dia, com muitos dias) estourava
+     a coluna inteira e empurrava a pagina para o lado, mesmo com
+     overflow-x:auto no wrapper interno. min-width:0 aqui permite o
+     cartao encolher normalmente e deixa o scroll interno funcionar de
+     verdade, em vez de vazar pra fora dos limites da pagina. */
+  .grade-paineis > .cartao,
+  .grade-metricas > .cartao-metrica {
+    min-width: 0;
+  }
   .cartao-grafico__titulo {
     font-size: 0.85rem;
     font-weight: 700;
@@ -120,6 +131,7 @@
   .tabela-scroll-wrap {
     max-height: 260px;
     overflow-y: auto;
+    overflow-x: auto;
     border: 1px solid var(--cor-linha);
     border-radius: var(--raio-pequeno);
   }
@@ -292,11 +304,19 @@
     </div>
   </div>
 
-  <!-- 03/09/2026: so aparece quando o servico especifico "Inspeção de
-       Canaleta" esta marcado no filtro Subcategoria (ver dashboard.js). -->
-  <div class="cartao" id="cartao-canaleta-criticidade" style="margin-top:12px; display:none;">
-    <p class="cartao-grafico__titulo">Anomalias (Canaleta) por grau de criticidade</p>
-    <div id="grafico-canaleta-criticidade"></div>
+  <!-- 03/09/2026 (ampliado 04/09/2026): so aparece quando o servico
+       especifico "Inspeção de Canaleta" esta marcado no filtro
+       Subcategoria (ver dashboard.js). Dois indicadores do bloco
+       Anomalias: grau de criticidade e tipo de anomalia. -->
+  <div class="grade-paineis" id="bloco-canaleta-detalhes" style="display:none;">
+    <div class="cartao">
+      <p class="cartao-grafico__titulo">Anomalias (Canaleta) — grau de criticidade</p>
+      <div id="grafico-canaleta-criticidade"></div>
+    </div>
+    <div class="cartao">
+      <p class="cartao-grafico__titulo">Anomalias (Canaleta) — tipo de anomalia</p>
+      <div id="grafico-canaleta-anomalia"></div>
+    </div>
   </div>
 
 </div>

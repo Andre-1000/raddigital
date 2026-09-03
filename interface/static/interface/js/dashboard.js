@@ -435,16 +435,17 @@ document.addEventListener('DOMContentLoaded', async function () {
       renderizarListaBarras('grafico-top-usuarios', dados.top_usuarios, (i) => i.nome);
       renderizarListaBarras('grafico-top-mch', dados.top_mch_defeito, (i) => i.mch);
 
-      // Painel de Canaleta por criticidade so aparece quando o
-      // servico especifico "Inspeção de Canaleta" esta marcado no
-      // filtro de Subcategoria (decisao do cliente).
+      // Bloco de detalhes da Canaleta (criticidade + tipo de anomalia)
+      // so aparece quando o servico especifico "Inspeção de Canaleta"
+      // esta marcado no filtro de Subcategoria (decisao do cliente).
       const idsMicroMarcados = Array.from(
         document.querySelectorAll('.checkbox-subcategoria-servico:checked')
       ).map((el) => el.value);
       const mostrarCanaleta = idServicoInspecaoCanaleta && idsMicroMarcados.includes(idServicoInspecaoCanaleta);
-      document.getElementById('cartao-canaleta-criticidade').style.display = mostrarCanaleta ? '' : 'none';
+      document.getElementById('bloco-canaleta-detalhes').style.display = mostrarCanaleta ? '' : 'none';
       if (mostrarCanaleta) {
         renderizarListaBarras('grafico-canaleta-criticidade', dados.canaleta_por_criticidade, (i) => i.rotulo);
+        renderizarListaBarras('grafico-canaleta-anomalia', dados.canaleta_por_anomalia, (i) => i.rotulo);
       }
     } catch (erro) {
       console.error('Erro ao pesquisar dashboard:', erro);
