@@ -373,11 +373,12 @@ document.addEventListener('DOMContentLoaded', async function () {
   function renderizarTabelaMotivos(motivos) {
     const tbody = document.getElementById('tabela-motivos-atraso');
     if (!motivos || motivos.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="2" class="texto-suave" style="text-align:center;">Sem atrasos no período.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="3" class="texto-suave" style="text-align:center;">Sem atrasos no período.</td></tr>';
       return;
     }
     tbody.innerHTML = motivos.map(function (item) {
-      return `<tr><td>${escapar(item.motivo)}</td><td>${item.total}</td></tr>`;
+      const descricao = item.descricoes ? escapar(item.descricoes) : '—';
+      return `<tr><td>${escapar(item.motivo)}</td><td>${item.total}</td><td class="coluna-descricao" title="${descricao}">${descricao}</td></tr>`;
     }).join('');
   }
 

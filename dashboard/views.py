@@ -39,6 +39,7 @@ ja existiam no sistema, sem nenhum campo novo:
   - percentual_atraso_termino ganhou irmao total_atraso_termino (o
     card agora alterna entre % e numero absoluto).
 """
+from django.contrib.postgres.aggregates import ArrayAgg
 from django.db.models import Avg, Count, Q
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
@@ -170,12 +171,33 @@ def dados(request):
     # pediu com barra de rolagem, nao um recorte de top N). Motivo do
     # atraso no INICIO nao existe mais no formulario (decisao de
     # negocio de 22/07/2026), entao so ha dado para termino.
-    motivos_atraso = list(
+    #
+    # 03/09/2026: coluna extra com as descricoes de texto livre --
+    # relevante so quando o motivo e "Outros" (os demais motivos nao
+    # tem campo de descricao). ArrayAgg(distinct=True) junta os
+    # valores UNICOS digitados por quem preencheu, sem repetir a mesma
+    # frase varias vezes so porque varios RADs usaram o mesmo texto.
+    motivos_atraso_bruto = list(
         queryset.filter(atraso_termino=True, motivo_atraso_termino__isnull=False)
         .values('motivo_atraso_termino__nome')
-        .annotate(total=Count('id_rad', distinct=True))
+        .annotate(
+            total=Count('id_rad', distinct=True),
+            descricoes=ArrayAgg(
+                'desc_motivo_atraso_termino',
+                distinct=True,
+                filter=Q(desc_motivo_atraso_termino__isnull=False) & ~Q(desc_motivo_atraso_termino=''),
+            ),
+        )
         .order_by('-total')
     )
+    motivos_atraso = [
+        {
+            'motivo': item['motivo_atraso_termino__nome'],
+            'total': item['total'],
+            'descricoes': '; '.join(item['descricoes']) if item['descricoes'] else None,
+        }
+        for item in motivos_atraso_bruto
+    ]
 
     top_locais = _top_locais(queryset)
 
@@ -228,10 +250,7 @@ def dados(request):
             {'area': item['servicos__servico__area'], 'total': item['total']}
             for item in rads_por_area
         ],
-        'motivos_atraso': [
-            {'motivo': item['motivo_atraso_termino__nome'], 'total': item['total']}
-            for item in motivos_atraso
-        ],
+        'motivos_atraso': motivos_atraso,
         'top_locais': top_locais,
         'top_usuarios': top_usuarios,
         'top_mch_defeito': [

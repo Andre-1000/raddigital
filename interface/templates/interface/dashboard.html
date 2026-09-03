@@ -143,9 +143,18 @@
     padding: 0.5rem 0.75rem;
     border-top: 1px solid var(--cor-linha);
   }
-  .tabela-scroll td:last-child {
+  .tabela-scroll td:nth-child(2) {
     text-align: right;
     font-weight: 600;
+  }
+  .tabela-scroll td.coluna-descricao {
+    text-align: left;
+    font-weight: 400;
+    color: var(--cor-tinta-suave);
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .grafico-linha-wrap {
@@ -261,7 +270,7 @@
       <p class="cartao-grafico__titulo">Top motivos de atraso no término</p>
       <div class="tabela-scroll-wrap">
         <table class="tabela-scroll">
-          <thead><tr><th>Motivo</th><th>Qtd.</th></tr></thead>
+          <thead><tr><th>Motivo</th><th>Qtd.</th><th>Descrição (quando "Outros")</th></tr></thead>
           <tbody id="tabela-motivos-atraso"></tbody>
         </table>
       </div>
