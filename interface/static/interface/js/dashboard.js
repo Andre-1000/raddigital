@@ -105,7 +105,11 @@ document.addEventListener('DOMContentLoaded', async function () {
   async function carregarCatalogos() {
     try {
       const resposta = await RadAuth.requisicaoAutenticada('/catalogos/todos/');
-      if (!resposta.ok) return;
+      if (!resposta.ok) {
+        console.error('Falha ao buscar /catalogos/todos/:', resposta.status);
+        mostrarAviso('Não foi possível carregar os catálogos dos filtros.', 'erro');
+        return;
+      }
       const catalogos = await resposta.json();
 
       locais = catalogos.locais;
@@ -123,8 +127,12 @@ document.addEventListener('DOMContentLoaded', async function () {
       popularAreasServico();
       atualizarSubcategoria();
     } catch (erro) {
-      // Falha ao carregar catalogos nao deve travar a tela -- os
-      // filtros por texto (pessoa, local) continuam funcionando.
+      // 29/08/2026: antes este catch engolia o erro em silencio --
+      // corrigido apos um bug real (lista de Area vazia) ficar
+      // impossivel de diagnosticar por causa disso. Agora sempre
+      // aparece no console (F12) e um aviso visivel na tela.
+      console.error('Erro ao carregar catalogos do dashboard:', erro);
+      mostrarAviso('Erro ao carregar os catálogos dos filtros. Veja o console (F12) para detalhes.', 'erro');
     }
   }
 
