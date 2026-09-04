@@ -1053,7 +1053,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     grupoDefeito.className = 'campo';
     grupoDefeito.innerHTML = '<label>Tipo de Defeito</label>';
     const listaDefeitoEl = document.createElement('div');
-    listaDefeitoEl.className = 'pilha';
+    listaDefeitoEl.className = 'grade-checkboxes';
     grupoDefeito.appendChild(listaDefeitoEl);
 
     const grupoOutrosDefeito = document.createElement('div');
@@ -1095,7 +1095,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     grupoAcoes.className = 'campo';
     grupoAcoes.innerHTML = '<label>Ações</label>';
     const listaAcoesEl = document.createElement('div');
-    listaAcoesEl.className = 'pilha';
+    listaAcoesEl.className = 'grade-checkboxes';
     grupoAcoes.appendChild(listaAcoesEl);
 
     const grupoOutrosAcao = document.createElement('div');
