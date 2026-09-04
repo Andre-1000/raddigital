@@ -893,25 +893,24 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     const campoMchGrupo = document.createElement('div');
     campoMchGrupo.className = 'campo';
-    const idListaMch = `lista-mch-${indice}`;
     campoMchGrupo.innerHTML = `<label>Identificação MCH</label>`;
     const inputMch = document.createElement('input');
     inputMch.type = 'text';
-    inputMch.setAttribute('list', idListaMch);
     inputMch.autocomplete = 'off';
     inputMch.placeholder = 'Buscar MCH…';
     const mchAtual = mchs.find((m) => m.id === bloco.id_mch);
     inputMch.value = mchAtual ? mchAtual.identificacao : '';
     campoMchGrupo.appendChild(inputMch);
 
-    const datalist = document.createElement('datalist');
-    datalist.id = idListaMch;
-    mchs.forEach(function (mch) {
-      const opcao = document.createElement('option');
-      opcao.value = mch.identificacao;
-      datalist.appendChild(opcao);
-    });
-    campoMchGrupo.appendChild(datalist);
+    // 04/09/2026: padronizado com o mesmo padrao de busca usado em
+    // Local Inicial/Final e Colaborador -- lista de resultados
+    // clicaveis abaixo do campo, em vez do <datalist> nativo do
+    // navegador (que tinha aparencia/comportamento diferente do resto
+    // do formulario).
+    const resultadosMchEl = document.createElement('div');
+    resultadosMchEl.className = 'pilha';
+    resultadosMchEl.style.marginTop = '0.5rem';
+    campoMchGrupo.appendChild(resultadosMchEl);
 
     const detalhesMchEl = document.createElement('div');
     detalhesMchEl.className = 'bloco-amv__detalhes-mch';
@@ -1000,11 +999,53 @@ document.addEventListener('DOMContentLoaded', async function () {
     campoMchGrupo.appendChild(grupoMchNaoCadastrada);
     atualizarEstadoMchNaoCadastrada();
 
-    inputMch.addEventListener('change', function () {
-      const mchEncontrada = mchs.find((m) => m.identificacao === inputMch.value.trim());
-      bloco.id_mch = mchEncontrada ? mchEncontrada.id : null;
+    function selecionarMch(mch) {
+      inputMch.value = mch.identificacao;
+      bloco.id_mch = mch.id;
+      resultadosMchEl.innerHTML = '';
       atualizarDetalhesMch();
       salvarRascunhoAgora();
+    }
+
+    inputMch.addEventListener('input', function () {
+      const termo = inputMch.value.trim().toLowerCase();
+      resultadosMchEl.innerHTML = '';
+      bloco.id_mch = null;
+      atualizarDetalhesMch();
+
+      if (!termo) return;
+
+      const encontradas = mchs
+        .filter((m) => m.identificacao.toLowerCase().includes(termo))
+        .slice(0, 8);
+
+      if (encontradas.length === 0) {
+        const aviso = document.createElement('p');
+        aviso.className = 'texto-suave';
+        aviso.style.fontSize = '0.85rem';
+        aviso.textContent = 'Nenhuma MCH encontrada.';
+        resultadosMchEl.appendChild(aviso);
+        return;
+      }
+
+      encontradas.forEach(function (mch) {
+        const botao = document.createElement('button');
+        botao.type = 'button';
+        botao.className = 'botao botao--secundaria';
+        botao.style.textAlign = 'left';
+        botao.style.justifyContent = 'flex-start';
+        botao.textContent = mch.identificacao;
+        botao.addEventListener('click', function () {
+          selecionarMch(mch);
+        });
+        resultadosMchEl.appendChild(botao);
+      });
+    });
+
+    inputMch.addEventListener('blur', function () {
+      setTimeout(function () {
+        resultadosMchEl.innerHTML = '';
+      }, 150);
     });
     cartao.appendChild(campoMchGrupo);
 
