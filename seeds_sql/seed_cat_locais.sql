@@ -52,7 +52,7 @@ INSERT INTO cat_locais (sigla, nome, categoria, ativo) VALUES
   ('AGU', 'Aeroporto Guarulhos', 'estacao', TRUE),
   ('SGU', 'Eng. Sebastião Gualberto', 'estacao', TRUE),
   ('ETR', 'Eng. Trindade', 'estacao', TRUE),
-  ('PTR', 'Patriarca', 'estacao', TRUE)
+  ('PTR', 'Patriarca', 'estacao', TRUE),
   ('PAT 001', 'Patio Luz', 'patio', TRUE),
   ('PAT 003', 'Patio Eng São Paulo', 'patio', TRUE),
   ('PAT 005', 'Patio para Lastros e Dormentes', 'patio', TRUE),
