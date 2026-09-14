@@ -25,7 +25,7 @@ def _normalizar_payload(dados):
     """
     dados = dict(dados)
     for campo in (
-        'data_preenchimento', 'data_hp_inicio', 'data_hp_termino',
+        'data_preenchimento', 'data_atividade', 'data_hp_inicio', 'data_hp_termino',
         'data_hr_inicio', 'data_hr_termino',
     ):
         if campo in dados:

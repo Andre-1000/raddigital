@@ -61,6 +61,15 @@ class Rad(models.Model):
         help_text='Ordem de execucao dentro da mesma OS. Gerado atomicamente (RG-IDENT-008/009).'
     )
     data_preenchimento = models.DateField()
+    # 05/09/2026: Data da Atividade -- data em que a atividade foi de
+    # fato realizada em campo, informada manualmente pela pessoa
+    # (nunca vem pre-preenchida, ao contrario de data_preenchimento,
+    # que sempre nasce com a data de hoje -- decisao do cliente).
+    # Nullable no banco de proposito (mesmo padrao ja usado em
+    # responsavel_atividade): obrigatoriedade e imposta pela
+    # validacao (VLD-046, ver rad/validadores.py), nao pelo schema --
+    # RADs ja sincronizados antes desta mudanca nao tem esse valor.
+    data_atividade = models.DateField(null=True, blank=True)
 
     # --- Localizacao (EFD-005 a EFD-009) --------------------------------
     local_inicial = models.ForeignKey(

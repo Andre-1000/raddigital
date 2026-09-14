@@ -99,6 +99,24 @@ def _validar_data_preenchimento(payload, erros, hoje):
         erros.append(_erro('VLD-002', 'data_preenchimento', 'Informe uma data valida.'))
 
 
+def _validar_data_atividade(payload, erros, hoje):
+    """
+    VLD-046 (05/09/2026): Data da Atividade e obrigatoria, informada
+    manualmente pela pessoa -- ao contrario de data_preenchimento
+    (VLD-002 acima), este campo nunca vem pre-preenchido, entao a
+    ausencia dele aqui significa que a pessoa realmente nao preencheu,
+    nao que o valor padrao ficou visivel sem ela notar. Mesma regra de
+    "nao pode ser no futuro" ja aplicada a data_preenchimento.
+    """
+    data = payload.get('data_atividade')
+    if not data:
+        erros.append(_erro('VLD-046', 'data_atividade', 'Informe a Data da Atividade.'))
+    elif data > hoje:
+        erros.append(
+            _erro('VLD-046', 'data_atividade', 'A Data da Atividade não pode ser posterior a hoje.')
+        )
+
+
 def _validar_locais(payload, erros):
     """VLD-005/VLD-006. VLD-025 (local igual) explicitamente NAO bloqueia."""
     if not payload.get('id_local_inicial'):
@@ -749,6 +767,7 @@ def validar_payload_sincronizacao(payload, *, hoje):
     _validar_os(payload, erros)
     _validar_numero_sa(payload, erros)
     _validar_data_preenchimento(payload, erros, hoje)
+    _validar_data_atividade(payload, erros, hoje)
     _validar_locais(payload, erros)
     _validar_linhas_e_vias(payload, erros)
     _validar_tipo_manutencao(payload, erros)

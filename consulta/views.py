@@ -640,6 +640,7 @@ def detalhe_rad(request, numero_rad):
                 'numero_execucao': rad.numero_execucao,
                 'status': rad.status,
                 'data_preenchimento': rad.data_preenchimento.isoformat(),
+                'data_atividade': rad.data_atividade.isoformat() if rad.data_atividade else None,
                 'local_inicial': rad.local_inicial.sigla,
                 'local_final': rad.local_final.sigla,
                 'km_poste': rad.km_poste,

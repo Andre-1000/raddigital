@@ -134,6 +134,12 @@ document.addEventListener('DOMContentLoaded', async function () {
       numero_sa: '',
       solicitante_sa: '',
       data_preenchimento: isoData,
+      // 05/09/2026: Data da Atividade -- ao contrario dos demais
+      // campos de data, nasce VAZIA de proposito (decisao do
+      // cliente confirmada) -- obriga a pessoa a preencher, em vez
+      // de vir com hoje pre-selecionado como todo o resto do
+      // formulario.
+      data_atividade: '',
       id_local_inicial: '',
       id_local_final: '',
       linhas: [],
@@ -450,6 +456,53 @@ document.addEventListener('DOMContentLoaded', async function () {
   });
   campoData.addEventListener('change', function () {
     rascunho.data_preenchimento = campoData.value;
+    salvarRascunhoAgora();
+  });
+
+  // 05/09/2026: Data da Atividade -- campo de texto com mascara
+  // DD/MM/AAAA (digita so numeros) + um calendario ao lado (input
+  // nativo type=date, posicionado por cima do icone via CSS -- ver
+  // novo_rad.html). Guardamos rascunho.data_atividade sempre em ISO
+  // (AAAA-MM-DD), igual todo outro campo de data do formulario que
+  // ja vai pro backend -- as duas funcoes abaixo so convertem entre
+  // o formato de exibicao (BR) e o de armazenamento (ISO).
+  function aplicarMascaraData(valorDigitado) {
+    const digitos = valorDigitado.replace(/\D/g, '').slice(0, 8);
+    let resultado = digitos;
+    if (digitos.length > 2) resultado = digitos.slice(0, 2) + '/' + digitos.slice(2);
+    if (digitos.length > 4) resultado = resultado.slice(0, 5) + '/' + digitos.slice(4);
+    return resultado;
+  }
+
+  function dataBrParaIso(dataBr) {
+    const partes = dataBr.split('/');
+    if (partes.length !== 3 || partes[2].length !== 4) return '';
+    const [dia, mes, ano] = partes;
+    return `${ano}-${mes}-${dia}`;
+  }
+
+  function dataIsoParaBr(dataIso) {
+    if (!dataIso) return '';
+    const [ano, mes, dia] = dataIso.split('-');
+    return `${dia}/${mes}/${ano}`;
+  }
+
+  const campoDataAtividade = document.getElementById('campo-data-atividade');
+  const campoDataAtividadePicker = document.getElementById('campo-data-atividade-picker');
+
+  campoDataAtividade.value = dataIsoParaBr(rascunho.data_atividade);
+
+  campoDataAtividade.addEventListener('input', function () {
+    campoDataAtividade.value = aplicarMascaraData(campoDataAtividade.value);
+    const iso = dataBrParaIso(campoDataAtividade.value);
+    rascunho.data_atividade = iso;
+    if (iso) campoDataAtividadePicker.value = iso;
+    salvarRascunhoAgora();
+  });
+
+  campoDataAtividadePicker.addEventListener('change', function () {
+    rascunho.data_atividade = campoDataAtividadePicker.value;
+    campoDataAtividade.value = dataIsoParaBr(campoDataAtividadePicker.value);
     salvarRascunhoAgora();
   });
 
@@ -1989,6 +2042,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       numero_sa: rascunho.numero_sa,
       solicitante_sa: rascunho.solicitante_sa,
       data_preenchimento: rascunho.data_preenchimento,
+      data_atividade: rascunho.data_atividade,
       id_local_inicial: rascunho.id_local_inicial,
       id_local_final: rascunho.id_local_final,
       linhas: rascunho.linhas,

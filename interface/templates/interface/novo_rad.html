@@ -65,9 +65,29 @@
       </div>
 
       <div class="campo">
-        <label for="campo-data">Data preenchimento <span class="obrigatorio">*</span></label>
-        <input type="date" id="campo-data" required>
+        <label for="campo-data-atividade">Data da Atividade <span class="obrigatorio">*</span></label>
+        <div class="campo-data-atividade__linha">
+          <input type="text" id="campo-data-atividade" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" autocomplete="off" required>
+          <div class="campo-data-atividade__calendario-wrap">
+            <span class="campo-data-atividade__calendario-icone" aria-hidden="true">&#128197;</span>
+            <input type="date" id="campo-data-atividade-picker" aria-label="Escolher a Data da Atividade no calendário">
+          </div>
+        </div>
+        <p class="campo__ajuda">Data em que a atividade foi realizada em campo. Digite os números ou toque no calendário.</p>
       </div>
+      </div>
+
+      <!-- 05/09/2026: Data de Preenchimento fica separada de proposito
+           do restante dos campos -- e a data do REGISTRO no sistema,
+           nao da atividade em si (ver Data da Atividade acima).
+           Funcoes inalteradas: vem pre-preenchida com hoje, pode ser
+           alterada. -->
+      <div class="campo-data-preenchimento-destacado">
+        <label for="campo-data">Data de preenchimento do formulário <span class="obrigatorio">*</span></label>
+        <input type="date" id="campo-data" required>
+        <p class="campo-data-preenchimento-destacado__ajuda">
+          Data em que este formulário está sendo preenchido no sistema — não precisa ser igual à Data da Atividade.
+        </p>
       </div>
     </div>
 
@@ -728,6 +748,78 @@
 
   /* Asterisco vermelho ao lado de rotulos de campos obrigatorios. */
   .obrigatorio { color: var(--cor-perigo); }
+
+  /* 05/09/2026: Data da Atividade -- campo de texto com mascara
+     (digita so numeros, "/" entra sozinho) + um botao de calendario ao
+     lado. O input[type=date] fica por cima do icone, com opacidade 0 --
+     assim um toque no icone e literalmente um toque no campo nativo de
+     data por baixo, garantindo que o seletor do sistema operacional
+     abra em qualquer navegador/celular, sem depender de metodos JS
+     (showPicker) que nem todo navegador suporta ainda. */
+  .campo-data-atividade__linha {
+    display: flex;
+    gap: 0.5rem;
+    align-items: stretch;
+  }
+  .campo-data-atividade__linha input[type="text"] {
+    flex: 1;
+    min-width: 0;
+  }
+  .campo-data-atividade__calendario-wrap {
+    position: relative;
+    width: var(--alvo-toque);
+    min-height: var(--alvo-toque);
+    flex-shrink: 0;
+  }
+  .campo-data-atividade__calendario-icone {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--cor-linha);
+    border-radius: var(--raio-pequeno);
+    background: var(--cor-superficie);
+    font-size: 1.15rem;
+    pointer-events: none;
+  }
+  .campo-data-atividade__calendario-wrap input[type="date"] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-height: unset;
+    opacity: 0;
+    cursor: pointer;
+    padding: 0;
+    border: none;
+  }
+
+  /* 05/09/2026: Data de Preenchimento sai de proposito do padrao
+     visual dos demais campos do RAD -- fundo suave + borda tracejada,
+     pra ficar claro que e outra coisa (data do REGISTRO, nao da
+     atividade), sem competir visualmente com Data da Atividade logo
+     acima. */
+  .campo-data-preenchimento-destacado {
+    margin-top: 1rem;
+    padding: 0.9rem 1rem;
+    background: var(--cor-fundo-suave);
+    border: 1px dashed var(--cor-linha);
+    border-radius: var(--raio-pequeno);
+  }
+  .campo-data-preenchimento-destacado label {
+    font-size: 0.85rem;
+    color: var(--cor-tinta-suave);
+    font-weight: 600;
+  }
+  .campo-data-preenchimento-destacado input[type="date"] {
+    max-width: 220px;
+  }
+  .campo-data-preenchimento-destacado__ajuda {
+    font-size: 0.78rem;
+    color: var(--cor-tinta-suave);
+    margin: 0.5rem 0 0;
+  }
 
   /* Pares de campo lado a lado (Horario Programado/Real, Inicio e
      Termino), para reduzir espaco vertical. Colapsa para 1 coluna em

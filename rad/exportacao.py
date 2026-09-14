@@ -90,7 +90,16 @@ def _campos_do_relatorio(rad):
     """
     return [
         ('servicos', 'Atividade', _servicos_texto(rad)),
-        ('data_preenchimento', 'Data', rad.data_preenchimento.strftime('%d/%m/%Y')),
+        # 05/09/2026: "Data" passou a usar Data da Atividade (mesma
+        # troca feita no Word oficial e na exportacao offline) --
+        # Data de Preenchimento continua aparecendo, agora como linha
+        # propria. RADs sincronizados antes desta mudanca nao tem
+        # data_atividade preenchida (campo nullable) -- cai em N/A.
+        (
+            'data_atividade', 'Data da Atividade',
+            rad.data_atividade.strftime('%d/%m/%Y') if rad.data_atividade else NAO_APLICAVEL,
+        ),
+        ('data_preenchimento', 'Data de Preenchimento', rad.data_preenchimento.strftime('%d/%m/%Y')),
         ('numero_os', 'OS', str(rad.numero_os)),
         ('numero_sa', 'N° SA', rad.numero_sa),
         ('numero_falha', 'Falha', _ou_na(rad.numero_falha)),

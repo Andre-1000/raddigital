@@ -74,7 +74,13 @@ const ExportarCliente = (function () {
 
     return [
       ['servicos', 'Atividade', textoServicos],
-      ['data_preenchimento', 'Data', formatarDataBr(rascunho.data_preenchimento)],
+      // 05/09/2026: "Data" passou a usar Data da Atividade (pedido do
+      // cliente, mesma troca feita no Word oficial) -- Data de
+      // Preenchimento continua aparecendo, agora como linha propria,
+      // ja que aqui (diferente do molde do Word) nao ha limite de 1
+      // unico campo de data.
+      ['data_atividade', 'Data da Atividade', formatarDataBr(rascunho.data_atividade)],
+      ['data_preenchimento', 'Data de Preenchimento', formatarDataBr(rascunho.data_preenchimento)],
       ['numero_os', 'OS', ouNA(rascunho.numero_os)],
       ['numero_sa', 'N° SA', ouNA(rascunho.numero_sa)],
       ['solicitante_sa', 'Solicitante SA', ouNA(rascunho.solicitante_sa)],
@@ -192,7 +198,8 @@ const ExportarCliente = (function () {
   const CAMPOS_OBRIGATORIOS_ROTULOS = [
     ['numero_os', 'OS'],
     ['numero_sa', 'N° SA'],
-    ['data_preenchimento', 'Data'],
+    ['data_preenchimento', 'Data de Preenchimento'],
+    ['data_atividade', 'Data da Atividade'],
     ['id_local_inicial', 'Local Inicial'],
     ['id_local_final', 'Local Final'],
     ['linhas', 'Linha'],
@@ -230,6 +237,7 @@ const ExportarCliente = (function () {
       rascunho.numero_os &&
       rascunho.numero_sa &&
       rascunho.data_preenchimento &&
+      rascunho.data_atividade &&
       rascunho.id_local_inicial &&
       rascunho.id_local_final &&
       rascunho.linhas && rascunho.linhas.length > 0 &&

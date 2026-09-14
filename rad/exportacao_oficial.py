@@ -300,7 +300,14 @@ def gerar_docx_oficial_bytes(rad):
         '{{OS}}': str(rad.numero_os),
         '{{LOCAL}}': f'{rad.local_inicial.sigla} / {rad.local_final.sigla}',
         '{{RESP_ATIVIDADE}}': na(rad.responsavel_atividade),
-        '{{DATA}}': rad.data_preenchimento.strftime('%d/%m/%Y'),
+        # 05/09/2026: passou a usar Data da Atividade (data em que a
+        # atividade foi realizada em campo), no lugar de Data de
+        # Preenchimento (data em que o formulario foi preenchido no
+        # sistema) -- pedido do cliente. RADs sincronizados antes
+        # desta mudanca nao tem data_atividade preenchida (campo
+        # nullable, ver rad/models.py) -- cai em 'N/A' nesse caso, em
+        # vez de quebrar a exportacao.
+        '{{DATA}}': rad.data_atividade.strftime('%d/%m/%Y') if rad.data_atividade else 'N/A',
         '{{SA}}': rad.numero_sa,
         '{{SOLICITANTE_SA}}': na(rad.solicitante_sa),
         '{{OPERADOR_CCM}}': _operador_ccm_abertura_texto(rad),
