@@ -2,7 +2,7 @@ Django==6.0.7
 psycopg2-binary==2.9.10
 python-dotenv==1.2.2
 pytest==9.0.3
-pytest-django==4.9.0
+pytest-django==4.14.0
 pytest-cov==6.0.0
 Pillow==12.3.0
 pypdf==6.16.2
