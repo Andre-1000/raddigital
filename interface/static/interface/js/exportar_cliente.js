@@ -89,7 +89,8 @@ const ExportarCliente = (function () {
       ['linhas', 'Linha', listaOuNA(nomesLinhas)],
       ['vias', 'Via', listaOuNA(nomesVias)],
       ['equipes', 'Equipes Envolvidas', listaOuNA(nomesEquipes)],
-      ['km_poste', 'Km/Poste', ouNA(rascunho.km_poste)],
+      ['km_poste_inicial', 'Km/Poste Inicial', ouNA(rascunho.km_poste_inicial)],
+      ['km_poste_final', 'Km/Poste Final', ouNA(rascunho.km_poste_final)],
       [
         'hora_prog_inicio', 'Horário programado',
         `${ouNA(rascunho.hora_prog_inicio)} a ${ouNA(rascunho.hora_prog_termino)}`,
@@ -202,6 +203,8 @@ const ExportarCliente = (function () {
     ['data_atividade', 'Data da Atividade'],
     ['id_local_inicial', 'Local Inicial'],
     ['id_local_final', 'Local Final'],
+    ['km_poste_inicial', 'Km/Poste Inicial'],
+    ['km_poste_final', 'Km/Poste Final'],
     ['linhas', 'Linha'],
     ['vias', 'Via'],
     ['id_tipo_manutencao', 'Tipo de Manutenção'],
@@ -240,6 +243,8 @@ const ExportarCliente = (function () {
       rascunho.data_atividade &&
       rascunho.id_local_inicial &&
       rascunho.id_local_final &&
+      rascunho.km_poste_inicial &&
+      rascunho.km_poste_final &&
       rascunho.linhas && rascunho.linhas.length > 0 &&
       rascunho.vias && rascunho.vias.length > 0 &&
       rascunho.id_tipo_manutencao &&

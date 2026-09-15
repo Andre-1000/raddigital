@@ -145,7 +145,11 @@ document.addEventListener('DOMContentLoaded', async function () {
       linhas: [],
       vias: [],
       equipes: ['VP'],
-      km_poste: '',
+      // 14/09/2026: Km/Poste virou dois campos (Inicial e Final) --
+      // ver aplicarMascaraKmPoste mais abaixo para o novo padrao
+      // "XXX/XXX + XXX".
+      km_poste_inicial: '',
+      km_poste_final: '',
       tipo_veiculo: '',
       operador: '',
       id_tipo_manutencao: null,
@@ -353,8 +357,31 @@ document.addEventListener('DOMContentLoaded', async function () {
     ['VP']
   );
 
-  const campoKmPoste = document.getElementById('campo-km-poste');
-  campoKmPoste.value = rascunho.km_poste || '';
+  // 14/09/2026: Km/Poste virou dois campos (Inicial e Final), padrao
+  // novo "XXX/XXX + XXX" (3 digitos / 3 digitos + 3 digitos). Funcao
+  // de mascara PROPRIA, separada de aplicarMascaraKmPoste (mais
+  // abaixo) -- aquela continua com o padrao antigo "XX/XX - XX/XX",
+  // ainda usado pelas linhas de Dimensoes do bloco Canaleta, que nao
+  // muda nesta mudanca.
+  function aplicarMascaraKmPosteNova(valorDigitado) {
+    const digitos = valorDigitado.replace(/\D/g, '').slice(0, 9);
+    let resultado = digitos;
+    if (digitos.length > 3) resultado = digitos.slice(0, 3) + '/' + digitos.slice(3);
+    if (digitos.length > 6) resultado = resultado.slice(0, 7) + ' + ' + digitos.slice(6);
+    return resultado;
+  }
+
+  function configurarCampoKmPoste(inputEl, chaveRascunho) {
+    inputEl.value = rascunho[chaveRascunho] || '';
+    inputEl.addEventListener('input', function () {
+      inputEl.value = aplicarMascaraKmPosteNova(inputEl.value);
+      rascunho[chaveRascunho] = inputEl.value;
+      salvarRascunhoAgora();
+    });
+  }
+
+  configurarCampoKmPoste(document.getElementById('campo-km-poste-inicial'), 'km_poste_inicial');
+  configurarCampoKmPoste(document.getElementById('campo-km-poste-final'), 'km_poste_final');
 
   function aplicarMascaraKmPoste(valorDigitado) {
     const digitos = valorDigitado.replace(/\D/g, '').slice(0, 8);
@@ -364,15 +391,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     if (digitos.length > 6) resultado = resultado.slice(0, 10) + '/' + digitos.slice(6);
     return resultado;
   }
-
-  campoKmPoste.addEventListener('input', function () {
-    const somenteDigitos = /^\d+$/.test(campoKmPoste.value.replace(/[/\s-]/g, ''));
-    if (somenteDigitos) {
-      campoKmPoste.value = aplicarMascaraKmPoste(campoKmPoste.value);
-    }
-    rascunho.km_poste = campoKmPoste.value;
-    salvarRascunhoAgora();
-  });
 
   const campoTipoManutencao = document.getElementById('campo-tipo-manutencao');
   tiposManutencao.forEach(function (tipo) {
@@ -439,7 +457,14 @@ document.addEventListener('DOMContentLoaded', async function () {
   campoNumeroOs.value = rascunho.numero_os || '';
   campoNumeroSa.value = rascunho.numero_sa || '';
   campoSolicitanteSa.value = rascunho.solicitante_sa || '';
-  campoData.value = rascunho.data_preenchimento || '';
+  // 14/09/2026: Data de Preenchimento deixou de ser editavel -- sempre
+  // mostra e grava a data de HOJE, recalculada toda vez que a tela
+  // abre (mesmo que o rascunho seja de um dia anterior). Sem
+  // addEventListener('change', ...) porque o campo esta desabilitado
+  // no HTML -- nao ha interacao do usuario pra escutar.
+  const dataDeHojeParaPreenchimento = new Date().toISOString().slice(0, 10);
+  campoData.value = dataDeHojeParaPreenchimento;
+  rascunho.data_preenchimento = dataDeHojeParaPreenchimento;
 
   campoNumeroOs.addEventListener('input', function () {
     rascunho.numero_os = campoNumeroOs.value ? Number(campoNumeroOs.value) : null;
@@ -452,10 +477,6 @@ document.addEventListener('DOMContentLoaded', async function () {
   });
   campoSolicitanteSa.addEventListener('input', function () {
     rascunho.solicitante_sa = campoSolicitanteSa.value;
-    salvarRascunhoAgora();
-  });
-  campoData.addEventListener('change', function () {
-    rascunho.data_preenchimento = campoData.value;
     salvarRascunhoAgora();
   });
 
@@ -2048,7 +2069,8 @@ document.addEventListener('DOMContentLoaded', async function () {
       linhas: rascunho.linhas,
       vias: rascunho.vias,
       equipes: rascunho.equipes,
-      km_poste: rascunho.km_poste,
+      km_poste_inicial: rascunho.km_poste_inicial,
+      km_poste_final: rascunho.km_poste_final,
       tipo_veiculo: rascunho.tipo_veiculo,
       operador: rascunho.operador,
       id_tipo_manutencao: rascunho.id_tipo_manutencao,

@@ -117,6 +117,23 @@ def _validar_data_atividade(payload, erros, hoje):
         )
 
 
+def _validar_km_poste(payload, erros):
+    """
+    VLD-047 (14/09/2026): Km/Poste virou dois campos (Inicial e
+    Final). Cada um precisa ter ALGUM valor digitado -- nao precisa
+    estar completo (o padrao XXX/XXX + XXX pode ficar parcial), mas
+    nao pode ficar vazio. Obrigatoriedade fixa, nao mais controlavel
+    via Configuracoes (ver _MAPA_CHAVE_CONFIG_PARA_CAMPO_PAYLOAD acima).
+    """
+    for campo, rotulo in (
+        ('km_poste_inicial', 'Km/Poste Inicial'),
+        ('km_poste_final', 'Km/Poste Final'),
+    ):
+        valor = payload.get(campo)
+        if not valor or not str(valor).strip():
+            erros.append(_erro('VLD-047', campo, f'Informe {rotulo} (ao menos um número).'))
+
+
 def _validar_locais(payload, erros):
     """VLD-005/VLD-006. VLD-025 (local igual) explicitamente NAO bloqueia."""
     if not payload.get('id_local_inicial'):
@@ -613,7 +630,12 @@ _MAPA_CHAVE_CONFIG_PARA_CAMPO_PAYLOAD = {
     'data_preenchimento': 'data_preenchimento',
     'local_inicial': 'id_local_inicial',
     'local_final': 'id_local_final',
-    'km_poste': 'km_poste',
+    # 14/09/2026: 'km_poste' saiu deste mapa -- virou dois campos
+    # (Inicial/Final) com obrigatoriedade FIXA (VLD-047), nao mais
+    # controlavel pelo Administrador em Configuracoes. O toggle
+    # "Km/Poste" que ainda existir na tela de Configuracoes fica sem
+    # efeito nenhum a partir de agora (nao remove nem quebra nada, so
+    # nao faz mais diferenca).
     'linhas': 'linhas',
     'vias': 'vias',
     'tipo_manutencao': 'id_tipo_manutencao',
@@ -768,6 +790,7 @@ def validar_payload_sincronizacao(payload, *, hoje):
     _validar_numero_sa(payload, erros)
     _validar_data_preenchimento(payload, erros, hoje)
     _validar_data_atividade(payload, erros, hoje)
+    _validar_km_poste(payload, erros)
     _validar_locais(payload, erros)
     _validar_linhas_e_vias(payload, erros)
     _validar_tipo_manutencao(payload, erros)

@@ -143,6 +143,7 @@
     <div class="pilha">
       <button type="button" class="botao botao--secundaria" id="botao-copiar-mensagem">Copiar mensagem</button>
       <button type="button" class="botao botao--primaria" id="botao-baixar-docx-oficial">Baixar Word</button>
+      <button type="button" class="botao botao--secundaria" id="botao-salvar-drive">Salvar no Drive</button>
       <button type="button" class="botao botao--secundaria" id="botao-baixar-pdf-oficial" style="display:none;">Baixar PDF</button>
     </div>
   </div>
@@ -671,6 +672,40 @@
     });
     document.getElementById('botao-baixar-pdf-oficial').addEventListener('click', function () {
       baixarArquivoAutenticado(`/consulta/rads/${encodeURIComponent(NUMERO_RAD)}/pdf-oficial/`, `${NUMERO_RAD}.pdf`);
+    });
+
+    // 14/09/2026: "Salvar no Drive" -- gera o mesmo Word oficial, mas
+    // em vez de baixar, sobe direto para a pasta do Google Drive
+    // configurada (ver rad/google_drive.py). Resolve o caso de
+    // maquinas sem Word/Office instalado -- o arquivo abre direto no
+    // Google Docs, no navegador. O backend devolve so o LINK (nao o
+    // arquivo), que abrimos numa aba nova.
+    document.getElementById('botao-salvar-drive').addEventListener('click', async function () {
+      avisoExportar.innerHTML = '';
+      const botao = document.getElementById('botao-salvar-drive');
+      botao.disabled = true;
+      const textoOriginal = botao.textContent;
+      botao.textContent = 'Salvando…';
+
+      try {
+        const resposta = await RadAuth.requisicaoAutenticada(
+          `/consulta/rads/${encodeURIComponent(NUMERO_RAD)}/docx-drive/`
+        );
+        const corpo = await resposta.json().catch(function () { return {}; });
+
+        if (!resposta.ok) {
+          avisoExportar.innerHTML = `<div class="aviso aviso--erro">${escapar(corpo.erro || 'Não foi possível salvar no Drive.')}</div>`;
+          return;
+        }
+
+        avisoExportar.innerHTML = '<div class="aviso aviso--sucesso">Salvo no Google Drive.</div>';
+        window.open(corpo.link, '_blank');
+      } catch (erro) {
+        avisoExportar.innerHTML = '<div class="aviso aviso--erro">Erro de conexão ao salvar no Drive.</div>';
+      } finally {
+        botao.disabled = false;
+        botao.textContent = textoOriginal;
+      }
     });
 
     // ---- Cancelamento (RG-CAN-001 a 012) --------------------------------

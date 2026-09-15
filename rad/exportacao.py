@@ -111,7 +111,7 @@ def _campos_do_relatorio(rad):
             'Equipes Envolvidas',
             _lista_ou_na(rad.equipes.values_list('equipe__nome', flat=True)),
         ),
-        ('km_poste', 'Km/Poste', _ou_na(rad.km_poste)),
+        ('km_poste', 'Km/Poste', _ou_na(rad.texto_km_poste)),
         (
             'hora_prog_inicio',
             'Horário programado',

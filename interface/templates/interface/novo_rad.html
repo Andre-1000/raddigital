@@ -80,14 +80,13 @@
       <!-- 05/09/2026: Data de Preenchimento fica separada de proposito
            do restante dos campos -- e a data do REGISTRO no sistema,
            nao da atividade em si (ver Data da Atividade acima).
-           Funcoes inalteradas: vem pre-preenchida com hoje, pode ser
-           alterada. -->
+           Funcoes inalteradas: vem pre-preenchida com hoje. 14/09/2026:
+           deixou de ser editavel -- agora e 100% automatica, sempre a
+           data de hoje, sem intervencao do usuario. -->
       <div class="campo-data-preenchimento-destacado">
-        <label for="campo-data">Data de preenchimento do formulário <span class="obrigatorio">*</span></label>
-        <input type="date" id="campo-data" required>
-        <p class="campo-data-preenchimento-destacado__ajuda">
-          Data em que este formulário está sendo preenchido no sistema — não precisa ser igual à Data da Atividade.
-        </p>
+        <label for="campo-data">Data de preenchimento do formulário</label>
+        <input type="date" id="campo-data" disabled>
+        <p class="campo-data-preenchimento-destacado__ajuda">(Campo automático)</p>
       </div>
     </div>
 
@@ -125,8 +124,18 @@
       </div>
 
       <div class="campo">
-        <label for="campo-km-poste">Km / Poste <span class="texto-suave">(opcional)</span></label>
-        <input type="text" id="campo-km-poste" inputmode="numeric" placeholder="XX/XX - XX/XX" maxlength="13">
+        <label>Km / Poste <span class="obrigatorio">*</span></label>
+        <div class="campo-km-poste__linha">
+          <div class="campo-km-poste__item">
+            <label for="campo-km-poste-inicial" class="campo-km-poste__sublabel">Inicial</label>
+            <input type="text" id="campo-km-poste-inicial" inputmode="numeric" placeholder="XXX/XXX + XXX" maxlength="13">
+          </div>
+          <div class="campo-km-poste__item">
+            <label for="campo-km-poste-final" class="campo-km-poste__sublabel">Final</label>
+            <input type="text" id="campo-km-poste-final" inputmode="numeric" placeholder="XXX/XXX + XXX" maxlength="13">
+          </div>
+        </div>
+        <p class="campo__ajuda">Digite os números — não precisa preencher tudo, mas cada caixa precisa de ao menos um.</p>
       </div>
     </div>
 
@@ -745,6 +754,23 @@
     color: #fff;
   }
   .chip:disabled { opacity: 0.7; cursor: not-allowed; }
+
+  /* 14/09/2026: Km/Poste virou duas caixas lado a lado (Inicial e
+     Final), no lugar do campo unico anterior. */
+  .campo-km-poste__linha {
+    display: flex;
+    gap: 0.75rem;
+  }
+  .campo-km-poste__item {
+    flex: 1;
+    min-width: 0;
+  }
+  .campo-km-poste__sublabel {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--cor-tinta-suave);
+    margin-bottom: 0.25rem;
+  }
 
   /* Asterisco vermelho ao lado de rotulos de campos obrigatorios. */
   .obrigatorio { color: var(--cor-perigo); }

@@ -84,7 +84,18 @@ class Rad(models.Model):
         related_name='rads_local_final',
         db_column='id_local_final',
     )
+    # 14/09/2026: Km/Poste virou dois campos (Inicial e Final, cada um
+    # obrigatorio ter algum valor -- ver VLD-047). Este campo antigo
+    # (km_poste) NAO foi removido -- so parou de ser preenchido em
+    # RADs novos -- porque os formatos sao incompativeis entre si (o
+    # antigo era "XX/XX - XX/XX" num unico campo; o novo e "XXX/XXX +
+    # XXX" em cada um dos dois campos) e nao da pra migrar os dados
+    # antigos sem inventar digitos. RADs sincronizados antes desta
+    # mudanca continuam com o valor deles aqui, intacto -- ver
+    # Rad.texto_km_poste, que unifica a exibicao dos dois formatos.
     km_poste = models.CharField(max_length=20, null=True, blank=True)
+    km_poste_inicial = models.CharField(max_length=20, null=True, blank=True)
+    km_poste_final = models.CharField(max_length=20, null=True, blank=True)
     tipo_veiculo = models.TextField(
         null=True, blank=True, help_text='Texto livre, sem limite de caracteres.'
     )
@@ -273,6 +284,24 @@ class Rad(models.Model):
 
     def __str__(self):
         return self.numero_rad or f'RAD (OS {self.numero_os}, sem numero ainda)'
+
+    @property
+    def texto_km_poste(self):
+        """
+        14/09/2026: unifica a exibicao do Km/Poste entre RADs antigos
+        (campo unico km_poste) e RADs novos (km_poste_inicial +
+        km_poste_final) -- usado em toda tela/exportacao que mostra
+        esse dado, pra nao precisar duplicar essa logica em cada
+        lugar. Nunca inventa valor: mostra so o que existe de fato.
+        """
+        if self.km_poste_inicial or self.km_poste_final:
+            partes = []
+            if self.km_poste_inicial:
+                partes.append(f'Inicial: {self.km_poste_inicial}')
+            if self.km_poste_final:
+                partes.append(f'Final: {self.km_poste_final}')
+            return ' | '.join(partes)
+        return self.km_poste or None
 
 
 class RadLinha(models.Model):

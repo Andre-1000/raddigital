@@ -451,6 +451,51 @@ def exportar_docx_oficial(request, numero_rad):
 
 
 @requer_token
+def exportar_docx_drive(request, numero_rad):
+    """
+    GET /consulta/rads/<numero_rad>/docx-drive/
+    14/09/2026. Gera o mesmo Word oficial de exportar_docx_oficial,
+    mas em vez de baixar para o computador, sobe direto para uma pasta
+    do Google Drive (ver rad/google_drive.py) -- resolve o problema de
+    maquinas sem Word/Office instalado: o arquivo pode ser aberto
+    direto no Google Docs, no navegador, sem instalar nada. Mesma
+    regra de acesso das demais exportacoes (_pode_exportar).
+
+    Retorna o link do arquivo no Drive em vez do arquivo em si -- quem
+    chama (JS) abre esse link numa aba nova.
+    """
+    try:
+        rad = _carregar_rad_para_exportacao(numero_rad)
+    except Rad.DoesNotExist:
+        return JsonResponse({'erro': 'RAD nao encontrado.'}, status=404)
+
+    if not _pode_exportar(request.usuario_rad, rad):
+        return JsonResponse({'erro': 'Acesso nao autorizado.'}, status=403)
+
+    from rad.exportacao_oficial import gerar_docx_oficial_bytes
+    from rad.google_drive import DriveNaoConfiguradoError, salvar_docx_no_drive
+
+    docx_bytes = gerar_docx_oficial_bytes(rad)
+
+    try:
+        link = salvar_docx_no_drive(f'{rad.numero_rad}.docx', docx_bytes)
+    except DriveNaoConfiguradoError as erro:
+        return JsonResponse({'erro': str(erro)}, status=503)
+    except Exception as erro:
+        # A resposta pro cliente fica generica de proposito -- o erro
+        # real (falha de rede, credencial revogada, cota excedida etc.)
+        # precisa aparecer no log do Render pra dar pra diagnosticar.
+        # Mesmo padrao ja usado para falha de envio de e-mail (SMTP).
+        print(f'[ERRO] Falha ao salvar {rad.numero_rad}.docx no Google Drive: {erro!r}')
+        return JsonResponse(
+            {'erro': 'Não foi possível salvar no Google Drive. Tente novamente ou contate o Administrador.'},
+            status=502,
+        )
+
+    return JsonResponse({'link': link})
+
+
+@requer_token
 def exportar_pdf_oficial(request, numero_rad):
     """
     GET /consulta/rads/<numero_rad>/pdf-oficial/
@@ -643,7 +688,7 @@ def detalhe_rad(request, numero_rad):
                 'data_atividade': rad.data_atividade.isoformat() if rad.data_atividade else None,
                 'local_inicial': rad.local_inicial.sigla,
                 'local_final': rad.local_final.sigla,
-                'km_poste': rad.km_poste,
+                'km_poste': rad.texto_km_poste,
                 'tipo_veiculo': rad.tipo_veiculo,
                 'operador': rad.operador,
                 'linhas': list(rad.linhas.values_list('linha_id', flat=True)),
