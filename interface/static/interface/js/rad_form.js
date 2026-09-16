@@ -1954,22 +1954,32 @@ document.addEventListener('DOMContentLoaded', async function () {
   let sincronizando = false;
 
   const botaoSincronizar = document.getElementById('botao-sincronizar');
+  const botaoSincronizarDrive = document.getElementById('botao-sincronizar-drive');
   const textoStatusBotao = document.getElementById('texto-status-botao');
   const avisoSincronizacao = document.getElementById('aviso-sincronizacao');
   const listaErrosSincronizacao = document.getElementById('lista-erros-sincronizacao');
 
+  // 15/09/2026: dois botoes, mesma acao de sincronizar por baixo --
+  // "Sincronizar e Salvar no Drive" so acrescenta a chamada ao Drive
+  // (ver executarSincronizacao) depois que o RAD ja foi sincronizado
+  // com sucesso. Os dois ficam sempre habilitados/desabilitados juntos
+  // -- nao faz sentido usar um enquanto o outro esta em andamento.
   function atualizarEstadoBotaoSincronizar() {
     if (sincronizando) {
       botaoSincronizar.disabled = true;
-      botaoSincronizar.textContent = 'Sincronizando…';
+      botaoSincronizarDrive.disabled = true;
       textoStatusBotao.textContent = '';
     } else if (!navigator.onLine) {
       botaoSincronizar.disabled = true;
+      botaoSincronizarDrive.disabled = true;
       botaoSincronizar.textContent = 'Sincronizar';
+      botaoSincronizarDrive.textContent = 'Sincronizar e Salvar no Drive';
       textoStatusBotao.textContent = 'Sem conexão';
     } else {
       botaoSincronizar.disabled = false;
+      botaoSincronizarDrive.disabled = false;
       botaoSincronizar.textContent = 'Sincronizar';
+      botaoSincronizarDrive.textContent = 'Sincronizar e Salvar no Drive';
       textoStatusBotao.textContent = '';
     }
   }
@@ -2143,11 +2153,18 @@ document.addEventListener('DOMContentLoaded', async function () {
     listaErrosSincronizacao.scrollIntoView && listaErrosSincronizacao.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  botaoSincronizar.addEventListener('click', async function () {
+  // 15/09/2026: reaproveitada pelos dois botoes -- Sincronizar e
+  // Sincronizar e Salvar no Drive. tambemSalvarNoDrive so muda o que
+  // acontece DEPOIS que a sincronizacao normal ja deu certo -- o RAD
+  // so pode ser salvo no Drive depois de existir de verdade no banco
+  // (com numero_rad definido), entao essa chamada vem sempre em
+  // seguida da sincronizacao, nunca no lugar dela.
+  async function executarSincronizacao(tambemSalvarNoDrive) {
     if (sincronizando || !navigator.onLine) return;
 
     sincronizando = true;
     atualizarEstadoBotaoSincronizar();
+    (tambemSalvarNoDrive ? botaoSincronizarDrive : botaoSincronizar).textContent = 'Sincronizando…';
     listaErrosSincronizacao.innerHTML = '';
     avisoSincronizacao.innerHTML = '';
 
@@ -2170,12 +2187,45 @@ document.addEventListener('DOMContentLoaded', async function () {
       });
 
       if (resposta.status === 201 || resposta.status === 200) {
+        const corpo = await resposta.json();
         await RadDB.limparRascunho(sessao.login);
+
+        if (!tambemSalvarNoDrive) {
+          avisoSincronizacao.innerHTML =
+            '<div class="aviso aviso--sucesso">RAD sincronizado com sucesso!</div>';
+          setTimeout(function () {
+            window.location.href = '/inicio/';
+          }, 1200);
+          return;
+        }
+
         avisoSincronizacao.innerHTML =
-          '<div class="aviso aviso--sucesso">RAD sincronizado com sucesso!</div>';
+          '<div class="aviso aviso--sucesso">RAD sincronizado! Salvando no Google Drive…</div>';
+        try {
+          const respostaDrive = await RadAuth.requisicaoAutenticada(
+            `/consulta/rads/${encodeURIComponent(corpo.numero_rad)}/docx-drive/`
+          );
+          const corpoDrive = await respostaDrive.json().catch(function () { return {}; });
+          if (respostaDrive.ok) {
+            avisoSincronizacao.innerHTML =
+              '<div class="aviso aviso--sucesso">RAD sincronizado e salvo no Google Drive!</div>';
+            window.open(corpoDrive.link, '_blank');
+          } else {
+            // 15/09/2026: o RAD ja sincronizou com sucesso nesse ponto
+            // -- uma falha so no upload pro Drive nao pode passar a
+            // impressao de que o RAD inteiro falhou. Aviso de atencao,
+            // nao de erro, deixando claro que so a parte do Drive nao
+            // deu certo.
+            avisoSincronizacao.innerHTML =
+              `<div class="aviso aviso--atencao">RAD sincronizado com sucesso, mas não foi possível salvar no Drive: ${corpoDrive.erro || 'erro desconhecido'}.</div>`;
+          }
+        } catch (erroDrive) {
+          avisoSincronizacao.innerHTML =
+            '<div class="aviso aviso--atencao">RAD sincronizado com sucesso, mas houve erro de conexão ao salvar no Drive.</div>';
+        }
         setTimeout(function () {
           window.location.href = '/inicio/';
-        }, 1200);
+        }, 2500);
         return;
       }
 
@@ -2196,6 +2246,13 @@ document.addEventListener('DOMContentLoaded', async function () {
       sincronizando = false;
       atualizarEstadoBotaoSincronizar();
     }
+  }
+
+  botaoSincronizar.addEventListener('click', function () {
+    executarSincronizacao(false);
+  });
+  botaoSincronizarDrive.addEventListener('click', function () {
+    executarSincronizacao(true);
   });
 
 });
