@@ -514,20 +514,18 @@
 <div class="acao-fixa">
   <div id="aviso-sincronizacao"></div>
   <div id="aviso-exportar-rascunho"></div>
-  <div style="display:flex; gap:0.5rem;">
-    <button type="button" class="botao botao--secundaria" id="botao-copiar-mensagem" style="flex:1;">
+  <div class="grade-botoes-acao-rad">
+    <button type="button" class="botao botao--secundaria" id="botao-copiar-mensagem">
       Copiar
     </button>
-    <button type="button" class="botao botao--secundaria" id="botao-exportar" style="flex:1;">
+    <button type="button" class="botao botao--secundaria" id="botao-exportar">
       Exportar
     </button>
-  </div>
-  <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
-    <button type="button" class="botao botao--primaria" id="botao-sincronizar" disabled style="flex:1;">
+    <button type="button" class="botao botao--primaria" id="botao-sincronizar" disabled>
       Sincronizar
     </button>
-    <button type="button" class="botao botao--secundaria" id="botao-sincronizar-drive" disabled style="flex:1.4; font-size:0.85rem;">
-      Sincronizar e Salvar no Drive
+    <button type="button" class="botao botao--secundaria" id="botao-sincronizar-drive" disabled>
+      Sincronizar + Drive
     </button>
   </div>
   <p class="texto-suave centro" id="texto-status-botao" style="margin: 0.4rem 0 0; font-size: 0.8rem;"></p>
@@ -775,6 +773,22 @@
     font-size: 0.78rem;
     color: var(--cor-tinta-suave);
     margin-bottom: 0.25rem;
+  }
+
+  /* 15/09/2026: grade responsiva pros 4 botoes de acao (Copiar,
+     Exportar, Sincronizar, Sincronizar + Drive) -- auto-fit encaixa
+     os 4 numa linha so quando ha espaco (computador) e quebra
+     sozinho em 2 colunas no celular, sem nenhum botao ficar
+     desproporcional ou vazar da tela. Mesmo padrao ja usado em
+     outras grades do sistema (ex.: grade-checkboxes). */
+  .grade-botoes-acao-rad {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.5rem;
+  }
+  .grade-botoes-acao-rad .botao {
+    font-size: 0.85rem;
+    padding: 0 0.6rem;
   }
 
   /* Asterisco vermelho ao lado de rotulos de campos obrigatorios. */
