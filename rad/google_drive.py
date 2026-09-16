@@ -61,6 +61,20 @@ def salvar_docx_no_drive(nome_arquivo, docx_bytes):
     Levanta DriveNaoConfiguradoError se as variaveis de ambiente nao
     estiverem definidas -- quem chama deve tratar isso como uma
     funcionalidade indisponivel (503), nao como um erro inesperado.
+
+    15/09/2026 (limitacao real do Google, achado em producao): uma
+    conta de servico NAO TEM cota de armazenamento propria -- criar
+    arquivo numa pasta comum ("Meu Drive" de alguem, mesmo compartilhada
+    como Editor) falha com HttpError 403 storageQuotaExceeded, sempre,
+    nao importa a permissao. GOOGLE_DRIVE_FOLDER_ID PRECISA apontar
+    para uma pasta dentro de um "Drive Compartilhado" (Shared Drive) --
+    esses tem cota da organizacao, nao de uma conta especifica.
+    supportsAllDrives=True abaixo e o que faz a chamada funcionar
+    com Shared Drives (sem ele, a API rejeita mesmo com Shared Drive).
+    Drives Compartilhados exigem Google Workspace (nao existe em conta
+    Gmail comum/gratuita) -- se a organizacao nao tiver isso
+    disponivel, a alternativa e delegacao de dominio (OAuth), que
+    exige acesso de Administrador do Workspace.
     """
     if not esta_configurado():
         raise DriveNaoConfiguradoError(
@@ -80,6 +94,15 @@ def salvar_docx_no_drive(nome_arquivo, docx_bytes):
         resumable=False,
     )
     arquivo = servico.files().create(
-        body=metadados, media_body=midia, fields='id, webViewLink'
+        body=metadados,
+        media_body=midia,
+        fields='id, webViewLink',
+        # 15/09/2026: necessario para funcionar com "Drives
+        # Compartilhados" (Shared Drives) -- ver
+        # storageQuotaExceeded no docstring da funcao acima. Sem este
+        # parametro, a API rejeita a chamada mesmo com a pasta
+        # compartilhada corretamente. Inofensivo para pastas comuns
+        # (nao Shared Drive) -- so amplia o que a chamada aceita.
+        supportsAllDrives=True,
     ).execute()
     return arquivo.get('webViewLink')
