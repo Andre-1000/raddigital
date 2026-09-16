@@ -213,6 +213,15 @@
     const mensagemVazia = document.getElementById('mensagem-vazia');
     const mensagemAntesDePesquisar = document.getElementById('mensagem-antes-de-pesquisar');
 
+    // 15/09/2026: mesmo padrao de defesa em profundidade ja aplicado
+    // em outras telas (detalhe_rad.html, meus_rads.html) -- neutraliza
+    // qualquer caractere especial de HTML antes de inserir um valor.
+    function escapar(texto) {
+      const div = document.createElement('div');
+      div.textContent = texto ?? '';
+      return div.innerHTML;
+    }
+
     function seloStatus(status) {
       const classe = status === 'cancelado' ? 'selo--offline' : 'selo--online';
       return `<span class="selo ${classe}">${status}</span>`;
@@ -463,7 +472,12 @@
           item.style.display = 'block';
           item.style.textDecoration = 'none';
           item.href = `/consultar/${rad.numero_rad}/`;
-          const dispositivoTexto = rad.dispositivo ? ` · ${rad.dispositivo}` : '';
+          // 15/09/2026: trocado Celular/Computador (dispositivo) pela
+          // SA -- informação mais útil pra identificar o RAD de
+          // relance na lista. numero_sa ja e validado no backend
+          // como somente digitos (VLD-028), mas escapamos aqui mesmo
+          // assim, mesmo padrao ja aplicado em outras telas.
+          const saTexto = rad.numero_sa ? ` · SA ${escapar(rad.numero_sa)}` : '';
           // 21/08/2026: selo "Exportado" so aparece para o
           // Administrador, ja que so ele ve o filtro correspondente.
           const seloExportado = ehAdministrador
@@ -477,7 +491,7 @@
               <span>${seloStatus(rad.status)}${seloExportado}</span>
             </div>
             <div class="texto-suave" style="margin-top:0.35rem; font-size:0.9rem;">
-              OS ${rad.numero_os} · ${rad.data_preenchimento} · ${rad.tipo_manutencao}${dispositivoTexto}
+              OS ${rad.numero_os}${saTexto} · ${rad.data_preenchimento} · ${rad.tipo_manutencao}
             </div>
           `;
           lista.appendChild(item);

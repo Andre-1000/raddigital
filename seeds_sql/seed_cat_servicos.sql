@@ -18,6 +18,10 @@
 -- "Topografia" (grupo Corretiva), "Esmerilhadora", "Desguarnecedora",
 -- "Descarga de lastro", "Socadora" (grupo Mecanizada), e "Inspeção de
 -- Canaleta" (grupo Infra, abre o bloco Anomalias).
+-- Mudança de negócio 15/09/2026: adicionados ao grupo Corretiva --
+-- "Inspeção Corretiva AMV" (abre o bloco AMV, mesmo padrão de
+-- "Manutenção em AMV"), "Instalação de Tala", "Socaria Manual",
+-- "Bolsão", "Retirada de Objeto da Via".
 -- Nenhum serviço é removido de verdade do banco — RadServico tem FK
 -- PROTECT contra CatServico e RADs antigos podem referenciá-los.
 --
@@ -49,6 +53,11 @@ INSERT INTO cat_servicos (nome, descricao, requer_amv, requer_descricao, requer_
   ('Inspeção de Canaleta', 'Inspeção visual de canaletas de drenagem. Ao selecionar, o sistema exibe o bloco Anomalias, com Anomalias identificadas, Grau de Criticidade, Dimensões, necessidade de cautela e Lado.', FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, 'infra', TRUE),
   ('Topografia', 'Serviço do grupo Corretiva.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'corretiva', TRUE),
   ('Inspeção Corretiva', 'Serviço do grupo Corretiva.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'corretiva', TRUE),
+  ('Inspeção Corretiva AMV', 'Serviço do grupo Corretiva. Ao selecionar, o sistema exibe o bloco AMV, com a possibilidade de adicionar até 16 blocos (uma MCH por bloco): Identificação MCH, Modelo, Via, UR, Local, Linha, Tipo de Defeito e Ações.', TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, 'corretiva', TRUE),
+  ('Instalação de Tala', 'Serviço do grupo Corretiva.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'corretiva', TRUE),
+  ('Socaria Manual', 'Serviço do grupo Corretiva.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'corretiva', TRUE),
+  ('Bolsão', 'Serviço do grupo Corretiva.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'corretiva', TRUE),
+  ('Retirada de Objeto da Via', 'Serviço do grupo Corretiva.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'corretiva', TRUE),
   ('Esmerilhadora', 'Serviço do grupo Mecanizada.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'mecanizada', TRUE),
   ('Desguarnecedora', 'Serviço do grupo Mecanizada.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'mecanizada', TRUE),
   ('Descarga de lastro', 'Serviço do grupo Mecanizada.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'mecanizada', TRUE),
@@ -65,5 +74,5 @@ ON CONFLICT (nome) DO UPDATE SET
   area = EXCLUDED.area,
   ativo = EXCLUDED.ativo;
 
--- Total: 25 registros (6 inativos: Ajuste, Limpeza, Lubrificação,
+-- Total: 30 registros (6 inativos: Ajuste, Limpeza, Lubrificação,
 -- Esmerilhamento, Socaria, Controle de Vegetação)
