@@ -485,10 +485,24 @@
                 ? ' <span class="selo selo--online" style="font-size:0.7rem;">Exportado</span>'
                 : ' <span class="selo selo--offline" style="font-size:0.7rem;">Não exportado</span>')
             : '';
+          // 17/09/2026: selo "Drive" -- ao contrario do selo de
+          // Exportado (exclusivo do Administrador), este aparece para
+          // qualquer um com acesso a esta tela (Supervisor e
+          // Administrador) -- mesmo criterio de acesso ja usado pelo
+          // campo 'enviado_drive' no detalhe do RAD (ver
+          // consulta/views.py::_linha_resumo). RAD cancelado nao tem
+          // bloco de Exportar/Drive (ver detalhe_rad.html), entao o
+          // selo fica de fora nesse caso, pra nao sinalizar "pendente"
+          // um RAD onde o envio ao Drive nunca fara sentido.
+          const seloDrive = rad.status !== 'cancelado'
+            ? (rad.enviado_drive
+                ? ' <span class="selo selo--online" style="font-size:0.7rem;">Drive OK</span>'
+                : ' <span class="selo selo--offline" style="font-size:0.7rem;">Drive pendente</span>')
+            : '';
           item.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <strong>${rad.numero_rad}</strong>
-              <span>${seloStatus(rad.status)}${seloExportado}</span>
+              <span>${seloStatus(rad.status)}${seloExportado}${seloDrive}</span>
             </div>
             <div class="texto-suave" style="margin-top:0.35rem; font-size:0.9rem;">
               OS ${rad.numero_os}${saTexto} · ${rad.data_preenchimento} · ${rad.tipo_manutencao}

@@ -47,6 +47,21 @@
       return `<span class="selo ${classe}">${status}</span>`;
     }
 
+    // 17/09/2026: mesmo selo "Drive" ja usado na tela de Consultar
+    // RADs (Supervisor/Administrador) -- aqui aparece pro proprio
+    // tecnico, que tambem tem interesse em saber se o RAD que ele
+    // preencheu ja foi salvo no Google Drive (o envio automatico na
+    // sincronizacao pode falhar por motivo pontual -- ver
+    // detalhe_rad.html e consulta/views.py::_linha_resumo). RAD
+    // cancelado nao tem bloco de Exportar/Drive, entao o selo fica de
+    // fora nesse caso.
+    function seloDrive(rad) {
+      if (rad.status === 'cancelado') return '';
+      return rad.enviado_drive
+        ? ' <span class="selo selo--online" style="font-size:0.7rem;">Drive OK</span>'
+        : ' <span class="selo selo--offline" style="font-size:0.7rem;">Drive pendente</span>';
+    }
+
     async function carregarLista(pagina) {
       aviso.innerHTML = '';
       mensagemVazia.style.display = 'none';
@@ -77,7 +92,7 @@
           item.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <strong>${escapar(rad.numero_rad)}</strong>
-              ${seloStatus(rad.status)}
+              <span>${seloStatus(rad.status)}${seloDrive(rad)}</span>
             </div>
             <div class="grade-campos" style="margin-top:0.6rem; gap:0.4rem 1rem;">
               <div><span class="texto-suave" style="font-size:0.78rem;">OS</span><br>${escapar(rad.numero_os)}</div>
