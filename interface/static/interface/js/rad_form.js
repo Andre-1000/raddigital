@@ -45,37 +45,53 @@ document.addEventListener('DOMContentLoaded', async function () {
   if (!rascunho.anexos) {
     rascunho.anexos = { fotos_intervencao_verificada: [], fotos_acao_realizada: [], pdf: [] };
   }
-  if (!rascunho.canaleta_dimensoes) {
-    const tinhaAlgumaDimensaoAntiga = !!(
-      rascunho.canaleta_largura_inicial || rascunho.canaleta_largura_final ||
-      rascunho.canaleta_altura_inicial || rascunho.canaleta_altura_final ||
-      rascunho.canaleta_comprimento
+  // 15/09/2026: "Anomalias Observadas" foi redesenhada -- de um bloco
+  // fixo (com uma lista separada so pra Dimensoes) para uma lista de
+  // "Itens" repetiveis, cada um com seu proprio conjunto completo de
+  // campos, incluindo Dimensoes (agora um conjunto FIXO de 7 campos
+  // por item, nao mais uma lista aninhada). Um rascunho salvo ANTES
+  // desta mudanca tem os campos antigos soltos (canaleta_anomalias,
+  // canaleta_grau_criticidade etc.) -- migra pra um unico Item, se
+  // havia algo preenchido. As Dimensoes antigas (formato incompativel
+  // com os 7 campos novos) NAO dao pra migrar automatico sem inventar
+  // valor -- o item migrado comeca com Dimensoes vazias, a pessoa
+  // reconfirma se precisar.
+  if (!rascunho.canaleta_itens) {
+    const tinhaAlgumaCoisaAntiga = !!(
+      rascunho.canaleta_grau_criticidade ||
+      (rascunho.canaleta_anomalias && rascunho.canaleta_anomalias.length) ||
+      (rascunho.canaleta_lados && rascunho.canaleta_lados.length)
     );
-    rascunho.canaleta_dimensoes = tinhaAlgumaDimensaoAntiga
+    rascunho.canaleta_itens = tinhaAlgumaCoisaAntiga
       ? [{
-          largura_inicial: rascunho.canaleta_largura_inicial || '',
-          largura_final: rascunho.canaleta_largura_final || '',
-          altura_inicial: rascunho.canaleta_altura_inicial || '',
-          altura_final: rascunho.canaleta_altura_final || '',
-          comprimento: rascunho.canaleta_comprimento || '',
-          km_poste_inicial: '',
-          km_poste_final: '',
+          anomalias: rascunho.canaleta_anomalias || [],
+          grau_criticidade: rascunho.canaleta_grau_criticidade || '',
+          justificativa: rascunho.canaleta_justificativa || '',
+          necessita_cautela: rascunho.canaleta_necessita_cautela || '',
+          lados: rascunho.canaleta_lados || [],
+          dimensao: {
+            largura_inicial: '', largura_inicial_nao_identificado: false,
+            largura_final: '', largura_final_nao_identificado: false,
+            altura_inicial: '', altura_inicial_nao_identificado: false,
+            altura_final: '', altura_final_nao_identificado: false,
+            comprimento: '', comprimento_nao_identificado: false,
+            km_poste_inicial: '', km_poste_inicial_nao_identificado: false,
+            km_poste_final: '', km_poste_final_nao_identificado: false,
+          },
         }]
-      : [{
-          largura_inicial: '', largura_final: '', altura_inicial: '', altura_final: '', comprimento: '',
-          km_poste_inicial: '', km_poste_final: '',
-        }];
+      : [];
   }
-  rascunho.canaleta_dimensoes.forEach(function (linha) {
-    if (linha.km_poste_inicial === undefined) linha.km_poste_inicial = '';
-    if (linha.km_poste_final === undefined) linha.km_poste_final = '';
-  });
+  delete rascunho.canaleta_anomalias;
+  delete rascunho.canaleta_grau_criticidade;
+  delete rascunho.canaleta_justificativa;
+  delete rascunho.canaleta_necessita_cautela;
+  delete rascunho.canaleta_lados;
+  delete rascunho.canaleta_dimensoes;
   delete rascunho.canaleta_largura_inicial;
   delete rascunho.canaleta_largura_final;
   delete rascunho.canaleta_altura_inicial;
   delete rascunho.canaleta_altura_final;
   delete rascunho.canaleta_comprimento;
-  if (rascunho.canaleta_justificativa === undefined) rascunho.canaleta_justificativa = '';
 
   let resolverConflitoPendente = null;
   const modalConfirmarExclusao = document.getElementById('modal-confirmar-exclusao');
@@ -176,14 +192,9 @@ document.addEventListener('DOMContentLoaded', async function () {
       terceiros_num_motorista: '',
       terceiros_volume: '',
       amv_blocos: [],
-      canaleta_anomalias: [],
-      canaleta_grau_criticidade: '',
-      canaleta_justificativa: '',
-      canaleta_necessita_cautela: '',
-      canaleta_dimensoes: [
-        { largura_inicial: '', largura_final: '', altura_inicial: '', altura_final: '', comprimento: '' },
-      ],
-      canaleta_lados: [],
+      // 15/09/2026: "Anomalias Observadas" -- lista de Itens, vazia
+      // por padrao (bloco inteiro e opcional).
+      canaleta_itens: [],
       colaboradores: [],
       anexos: {
         fotos_intervencao_verificada: [],
@@ -1227,17 +1238,9 @@ document.addEventListener('DOMContentLoaded', async function () {
   });
 
   const blocoCanaleta = document.getElementById('bloco-canaleta');
-  const listaCanaletaAnomaliasEl = document.getElementById('lista-canaleta-anomalias');
-  const grupoCanaletaObstrucao = document.getElementById('grupo-canaleta-obstrucao');
-  const listaCanaletaSubAnomaliasEl = document.getElementById('lista-canaleta-sub-anomalias');
-  const listaCanaletaLadoEl = document.getElementById('lista-canaleta-lado');
-  const campoCanaletaCriticidade = document.getElementById('campo-canaleta-criticidade');
-  const grupoCanaletaJustificativa = document.getElementById('campo-grupo-canaleta-justificativa');
-  const campoCanaletaJustificativa = document.getElementById('campo-canaleta-justificativa');
-  const campoCanaletaCautela = document.getElementById('campo-canaleta-cautela');
-  const containerDimensoesCanaleta = document.getElementById('container-canaleta-dimensoes');
-  const botaoAdicionarDimensaoCanaleta = document.getElementById('botao-adicionar-dimensao-canaleta');
-  const contadorDimensoesCanaleta = document.getElementById('contador-dimensoes-canaleta');
+  const containerItensCanaleta = document.getElementById('container-itens-canaleta');
+  const botaoAdicionarItemCanaleta = document.getElementById('botao-adicionar-item-canaleta');
+  const contadorItensCanaleta = document.getElementById('contador-itens-canaleta');
 
   const ANOMALIAS_CANALETA = [
     { valor: 'limpa', rotulo: 'Limpa' },
@@ -1253,14 +1256,19 @@ document.addEventListener('DOMContentLoaded', async function () {
     { valor: 'entulho', rotulo: 'Entulho' },
     { valor: 'terra', rotulo: 'Terra' },
   ];
-  const GRAUS_CRITICIDADE_EXIGEM_JUSTIFICATIVA = ['media', 'alta', 'critica'];
-  const MAXIMO_DIMENSOES_CANALETA = 10;
   const LADOS_CANALETA = [
     { valor: 'direito', rotulo: 'Direito' },
     { valor: 'esquerdo', rotulo: 'Esquerdo' },
     { valor: 'entrevia', rotulo: 'Entrevia' },
   ];
-  const CAMPOS_DIMENSAO_CANALETA = [
+  const MAXIMO_ITENS_CANALETA = 15;
+  const ROTULOS_GRAU_CRITICIDADE = { baixa: 'Baixa', media: 'Média', alta: 'Alta', critica: 'Crítica' };
+  // 15/09/2026: Dimensoes agora e um conjunto FIXO de 7 campos por
+  // Item (nao mais uma lista de linhas) -- cada um com seu proprio
+  // checkbox "Não identificado". Km/Poste Inicial/Final usam a MESMA
+  // mascara nova do Km/Poste de Localizacao (aplicarMascaraKmPosteNova,
+  // padrao "XXX/XXX + XXX") -- pedido do cliente.
+  const CAMPOS_DIMENSAO_ITEM_CANALETA = [
     ['largura_inicial', 'Largura Inicial (m)', 'numero'],
     ['largura_final', 'Largura Final (m)', 'numero'],
     ['altura_inicial', 'Altura Inicial (m)', 'numero'],
@@ -1270,163 +1278,244 @@ document.addEventListener('DOMContentLoaded', async function () {
     ['km_poste_final', 'Km/Poste Final', 'km'],
   ];
 
-  function criarLinhaDimensaoCanaletaVazia() {
+  function criarItemCanaletaVazio() {
     return {
-      largura_inicial: '', largura_final: '',
-      altura_inicial: '', altura_final: '',
-      comprimento: '',
-      km_poste_inicial: '', km_poste_final: '',
+      anomalias: [],
+      grau_criticidade: '',
+      justificativa: '',
+      necessita_cautela: '',
+      lados: [],
+      dimensao: {
+        largura_inicial: '', largura_inicial_nao_identificado: false,
+        largura_final: '', largura_final_nao_identificado: false,
+        altura_inicial: '', altura_inicial_nao_identificado: false,
+        altura_final: '', altura_final_nao_identificado: false,
+        comprimento: '', comprimento_nao_identificado: false,
+        km_poste_inicial: '', km_poste_inicial_nao_identificado: false,
+        km_poste_final: '', km_poste_final_nao_identificado: false,
+      },
     };
   }
 
-  function aoMudarAnomaliaCanaleta() {
-    atualizarVisibilidadeSubAnomaliasCanaleta();
-    salvarRascunhoAgora();
-  }
+  function renderizarItemCanaletaIndividual(item, indice) {
+    const cartao = document.createElement('div');
+    cartao.className = 'cartao item-canaleta';
 
-  function atualizarVisibilidadeSubAnomaliasCanaleta() {
-    const obstruidaMarcada = rascunho.canaleta_anomalias.includes('obstruida');
-    grupoCanaletaObstrucao.style.display = obstruidaMarcada ? '' : 'none';
-    if (!obstruidaMarcada) {
-      let mudou = false;
-      SUB_ANOMALIAS_OBSTRUIDA_CANALETA.forEach(function (sub) {
-        const indice = rascunho.canaleta_anomalias.indexOf(sub.valor);
-        if (indice !== -1) {
-          rascunho.canaleta_anomalias.splice(indice, 1);
-          mudou = true;
-        }
-      });
-      if (mudou) {
-        renderizarListaCheckbox(
-          listaCanaletaSubAnomaliasEl, SUB_ANOMALIAS_OBSTRUIDA_CANALETA,
-          rascunho.canaleta_anomalias, aoMudarAnomaliaCanaleta
-        );
-      }
-    }
-  }
+    const cabecalho = document.createElement('div');
+    cabecalho.className = 'item-canaleta__cabecalho';
+    const titulo = document.createElement('p');
+    titulo.className = 'item-canaleta__titulo';
+    titulo.textContent = `Item ${indice + 1} de ${rascunho.canaleta_itens.length}`;
+    cabecalho.appendChild(titulo);
 
-  function atualizarVisibilidadeJustificativaCanaleta() {
-    const exige = GRAUS_CRITICIDADE_EXIGEM_JUSTIFICATIVA.includes(rascunho.canaleta_grau_criticidade);
-    grupoCanaletaJustificativa.style.display = exige ? '' : 'none';
-    if (!exige) {
-      rascunho.canaleta_justificativa = '';
-      campoCanaletaJustificativa.value = '';
-    }
-  }
-
-  function renderizarLinhasDimensoesCanaleta() {
-    containerDimensoesCanaleta.innerHTML = '';
-    rascunho.canaleta_dimensoes.forEach(function (linha, indice) {
-      const cartaoLinha = document.createElement('div');
-      cartaoLinha.className = 'linha-dimensao-canaleta';
-
-      const cabecalho = document.createElement('div');
-      cabecalho.className = 'linha-dimensao-canaleta__cabecalho';
-      const titulo = document.createElement('p');
-      titulo.className = 'linha-dimensao-canaleta__titulo';
-      titulo.textContent = `Linha ${indice + 1} de ${rascunho.canaleta_dimensoes.length}`;
-      cabecalho.appendChild(titulo);
-
-      if (rascunho.canaleta_dimensoes.length > 1) {
-        const botaoRemover = document.createElement('button');
-        botaoRemover.type = 'button';
-        botaoRemover.className = 'botao botao--perigo';
-        botaoRemover.style.width = 'auto';
-        botaoRemover.style.minHeight = '30px';
-        botaoRemover.style.padding = '0 0.7rem';
-        botaoRemover.style.fontSize = '0.78rem';
-        botaoRemover.textContent = 'Remover';
-        botaoRemover.addEventListener('click', function () {
-          rascunho.canaleta_dimensoes.splice(indice, 1);
-          renderizarLinhasDimensoesCanaleta();
-          salvarRascunhoAgora();
-        });
-        cabecalho.appendChild(botaoRemover);
-      }
-      cartaoLinha.appendChild(cabecalho);
-
-      const grade = document.createElement('div');
-      grade.className = 'grade-campos--dimensao-canaleta';
-
-      CAMPOS_DIMENSAO_CANALETA.forEach(function ([chave, rotulo, tipo]) {
-        const campoDiv = document.createElement('div');
-        campoDiv.className = 'campo';
-        const label = document.createElement('label');
-        label.className = 'texto-suave';
-        label.style.fontSize = '0.75rem';
-        label.textContent = rotulo;
-        const input = document.createElement('input');
-        if (tipo === 'numero') {
-          input.type = 'number';
-          input.step = '0.01';
-          input.min = '0';
-          input.value = linha[chave];
-          input.addEventListener('input', function () {
-            linha[chave] = input.value;
-            salvarRascunhoAgora();
-          });
-        } else {
-          input.type = 'text';
-          input.inputMode = 'numeric';
-          input.placeholder = 'XX/XX - XX/XX';
-          input.maxLength = 13;
-          input.value = linha[chave];
-          input.addEventListener('input', function () {
-            const somenteDigitos = /^\d+$/.test(input.value.replace(/[/\s-]/g, ''));
-            if (somenteDigitos) {
-              input.value = aplicarMascaraKmPoste(input.value);
-            }
-            linha[chave] = input.value;
-            salvarRascunhoAgora();
-          });
-        }
-        campoDiv.appendChild(label);
-        campoDiv.appendChild(input);
-        grade.appendChild(campoDiv);
-      });
-      cartaoLinha.appendChild(grade);
-
-      containerDimensoesCanaleta.appendChild(cartaoLinha);
+    const botaoRemover = document.createElement('button');
+    botaoRemover.type = 'button';
+    botaoRemover.className = 'botao botao--perigo';
+    botaoRemover.style.width = 'auto';
+    botaoRemover.style.minHeight = '32px';
+    botaoRemover.style.padding = '0 0.8rem';
+    botaoRemover.style.fontSize = '0.8rem';
+    botaoRemover.textContent = 'Remover';
+    botaoRemover.addEventListener('click', function () {
+      rascunho.canaleta_itens.splice(indice, 1);
+      renderizarItensCanaleta();
+      salvarRascunhoAgora();
     });
+    cabecalho.appendChild(botaoRemover);
+    cartao.appendChild(cabecalho);
 
-    contadorDimensoesCanaleta.textContent = `${rascunho.canaleta_dimensoes.length} de ${MAXIMO_DIMENSOES_CANALETA} linhas usadas`;
-    botaoAdicionarDimensaoCanaleta.style.display =
-      rascunho.canaleta_dimensoes.length >= MAXIMO_DIMENSOES_CANALETA ? 'none' : '';
-  }
+    // 1) Dimensões -- sem botao de adicionar linha, conjunto fixo de
+    // 7 campos, cada um com seu proprio checkbox "Não identificado".
+    const secaoDimensao = document.createElement('div');
+    secaoDimensao.className = 'item-canaleta__secao';
+    const tituloDimensao = document.createElement('p');
+    tituloDimensao.className = 'item-canaleta__secao-titulo';
+    tituloDimensao.textContent = 'Dimensões';
+    secaoDimensao.appendChild(tituloDimensao);
 
-  botaoAdicionarDimensaoCanaleta.addEventListener('click', function () {
-    if (rascunho.canaleta_dimensoes.length >= MAXIMO_DIMENSOES_CANALETA) return;
-    rascunho.canaleta_dimensoes.push(criarLinhaDimensaoCanaletaVazia());
-    renderizarLinhasDimensoesCanaleta();
-    salvarRascunhoAgora();
-  });
+    const gradeDimensao = document.createElement('div');
+    gradeDimensao.className = 'grade-campos--dimensao-canaleta';
 
-  function renderizarBlocoCanaleta() {
-    renderizarListaCheckbox(listaCanaletaAnomaliasEl, ANOMALIAS_CANALETA, rascunho.canaleta_anomalias, aoMudarAnomaliaCanaleta);
-    renderizarListaCheckbox(listaCanaletaSubAnomaliasEl, SUB_ANOMALIAS_OBSTRUIDA_CANALETA, rascunho.canaleta_anomalias, aoMudarAnomaliaCanaleta);
-    atualizarVisibilidadeSubAnomaliasCanaleta();
-    renderizarListaCheckbox(listaCanaletaLadoEl, LADOS_CANALETA, rascunho.canaleta_lados, salvarRascunhoAgora);
-    campoCanaletaCriticidade.value = rascunho.canaleta_grau_criticidade || '';
-    campoCanaletaJustificativa.value = rascunho.canaleta_justificativa || '';
-    atualizarVisibilidadeJustificativaCanaleta();
-    campoCanaletaCautela.value = rascunho.canaleta_necessita_cautela || '';
-    if (!rascunho.canaleta_dimensoes || rascunho.canaleta_dimensoes.length === 0) {
-      rascunho.canaleta_dimensoes = [criarLinhaDimensaoCanaletaVazia()];
+    CAMPOS_DIMENSAO_ITEM_CANALETA.forEach(function ([chave, rotulo, tipo]) {
+      const campoDiv = document.createElement('div');
+      campoDiv.className = 'campo';
+      const label = document.createElement('label');
+      label.className = 'texto-suave';
+      label.style.fontSize = '0.75rem';
+      label.textContent = rotulo;
+      campoDiv.appendChild(label);
+
+      const input = document.createElement('input');
+      if (tipo === 'numero') {
+        input.type = 'number';
+        input.step = '0.01';
+        input.min = '0';
+      } else {
+        input.type = 'text';
+        input.inputMode = 'numeric';
+        input.placeholder = 'XXX/XXX + XXX';
+        input.maxLength = 13;
+      }
+      input.value = item.dimensao[chave];
+      input.disabled = !!item.dimensao[`${chave}_nao_identificado`];
+      input.addEventListener('input', function () {
+        if (tipo === 'km') {
+          input.value = aplicarMascaraKmPosteNova(input.value);
+        }
+        item.dimensao[chave] = input.value;
+        salvarRascunhoAgora();
+      });
+      campoDiv.appendChild(input);
+
+      const labelCheckbox = document.createElement('label');
+      labelCheckbox.className = 'campo-dimensao-item__nao-identificado';
+      const checkboxNaoIdentificado = document.createElement('input');
+      checkboxNaoIdentificado.type = 'checkbox';
+      checkboxNaoIdentificado.checked = !!item.dimensao[`${chave}_nao_identificado`];
+      checkboxNaoIdentificado.addEventListener('change', function () {
+        item.dimensao[`${chave}_nao_identificado`] = checkboxNaoIdentificado.checked;
+        input.disabled = checkboxNaoIdentificado.checked;
+        if (checkboxNaoIdentificado.checked) {
+          input.value = '';
+          item.dimensao[chave] = '';
+        }
+        salvarRascunhoAgora();
+      });
+      labelCheckbox.appendChild(checkboxNaoIdentificado);
+      labelCheckbox.appendChild(document.createTextNode('Não identificado'));
+      campoDiv.appendChild(labelCheckbox);
+
+      gradeDimensao.appendChild(campoDiv);
+    });
+    secaoDimensao.appendChild(gradeDimensao);
+    cartao.appendChild(secaoDimensao);
+
+    // 2) Grau de Criticidade
+    const secaoCriticidade = document.createElement('div');
+    secaoCriticidade.className = 'item-canaleta__secao campo';
+    secaoCriticidade.innerHTML = '<label>Grau de Criticidade</label>';
+    const selectCriticidade = document.createElement('select');
+    [['', 'Selecione…'], ['baixa', 'Baixa'], ['media', 'Média'], ['alta', 'Alta'], ['critica', 'Crítica']].forEach(
+      function ([valor, rotuloOpcao]) {
+        const opcao = document.createElement('option');
+        opcao.value = valor;
+        opcao.textContent = rotuloOpcao;
+        selectCriticidade.appendChild(opcao);
+      }
+    );
+    selectCriticidade.value = item.grau_criticidade || '';
+    selectCriticidade.addEventListener('change', function () {
+      item.grau_criticidade = selectCriticidade.value;
+      salvarRascunhoAgora();
+    });
+    secaoCriticidade.appendChild(selectCriticidade);
+    cartao.appendChild(secaoCriticidade);
+
+    // 3) Anomalias
+    const secaoAnomalias = document.createElement('div');
+    secaoAnomalias.className = 'item-canaleta__secao campo';
+    secaoAnomalias.innerHTML = '<label>Anomalias</label>';
+    const listaAnomaliasEl = document.createElement('div');
+    listaAnomaliasEl.className = 'grade-checkboxes';
+    secaoAnomalias.appendChild(listaAnomaliasEl);
+
+    const grupoObstrucao = document.createElement('div');
+    grupoObstrucao.style.display = 'none';
+    grupoObstrucao.style.marginTop = '0.6rem';
+    grupoObstrucao.innerHTML = '<label class="texto-suave" style="font-size:0.85rem;">Tipo de obstrução</label>';
+    const listaSubAnomaliasEl = document.createElement('div');
+    listaSubAnomaliasEl.className = 'grade-checkboxes grade-checkboxes--sub';
+    grupoObstrucao.appendChild(listaSubAnomaliasEl);
+    secaoAnomalias.appendChild(grupoObstrucao);
+
+    function atualizarVisibilidadeSubAnomalias() {
+      const obstruidaMarcada = item.anomalias.includes('obstruida');
+      grupoObstrucao.style.display = obstruidaMarcada ? '' : 'none';
+      if (!obstruidaMarcada) {
+        let mudou = false;
+        SUB_ANOMALIAS_OBSTRUIDA_CANALETA.forEach(function (sub) {
+          const idx = item.anomalias.indexOf(sub.valor);
+          if (idx !== -1) {
+            item.anomalias.splice(idx, 1);
+            mudou = true;
+          }
+        });
+        if (mudou) {
+          renderizarListaCheckbox(listaSubAnomaliasEl, SUB_ANOMALIAS_OBSTRUIDA_CANALETA, item.anomalias, aoMudarAnomalia);
+        }
+      }
     }
-    renderizarLinhasDimensoesCanaleta();
+    function aoMudarAnomalia() {
+      atualizarVisibilidadeSubAnomalias();
+      salvarRascunhoAgora();
+    }
+    renderizarListaCheckbox(listaAnomaliasEl, ANOMALIAS_CANALETA, item.anomalias, aoMudarAnomalia);
+    renderizarListaCheckbox(listaSubAnomaliasEl, SUB_ANOMALIAS_OBSTRUIDA_CANALETA, item.anomalias, aoMudarAnomalia);
+    atualizarVisibilidadeSubAnomalias();
+    cartao.appendChild(secaoAnomalias);
+
+    // 4) Justificativa -- 15/09/2026: sempre visivel, sempre opcional
+    // (deixou de ser obrigatoria em qualquer grau de criticidade).
+    const secaoJustificativa = document.createElement('div');
+    secaoJustificativa.className = 'item-canaleta__secao campo';
+    secaoJustificativa.innerHTML = '<label>Justificativa <span class="texto-suave" style="font-size:0.78rem; font-weight:400;">(opcional)</span></label>';
+    const textareaJustificativa = document.createElement('textarea');
+    textareaJustificativa.value = item.justificativa || '';
+    textareaJustificativa.addEventListener('input', function () {
+      item.justificativa = textareaJustificativa.value;
+      salvarRascunhoAgora();
+    });
+    secaoJustificativa.appendChild(textareaJustificativa);
+    cartao.appendChild(secaoJustificativa);
+
+    // 5) Necessita de Cautela?
+    const secaoCautela = document.createElement('div');
+    secaoCautela.className = 'item-canaleta__secao campo';
+    secaoCautela.innerHTML = '<label>Necessita de Cautela?</label>';
+    const selectCautela = document.createElement('select');
+    [['', 'Selecione…'], ['sim', 'Sim'], ['nao', 'Não']].forEach(function ([valor, rotuloOpcao]) {
+      const opcao = document.createElement('option');
+      opcao.value = valor;
+      opcao.textContent = rotuloOpcao;
+      selectCautela.appendChild(opcao);
+    });
+    selectCautela.value = item.necessita_cautela || '';
+    selectCautela.addEventListener('change', function () {
+      item.necessita_cautela = selectCautela.value;
+      salvarRascunhoAgora();
+    });
+    secaoCautela.appendChild(selectCautela);
+    cartao.appendChild(secaoCautela);
+
+    // 6) Lado
+    const secaoLado = document.createElement('div');
+    secaoLado.className = 'item-canaleta__secao campo';
+    secaoLado.innerHTML = '<label>Lado</label>';
+    const listaLadoEl = document.createElement('div');
+    listaLadoEl.className = 'grade-checkboxes';
+    renderizarListaCheckbox(listaLadoEl, LADOS_CANALETA, item.lados, salvarRascunhoAgora);
+    secaoLado.appendChild(listaLadoEl);
+    cartao.appendChild(secaoLado);
+
+    return cartao;
   }
 
-  campoCanaletaCriticidade.addEventListener('change', function () {
-    rascunho.canaleta_grau_criticidade = campoCanaletaCriticidade.value;
-    atualizarVisibilidadeJustificativaCanaleta();
-    salvarRascunhoAgora();
-  });
-  campoCanaletaJustificativa.addEventListener('input', function () {
-    rascunho.canaleta_justificativa = campoCanaletaJustificativa.value;
-    salvarRascunhoAgora();
-  });
-  campoCanaletaCautela.addEventListener('change', function () {
-    rascunho.canaleta_necessita_cautela = campoCanaletaCautela.value;
+  function renderizarItensCanaleta() {
+    containerItensCanaleta.innerHTML = '';
+    rascunho.canaleta_itens.forEach(function (item, indice) {
+      containerItensCanaleta.appendChild(renderizarItemCanaletaIndividual(item, indice));
+    });
+    contadorItensCanaleta.textContent = rascunho.canaleta_itens.length > 0
+      ? `${rascunho.canaleta_itens.length} de ${MAXIMO_ITENS_CANALETA} itens usados`
+      : '';
+    botaoAdicionarItemCanaleta.style.display =
+      rascunho.canaleta_itens.length >= MAXIMO_ITENS_CANALETA ? 'none' : '';
+  }
+
+  botaoAdicionarItemCanaleta.addEventListener('click', function () {
+    if (rascunho.canaleta_itens.length >= MAXIMO_ITENS_CANALETA) return;
+    rascunho.canaleta_itens.push(criarItemCanaletaVazio());
+    renderizarItensCanaleta();
     salvarRascunhoAgora();
   });
 
@@ -1439,13 +1528,11 @@ document.addEventListener('DOMContentLoaded', async function () {
     rascunho[chaveRascunho] = '';
   }
 
+  // 15/09/2026: "Anomalias Observadas" e opcional mesmo com o servico
+  // selecionado -- limpar so esvazia a lista de Itens, sem forcar
+  // nenhum item vazio de volta.
   function limparBlocoCanaleta() {
-    rascunho.canaleta_anomalias.length = 0;
-    rascunho.canaleta_lados.length = 0;
-    rascunho.canaleta_grau_criticidade = '';
-    rascunho.canaleta_justificativa = '';
-    rascunho.canaleta_necessita_cautela = '';
-    rascunho.canaleta_dimensoes = [criarLinhaDimensaoCanaletaVazia()];
+    rascunho.canaleta_itens.length = 0;
   }
 
   function atualizarVisibilidadeServicos() {
@@ -1469,7 +1556,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     if (servicoRequerCanaletaSelecionado()) {
       blocoCanaleta.style.display = '';
-      renderizarBlocoCanaleta();
+      renderizarItensCanaleta();
     } else {
       blocoCanaleta.style.display = 'none';
       limparBlocoCanaleta();
@@ -1953,33 +2040,27 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   let sincronizando = false;
 
-  const botaoSincronizar = document.getElementById('botao-sincronizar');
-  const botaoSincronizarDrive = document.getElementById('botao-sincronizar-drive');
+  // 15/09/2026: virou um unico botao -- Sincronizar sempre tenta
+  // enviar ao Drive em seguida, automaticamente (nao e mais uma
+  // escolha separada). O id do elemento ficou como
+  // 'botao-sincronizar-drive' (reaproveitado do que antes era o
+  // segundo botao) pra nao precisar tocar no HTML de novo.
+  const botaoSincronizar = document.getElementById('botao-sincronizar-drive');
   const textoStatusBotao = document.getElementById('texto-status-botao');
   const avisoSincronizacao = document.getElementById('aviso-sincronizacao');
   const listaErrosSincronizacao = document.getElementById('lista-erros-sincronizacao');
 
-  // 15/09/2026: dois botoes, mesma acao de sincronizar por baixo --
-  // "Sincronizar e Salvar no Drive" so acrescenta a chamada ao Drive
-  // (ver executarSincronizacao) depois que o RAD ja foi sincronizado
-  // com sucesso. Os dois ficam sempre habilitados/desabilitados juntos
-  // -- nao faz sentido usar um enquanto o outro esta em andamento.
   function atualizarEstadoBotaoSincronizar() {
     if (sincronizando) {
       botaoSincronizar.disabled = true;
-      botaoSincronizarDrive.disabled = true;
       textoStatusBotao.textContent = '';
     } else if (!navigator.onLine) {
       botaoSincronizar.disabled = true;
-      botaoSincronizarDrive.disabled = true;
       botaoSincronizar.textContent = 'Sincronizar';
-      botaoSincronizarDrive.textContent = 'Sincronizar e Salvar no Drive';
       textoStatusBotao.textContent = 'Sem conexão';
     } else {
       botaoSincronizar.disabled = false;
-      botaoSincronizarDrive.disabled = false;
       botaoSincronizar.textContent = 'Sincronizar';
-      botaoSincronizarDrive.textContent = 'Sincronizar e Salvar no Drive';
       textoStatusBotao.textContent = '';
     }
   }
@@ -2107,26 +2188,38 @@ document.addEventListener('DOMContentLoaded', async function () {
       terceiros_num_motorista: rascunho.terceiros_num_motorista ? Number(rascunho.terceiros_num_motorista) : null,
       terceiros_volume: rascunho.terceiros_volume ? Number(rascunho.terceiros_volume) : null,
       amv_blocos: rascunho.amv_blocos,
-      canaleta: servicoRequerCanaletaSelecionado() ? {
-        anomalias: rascunho.canaleta_anomalias,
-        grau_criticidade: rascunho.canaleta_grau_criticidade || null,
-        justificativa: rascunho.canaleta_justificativa || null,
-        necessita_cautela:
-          rascunho.canaleta_necessita_cautela === 'sim' ? true :
-          (rascunho.canaleta_necessita_cautela === 'nao' ? false : null),
-        dimensoes: (rascunho.canaleta_dimensoes || []).map(function (linha) {
-          return {
-            largura_inicial: linha.largura_inicial !== '' ? Number(linha.largura_inicial) : null,
-            largura_final: linha.largura_final !== '' ? Number(linha.largura_final) : null,
-            altura_inicial: linha.altura_inicial !== '' ? Number(linha.altura_inicial) : null,
-            altura_final: linha.altura_final !== '' ? Number(linha.altura_final) : null,
-            comprimento: linha.comprimento !== '' ? Number(linha.comprimento) : null,
-            km_poste_inicial: linha.km_poste_inicial || null,
-            km_poste_final: linha.km_poste_final || null,
-          };
-        }),
-        lados: rascunho.canaleta_lados,
-      } : null,
+      // 15/09/2026: "Anomalias Observadas" -- lista de Itens, sempre
+      // enviada (mesmo vazia, ja que o bloco e opcional). Cada item
+      // manda o par valor+"_nao_identificado" pra cada um dos 7
+      // campos de Dimensao -- o backend usa esse par pra decidir se
+      // aceita vazio ou exige numero/texto.
+      canaleta_itens: (rascunho.canaleta_itens || []).map(function (item) {
+        return {
+          anomalias: item.anomalias,
+          grau_criticidade: item.grau_criticidade || null,
+          justificativa: item.justificativa || null,
+          necessita_cautela:
+            item.necessita_cautela === 'sim' ? true :
+            (item.necessita_cautela === 'nao' ? false : null),
+          lados: item.lados,
+          dimensao: {
+            largura_inicial: item.dimensao.largura_inicial !== '' ? Number(item.dimensao.largura_inicial) : null,
+            largura_inicial_nao_identificado: !!item.dimensao.largura_inicial_nao_identificado,
+            largura_final: item.dimensao.largura_final !== '' ? Number(item.dimensao.largura_final) : null,
+            largura_final_nao_identificado: !!item.dimensao.largura_final_nao_identificado,
+            altura_inicial: item.dimensao.altura_inicial !== '' ? Number(item.dimensao.altura_inicial) : null,
+            altura_inicial_nao_identificado: !!item.dimensao.altura_inicial_nao_identificado,
+            altura_final: item.dimensao.altura_final !== '' ? Number(item.dimensao.altura_final) : null,
+            altura_final_nao_identificado: !!item.dimensao.altura_final_nao_identificado,
+            comprimento: item.dimensao.comprimento !== '' ? Number(item.dimensao.comprimento) : null,
+            comprimento_nao_identificado: !!item.dimensao.comprimento_nao_identificado,
+            km_poste_inicial: item.dimensao.km_poste_inicial || null,
+            km_poste_inicial_nao_identificado: !!item.dimensao.km_poste_inicial_nao_identificado,
+            km_poste_final: item.dimensao.km_poste_final || null,
+            km_poste_final_nao_identificado: !!item.dimensao.km_poste_final_nao_identificado,
+          },
+        };
+      }),
       colaboradores: rascunho.colaboradores,
       responsavel_atividade: rascunho.responsavel_atividade,
       operador_ccm_abertura_nome: rascunho.operador_ccm_abertura_nome,
@@ -2164,7 +2257,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     sincronizando = true;
     atualizarEstadoBotaoSincronizar();
-    (tambemSalvarNoDrive ? botaoSincronizarDrive : botaoSincronizar).textContent = 'Sincronizando…';
+    botaoSincronizar.textContent = 'Sincronizando…';
     listaErrosSincronizacao.innerHTML = '';
     avisoSincronizacao.innerHTML = '';
 
@@ -2249,9 +2342,6 @@ document.addEventListener('DOMContentLoaded', async function () {
   }
 
   botaoSincronizar.addEventListener('click', function () {
-    executarSincronizacao(false);
-  });
-  botaoSincronizarDrive.addEventListener('click', function () {
     executarSincronizacao(true);
   });
 

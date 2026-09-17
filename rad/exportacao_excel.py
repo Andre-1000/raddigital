@@ -81,14 +81,14 @@ def _sem_timezone(valor_datetime):
 
 def _campos_canaleta(rad):
     """
-    21/08/2026: achata o bloco Canaleta (achado em auditoria -- estava
-    sendo salvo no banco mas nunca reaparecia em lugar nenhum) em
-    texto para as colunas do Excel. RadCanaleta e OneToOneField (no
-    maximo 1 por RAD) -- se o RAD nao tiver esse bloco, todas as
-    colunas ficam vazias, sem erro.
+    "Anomalias Observadas" (21/08/2026, redesenhado 15/09/2026):
+    achata TODOS os itens do RAD (agora pode ter varios, ate 15 --
+    mesmo padrao do bloco AMV) em texto para as colunas do Excel,
+    separando cada item por '; '. Sem nenhum item, todas as colunas
+    ficam vazias, sem erro.
     """
-    canaleta = getattr(rad, 'canaleta', None)
-    if canaleta is None:
+    itens = list(rad.canaleta_itens.all())
+    if not itens:
         return {
             'canaleta_grau_criticidade': '',
             'canaleta_necessita_cautela': '',
@@ -98,25 +98,61 @@ def _campos_canaleta(rad):
             'canaleta_dimensoes': '',
         }
 
-    linhas_dimensao = []
-    for d in canaleta.dimensoes.all():
-        km = (
-            f' (Km {d.km_poste_inicial} - {d.km_poste_final})'
-            if d.km_poste_inicial or d.km_poste_final else ''
-        )
-        linhas_dimensao.append(
-            f'L:{d.largura_inicial}-{d.largura_final} '
-            f'A:{d.altura_inicial}-{d.altura_final} '
-            f'C:{d.comprimento}{km}'
-        )
+    graus, cautelas, anomalias_todas, lados_todos, justificativas, linhas_dimensao = (
+        [], [], [], [], [], []
+    )
+
+    for canaleta in itens:
+        graus.append(canaleta.get_grau_criticidade_display())
+        cautelas.append('Sim' if canaleta.necessita_cautela else 'Não')
+        anomalias_todas.extend(a.get_anomalia_display() for a in canaleta.anomalias.all())
+        lados_todos.extend(l.get_lado_display() for l in canaleta.lados.all())
+        if canaleta.justificativa:
+            justificativas.append(canaleta.justificativa)
+
+        # 15/09/2026: item novo -- Dimensoes sao campos diretos, um
+        # conjunto so. Campos nao identificados ficam como "?".
+        if any(
+            v is not None
+            for v in (
+                canaleta.largura_inicial, canaleta.largura_final,
+                canaleta.altura_inicial, canaleta.altura_final,
+                canaleta.comprimento, canaleta.km_poste_inicial, canaleta.km_poste_final,
+            )
+        ):
+            km = (
+                f' (Km {canaleta.km_poste_inicial or "?"} - {canaleta.km_poste_final or "?"})'
+                if canaleta.km_poste_inicial or canaleta.km_poste_final else ''
+            )
+            linhas_dimensao.append(
+                f'L:{canaleta.largura_inicial if canaleta.largura_inicial is not None else "?"}'
+                f'-{canaleta.largura_final if canaleta.largura_final is not None else "?"} '
+                f'A:{canaleta.altura_inicial if canaleta.altura_inicial is not None else "?"}'
+                f'-{canaleta.altura_final if canaleta.altura_final is not None else "?"} '
+                f'C:{canaleta.comprimento if canaleta.comprimento is not None else "?"}{km}'
+            )
+
+        # RADs sincronizados antes desta mudanca: Dimensoes vivem na
+        # tabela antiga (RadCanaletaDimensao), possivelmente varias
+        # linhas por item.
+        for d in canaleta.dimensoes.all():
+            km = (
+                f' (Km {d.km_poste_inicial} - {d.km_poste_final})'
+                if d.km_poste_inicial or d.km_poste_final else ''
+            )
+            linhas_dimensao.append(
+                f'L:{d.largura_inicial}-{d.largura_final} '
+                f'A:{d.altura_inicial}-{d.altura_final} '
+                f'C:{d.comprimento}{km}'
+            )
 
     return {
-        'canaleta_grau_criticidade': canaleta.get_grau_criticidade_display(),
-        'canaleta_necessita_cautela': 'Sim' if canaleta.necessita_cautela else 'Não',
-        'canaleta_anomalias': '; '.join(a.get_anomalia_display() for a in canaleta.anomalias.all()),
-        'canaleta_lados': '; '.join(l.get_lado_display() for l in canaleta.lados.all()),
-        'canaleta_justificativa': canaleta.justificativa or '',
-        'canaleta_dimensoes': '; '.join(linhas_dimensao),
+        'canaleta_grau_criticidade': '; '.join(graus),
+        'canaleta_necessita_cautela': '; '.join(cautelas),
+        'canaleta_anomalias': '; '.join(anomalias_todas),
+        'canaleta_lados': '; '.join(lados_todos),
+        'canaleta_justificativa': '; '.join(justificativas),
+        'canaleta_dimensoes': ' | '.join(linhas_dimensao),
     }
 
 

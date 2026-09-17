@@ -292,66 +292,22 @@
       <p class="texto-suave centro" id="contador-blocos-amv" style="font-size:0.8rem; margin-top:0.4rem;"></p>
     </div>
 
-    <!-- Anomalias (bloco Canaleta, 30/07/2026): aparece quando o
-         servico "Inspecao de Canaleta" e selecionado (ver
-         catalogos.models.CatServico.requer_canaleta). Ao contrario do
-         AMV, este bloco NAO se repete -- no maximo 1 por RAD.
-         14/08/2026: sub-opcoes de obstrucao (aparecem so quando
-         "Obstruída" esta marcada), Justificativa (aparece so quando o
-         Grau de Criticidade e Media/Alta/Critica) e Dimensões virou
-         uma lista de linhas repetiveis com botao "+". -->
+    <!-- Anomalias Observadas (bloco Canaleta, 30/07/2026, redesenhado
+         15/09/2026): aparece quando o servico "Inspecao de Canaleta" e
+         selecionado (ver catalogos.models.CatServico.requer_canaleta).
+         Bloco inteiro e OPCIONAL -- mesmo com o servico selecionado,
+         nao e obrigatorio adicionar nenhum Item. Cada Item (ate 15)
+         tem seu proprio conjunto completo de campos -- ver
+         renderizarItemCanaletaIndividual em rad_form.js. -->
     <div class="cartao" id="bloco-canaleta" style="margin-top:1rem; display:none;">
-      <h2 style="font-size:1rem;">Anomalias</h2>
-
-      <div class="campo">
-        <label>Anomalias <span class="obrigatorio">*</span></label>
-        <div class="grade-checkboxes" id="lista-canaleta-anomalias"></div>
-      </div>
-
-      <div class="campo" id="grupo-canaleta-obstrucao" style="display:none;">
-        <label class="texto-suave" style="font-size:0.85rem;">Tipo de obstrução <span class="obrigatorio">*</span></label>
-        <div class="grade-checkboxes grade-checkboxes--sub" id="lista-canaleta-sub-anomalias"></div>
-      </div>
-
-      <div class="campo">
-        <label for="campo-canaleta-criticidade">Grau de Criticidade <span class="obrigatorio">*</span></label>
-        <select id="campo-canaleta-criticidade" required>
-          <option value="">Selecione…</option>
-          <option value="baixa">Baixa</option>
-          <option value="media">Média</option>
-          <option value="alta">Alta</option>
-          <option value="critica">Crítica</option>
-        </select>
-      </div>
-
-      <div class="campo" id="campo-grupo-canaleta-justificativa" style="display:none;">
-        <label for="campo-canaleta-justificativa">Justificativa <span class="obrigatorio">*</span></label>
-        <textarea id="campo-canaleta-justificativa"></textarea>
-      </div>
-
-      <div class="campo">
-        <label>Dimensões <span class="obrigatorio">*</span></label>
-        <div id="container-canaleta-dimensoes"></div>
-        <button type="button" class="botao botao--secundaria" id="botao-adicionar-dimensao-canaleta"
-                style="width:auto; min-height:36px; padding:0 0.9rem; margin-top:0.2rem; font-size:0.85rem;">
-          + Adicionar linha
-        </button>
-        <p class="texto-suave centro" id="contador-dimensoes-canaleta" style="font-size:0.8rem; margin-top:0.4rem;"></p>
-      </div>
-
-      <div class="campo">
-        <label for="campo-canaleta-cautela">Necessita de Cautela? <span class="obrigatorio">*</span></label>
-        <select id="campo-canaleta-cautela" required>
-          <option value="">Selecione…</option>
-          <option value="sim">Sim</option>
-          <option value="nao">Não</option>
-        </select>
-      </div>
-
-      <div class="campo">
-        <label>Lado <span class="obrigatorio">*</span></label>
-        <div class="grade-checkboxes" id="lista-canaleta-lado"></div>
-      </div>
+      <h2 style="font-size:1rem;">Anomalias Observadas</h2>
+      <p class="texto-suave" style="font-size:0.85rem; margin-top:-0.5rem;">Opcional. Adicione um Item para cada anomalia observada.</p>
+      <div id="container-itens-canaleta"></div>
+      <button type="button" class="botao botao--secundaria" id="botao-adicionar-item-canaleta"
+              style="width:auto; min-height:36px; padding:0 0.9rem; margin-top:0.5rem; font-size:0.85rem;">
+        + Adicionar novo Item
+      </button>
+      <p class="texto-suave centro" id="contador-itens-canaleta" style="font-size:0.8rem; margin-top:0.4rem;"></p>
     </div>
 
     <div class="cartao" id="secao-colaboradores" style="margin-top:1rem;">
@@ -521,11 +477,13 @@
     <button type="button" class="botao botao--secundaria" id="botao-exportar">
       Exportar
     </button>
-    <button type="button" class="botao botao--primaria" id="botao-sincronizar" disabled>
+    <!-- 15/09/2026: virou um unico botao -- Sincronizar sempre tenta
+         enviar ao Drive em seguida, automaticamente (nao e mais uma
+         escolha separada). Se so a parte do Drive falhar, o RAD
+         continua sincronizado normalmente -- so fica um aviso na tela
+         de detalhe convidando a reenviar manualmente. -->
+    <button type="button" class="botao botao--primaria" id="botao-sincronizar-drive" disabled>
       Sincronizar
-    </button>
-    <button type="button" class="botao botao--secundaria" id="botao-sincronizar-drive" disabled>
-      Sincronizar + Drive
     </button>
   </div>
   <p class="texto-suave centro" id="texto-status-botao" style="margin: 0.4rem 0 0; font-size: 0.8rem;"></p>
@@ -899,42 +857,60 @@
     margin-top: 0.5rem;
   }
 
-  /* Linhas de Dimensões da Canaleta (14/08/2026) -- cada linha e um
-     cartao com os campos (5 medidas + Km/Poste Inicial/Final) lado a
-     lado, menores que o padrao pra caberem juntos numa linha so no
-     computador (pedido do André). Colapsa pra grade normal em telas
-     estreitas, igual as outras grades responsivas do formulario. */
-  .linha-dimensao-canaleta {
-    border: 1px solid var(--cor-linha);
-    border-radius: var(--raio-pequeno);
-    padding: 0.6rem 0.7rem;
-    margin-bottom: 0.6rem;
+  /* 15/09/2026: Item de Anomalias Observadas -- mesmo espirito visual
+     dos blocos AMV (cartao com cabecalho + botao Remover, exceto no
+     primeiro item). */
+  .item-canaleta {
+    margin-bottom: 0.75rem;
   }
-  .linha-dimensao-canaleta__cabecalho {
+  .item-canaleta__cabecalho {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.6rem;
   }
-  .linha-dimensao-canaleta__titulo {
-    font-size: 0.8rem;
+  .item-canaleta__titulo {
     font-weight: 700;
-    color: var(--cor-tinta-suave);
     margin: 0;
   }
-  /* 14/08/2026: 7 campos por linha agora (5 medidas + Km/Poste
-     Inicial/Final) -- auto-fit deixa os 7 numa linha so em telas
-     largas (computador) e quebra pra 2 linhas sozinho em telas
-     estreitas, sem precisar de uma media query separada pra isso. */
+  .item-canaleta__secao {
+    margin-top: 0.9rem;
+  }
+  .item-canaleta__secao-titulo {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--cor-tinta-suave);
+    margin: 0 0 0.5rem;
+  }
+
+  /* 14/08/2026 (adaptado 15/09/2026): 7 campos de Dimensoes -- auto-fit
+     deixa os 7 numa linha so em telas largas e quebra sozinho em
+     telas estreitas. Cada campo agora tambem carrega seu proprio
+     checkbox "Não identificado" logo abaixo do input. */
   .grade-campos--dimensao-canaleta {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-    gap: 0.5rem 0.6rem;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.6rem 0.6rem;
   }
   .grade-campos--dimensao-canaleta input {
     padding: 0.45rem 0.5rem;
     font-size: 0.85rem;
     min-height: 38px;
+  }
+  .campo-dimensao-item__nao-identificado {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 0.3rem;
+    font-size: 0.72rem;
+    color: var(--cor-tinta-suave);
+    cursor: pointer;
+  }
+  .campo-dimensao-item__nao-identificado input {
+    min-height: unset;
+    width: 16px;
+    height: 16px;
+    padding: 0;
   }
 </style>
 {% endblock %}

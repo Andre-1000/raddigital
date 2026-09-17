@@ -116,10 +116,11 @@
     <div id="lista-amv-detalhe"></div>
   </div>
 
-  <!-- 21/08/2026: bloco Anomalias (Canaleta) -- mesmo achado: dados
-       existiam no banco, nunca apareciam aqui. No máximo 1 por RAD. -->
+  <!-- 21/08/2026: bloco Anomalias Observadas (Canaleta) -- redesenhado
+       15/09/2026: agora uma LISTA de Itens (mesmo padrao do AMV), ate
+       15 por RAD, em vez de um unico bloco fixo. -->
   <div class="cartao" id="cartao-canaleta" style="margin-top:1rem; display:none;">
-    <h2 class="titulo-secao">Anomalias (Canaleta)</h2>
+    <h2 class="titulo-secao">Anomalias Observadas</h2>
     <div id="conteudo-canaleta"></div>
   </div>
 
@@ -139,6 +140,13 @@
     <p class="texto-suave" style="font-size:0.8rem; margin-top:-0.5rem;">
       Layout oficial da TRIVIA.
     </p>
+    <!-- 15/09/2026: so aparece quando enviado_drive=False -- o envio
+         automatico na sincronizacao pode falhar por motivo pontual
+         (sem afetar o RAD em si, ja sincronizado normalmente). Aponta
+         direto pro botao "Salvar no Drive" abaixo como o conserto. -->
+    <div id="aviso-nao-enviado-drive" style="display:none; margin-bottom:0.75rem;">
+      <div class="aviso aviso--atencao">Este RAD ainda não foi enviado ao Google Drive. Use o botão "Salvar no Drive" abaixo.</div>
+    </div>
     <div id="aviso-exportar"></div>
     <div class="pilha">
       <button type="button" class="botao botao--secundaria" id="botao-copiar-mensagem">Copiar mensagem</button>
@@ -417,77 +425,111 @@
       });
     }
 
-    // ---- Bloco Anomalias / Canaleta (21/08/2026) --------------------
-    // No máximo 1 por RAD (diferente do AMV, que pode repetir).
-    function renderizarCanaleta(canaleta) {
-      const cartao = document.getElementById('cartao-canaleta');
-      const container = document.getElementById('conteudo-canaleta');
-      if (!canaleta) return;
-      cartao.style.display = '';
+    // ---- Anomalias Observadas / Canaleta (21/08/2026, redesenhado
+    // 15/09/2026) -- agora uma LISTA de Itens (mesmo padrao do AMV),
+    // ate 15 por RAD, em vez de um unico bloco fixo.
+    const CAMPOS_DIMENSAO_ROTULOS = [
+      ['largura_inicial', 'Largura Inicial (m)'],
+      ['largura_final', 'Largura Final (m)'],
+      ['altura_inicial', 'Altura Inicial (m)'],
+      ['altura_final', 'Altura Final (m)'],
+      ['comprimento', 'Comprimento (m)'],
+      ['km_poste_inicial', 'Km/Poste Inicial'],
+      ['km_poste_final', 'Km/Poste Final'],
+    ];
 
+    function renderizarGradeDimensao(dados) {
       const grade = document.createElement('div');
-      grade.className = 'grade-campos grade-dados';
-
-      const campos = [
-        ['Grau de Criticidade', canaleta.grau_criticidade],
-        ['Necessita Cautela', canaleta.necessita_cautela],
-        ['Anomalias', canaleta.anomalias],
-        ['Lado', canaleta.lados],
-      ];
-      if (canaleta.justificativa) {
-        campos.push(['Justificativa', canaleta.justificativa]);
-      }
-      campos.forEach(function ([rotulo, valor]) {
+      grade.className = 'grade-campos grade-campos--compacta grade-dados';
+      CAMPOS_DIMENSAO_ROTULOS.forEach(function ([chave, rotulo]) {
         const campo = document.createElement('div');
         campo.className = 'campo-leitura';
         campo.innerHTML = `
           <span class="campo-leitura__rotulo">${rotulo}</span>
-          <span class="campo-leitura__valor">${formatarValor(valor)}</span>
+          <span class="campo-leitura__valor">${formatarValor(dados[chave])}</span>
         `;
         grade.appendChild(campo);
       });
-      container.appendChild(grade);
+      return grade;
+    }
 
-      if (canaleta.dimensoes && canaleta.dimensoes.length > 0) {
-        const tituloDimensoes = document.createElement('p');
-        tituloDimensoes.className = 'subcartao__titulo';
-        tituloDimensoes.style.marginTop = '1rem';
-        tituloDimensoes.textContent = 'Dimensões';
-        container.appendChild(tituloDimensoes);
+    function renderizarCanaleta(itensCanaleta) {
+      const cartao = document.getElementById('cartao-canaleta');
+      const container = document.getElementById('conteudo-canaleta');
+      if (!itensCanaleta || itensCanaleta.length === 0) return;
+      cartao.style.display = '';
 
-        canaleta.dimensoes.forEach(function (linha) {
-          const item = document.createElement('div');
-          item.className = 'subcartao';
+      itensCanaleta.forEach(function (item, indice) {
+        const itemEl = document.createElement('div');
+        itemEl.className = 'subcartao';
 
-          const tituloLinha = document.createElement('p');
-          tituloLinha.className = 'subcartao__titulo';
-          tituloLinha.textContent = `Linha ${linha.ordem}`;
-          item.appendChild(tituloLinha);
+        const titulo = document.createElement('p');
+        titulo.className = 'subcartao__titulo';
+        titulo.textContent = `Item ${indice + 1} de ${itensCanaleta.length}`;
+        itemEl.appendChild(titulo);
 
-          const gradeLinha = document.createElement('div');
-          gradeLinha.className = 'grade-campos grade-campos--compacta grade-dados';
-          const camposLinha = [
-            ['Largura Inicial (m)', linha.largura_inicial],
-            ['Largura Final (m)', linha.largura_final],
-            ['Altura Inicial (m)', linha.altura_inicial],
-            ['Altura Final (m)', linha.altura_final],
-            ['Comprimento (m)', linha.comprimento],
-            ['Km/Poste Inicial', linha.km_poste_inicial],
-            ['Km/Poste Final', linha.km_poste_final],
-          ];
-          camposLinha.forEach(function ([rotulo, valor]) {
-            const campo = document.createElement('div');
-            campo.className = 'campo-leitura';
-            campo.innerHTML = `
-              <span class="campo-leitura__rotulo">${rotulo}</span>
-              <span class="campo-leitura__valor">${formatarValor(valor)}</span>
-            `;
-            gradeLinha.appendChild(campo);
-          });
-          item.appendChild(gradeLinha);
-          container.appendChild(item);
+        const grade = document.createElement('div');
+        grade.className = 'grade-campos grade-dados';
+
+        const campos = [
+          ['Grau de Criticidade', item.grau_criticidade],
+          ['Necessita Cautela', item.necessita_cautela],
+          ['Anomalias', item.anomalias],
+          ['Lado', item.lados],
+        ];
+        if (item.justificativa) {
+          campos.push(['Justificativa', item.justificativa]);
+        }
+        campos.forEach(function ([rotulo, valor]) {
+          const campo = document.createElement('div');
+          campo.className = 'campo-leitura';
+          campo.innerHTML = `
+            <span class="campo-leitura__rotulo">${rotulo}</span>
+            <span class="campo-leitura__valor">${formatarValor(valor)}</span>
+          `;
+          grade.appendChild(campo);
         });
-      }
+        itemEl.appendChild(grade);
+
+        // Dimensões: item NOVO (campos diretos, 'dimensao') ou ANTIGO
+        // (lista em 'dimensoes_antigas', de RADs sincronizados antes
+        // desta mudanca -- ver consulta/views.py::_canaleta_resumo).
+        const dimensao = item.dimensao || {};
+        const temDimensaoNova = CAMPOS_DIMENSAO_ROTULOS.some(
+          ([chave]) => dimensao[chave] !== null && dimensao[chave] !== undefined
+        );
+
+        if (temDimensaoNova) {
+          const tituloDimensao = document.createElement('p');
+          tituloDimensao.className = 'subcartao__titulo';
+          tituloDimensao.style.marginTop = '0.75rem';
+          tituloDimensao.textContent = 'Dimensões';
+          itemEl.appendChild(tituloDimensao);
+          itemEl.appendChild(renderizarGradeDimensao(dimensao));
+        } else if (item.dimensoes_antigas && item.dimensoes_antigas.length > 0) {
+          const tituloDimensao = document.createElement('p');
+          tituloDimensao.className = 'subcartao__titulo';
+          tituloDimensao.style.marginTop = '0.75rem';
+          tituloDimensao.textContent = 'Dimensões (registro anterior à atualização)';
+          itemEl.appendChild(tituloDimensao);
+
+          item.dimensoes_antigas.forEach(function (linha) {
+            const linhaEl = document.createElement('div');
+            linhaEl.className = 'subcartao';
+            linhaEl.style.marginTop = '0.5rem';
+
+            const tituloLinha = document.createElement('p');
+            tituloLinha.className = 'subcartao__titulo';
+            tituloLinha.textContent = `Linha ${linha.ordem}`;
+            linhaEl.appendChild(tituloLinha);
+            linhaEl.appendChild(renderizarGradeDimensao(linha));
+
+            itemEl.appendChild(linhaEl);
+          });
+        }
+
+        container.appendChild(itemEl);
+      });
     }
 
     function renderizarColaboradores(colaboradores) {
@@ -608,6 +650,12 @@
           if (dados.exportacao_pdf_disponivel) {
             document.getElementById('botao-baixar-pdf-oficial').style.display = '';
           }
+          // 15/09/2026: avisa quando o envio automatico ao Drive (na
+          // hora da sincronizacao) nao deu certo -- aponta direto pro
+          // botao "Salvar no Drive" logo abaixo como o conserto.
+          if (!dados.enviado_drive) {
+            document.getElementById('aviso-nao-enviado-drive').style.display = '';
+          }
         }
         if (dados.pode_cancelar) {
           document.getElementById('cartao-cancelar').style.display = '';
@@ -699,6 +747,7 @@
         }
 
         avisoExportar.innerHTML = '<div class="aviso aviso--sucesso">Salvo no Google Drive.</div>';
+        document.getElementById('aviso-nao-enviado-drive').style.display = 'none';
         window.open(corpo.link, '_blank');
       } catch (erro) {
         avisoExportar.innerHTML = '<div class="aviso aviso--erro">Erro de conexão ao salvar no Drive.</div>';

@@ -23,7 +23,6 @@ from .models import (
     RadAnexo,
     RadCanaleta,
     RadCanaletaAnomalia,
-    RadCanaletaDimensao,
     RadCanaletaLado,
     RadColaborador,
     RadEquipe,
@@ -193,56 +192,48 @@ def _preparar_horarios(payload):
     return resultado
 
 
-def _criar_bloco_canaleta(rad, payload):
+def _criar_itens_canaleta(rad, payload):
     """
-    30/07/2026: cria o bloco Anomalias (RadCanaleta + anomalias/lados
-    selecionados) quando presente no payload -- so existe quando o
-    servico "Inspeção de Canaleta" foi selecionado, ja garantido pela
-    validacao (VLD-040 a VLD-045) antes de chegar aqui. Diferente do
-    bloco AMV, e um unico bloco por RAD (nao uma lista).
+    "Anomalias Observadas" (15/09/2026, redesenhado): um RadCanaleta
+    por Item (ate LIMITE_ITENS_CANALETA, ver rad/validadores.py) --
+    mesmo padrao do bloco AMV. Bloco inteiro e opcional -- payload sem
+    nenhum item (lista vazia ou ausente) simplesmente nao cria nada,
+    sem erro.
 
-    14/08/2026: 'justificativa' passou a ser gravada junto (so tem
-    valor real quando grau_criticidade e Media/Alta/Critica, mas gravar
-    sempre que vier preenchida e inofensivo -- mesmo padrao ja usado
-    para outros_servico_desc). 'dimensoes' agora e uma LISTA -- cada
-    item vira um RadCanaletaDimensao proprio, numerado na ordem em que
-    chegou (1-indexado, mesma ordem exibida no formulario).
+    Dimensoes agora sao campos DIRETOS em RadCanaleta (nao mais uma
+    lista filha) -- cada um dos 7 campos vira NULL quando o respectivo
+    '<campo>_nao_identificado' veio True no payload (ja garantido pela
+    validacao: um campo so chega aqui vazio se foi explicitamente
+    marcado como nao identificado).
     """
-    canaleta_dados = payload.get('canaleta')
-    if not canaleta_dados:
-        return
+    for item in payload.get('canaleta_itens') or []:
+        dimensao = item.get('dimensao') or {}
 
-    canaleta = RadCanaleta.objects.create(
-        rad=rad,
-        grau_criticidade=canaleta_dados['grau_criticidade'],
-        justificativa=canaleta_dados.get('justificativa') or None,
-        necessita_cautela=bool(canaleta_dados['necessita_cautela']),
-    )
-    RadCanaletaAnomalia.objects.bulk_create(
-        [
-            RadCanaletaAnomalia(canaleta=canaleta, anomalia=a)
-            for a in canaleta_dados.get('anomalias', [])
-        ]
-    )
-    RadCanaletaLado.objects.bulk_create(
-        [RadCanaletaLado(canaleta=canaleta, lado=l) for l in canaleta_dados.get('lados', [])]
-    )
-    RadCanaletaDimensao.objects.bulk_create(
-        [
-            RadCanaletaDimensao(
-                canaleta=canaleta,
-                ordem=indice + 1,
-                largura_inicial=linha['largura_inicial'],
-                largura_final=linha['largura_final'],
-                altura_inicial=linha['altura_inicial'],
-                altura_final=linha['altura_final'],
-                comprimento=linha['comprimento'],
-                km_poste_inicial=linha.get('km_poste_inicial') or None,
-                km_poste_final=linha.get('km_poste_final') or None,
-            )
-            for indice, linha in enumerate(canaleta_dados.get('dimensoes', []))
-        ]
-    )
+        def _valor_dimensao(campo):
+            if dimensao.get(f'{campo}_nao_identificado'):
+                return None
+            valor = dimensao.get(campo)
+            return valor if valor not in ('', None) else None
+
+        canaleta = RadCanaleta.objects.create(
+            rad=rad,
+            grau_criticidade=item['grau_criticidade'],
+            justificativa=item.get('justificativa') or None,
+            necessita_cautela=bool(item['necessita_cautela']),
+            largura_inicial=_valor_dimensao('largura_inicial'),
+            largura_final=_valor_dimensao('largura_final'),
+            altura_inicial=_valor_dimensao('altura_inicial'),
+            altura_final=_valor_dimensao('altura_final'),
+            comprimento=_valor_dimensao('comprimento'),
+            km_poste_inicial=_valor_dimensao('km_poste_inicial'),
+            km_poste_final=_valor_dimensao('km_poste_final'),
+        )
+        RadCanaletaAnomalia.objects.bulk_create(
+            [RadCanaletaAnomalia(canaleta=canaleta, anomalia=a) for a in item.get('anomalias', [])]
+        )
+        RadCanaletaLado.objects.bulk_create(
+            [RadCanaletaLado(canaleta=canaleta, lado=l) for l in item.get('lados', [])]
+        )
 
 
 def _criar_relacionamentos(rad, payload):
@@ -344,7 +335,7 @@ def _criar_relacionamentos(rad, payload):
 
     # 30/07/2026: bloco Anomalias (Canaleta) -- so existe quando o
     # servico "Inspeção de Canaleta" foi selecionado.
-    _criar_bloco_canaleta(rad, payload)
+    _criar_itens_canaleta(rad, payload)
 
 
 def _salvar_anexos(rad, fotos_intervencao, fotos_acao, pdfs):

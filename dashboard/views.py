@@ -228,15 +228,15 @@ def dados(request):
     # decisao do cliente).
     rotulos_criticidade = dict(RadCanaleta.GRAU_CRITICIDADE_CHOICES)
     canaleta_por_criticidade_bruto = list(
-        queryset.filter(canaleta__isnull=False)
-        .values('canaleta__grau_criticidade')
+        queryset.filter(canaleta_itens__isnull=False)
+        .values('canaleta_itens__grau_criticidade')
         .annotate(total=Count('id_rad', distinct=True))
-        .order_by('canaleta__grau_criticidade')
+        .order_by('canaleta_itens__grau_criticidade')
     )
     canaleta_por_criticidade = [
         {
-            'grau': item['canaleta__grau_criticidade'],
-            'rotulo': rotulos_criticidade.get(item['canaleta__grau_criticidade'], item['canaleta__grau_criticidade']),
+            'grau': item['canaleta_itens__grau_criticidade'],
+            'rotulo': rotulos_criticidade.get(item['canaleta_itens__grau_criticidade'], item['canaleta_itens__grau_criticidade']),
             'total': item['total'],
         }
         for item in canaleta_por_criticidade_bruto
@@ -304,10 +304,10 @@ def exportar_excel(request):
     """
     queryset = Rad.objects.select_related(
         'local_inicial', 'local_final', 'tipo_manutencao', 'usuario',
-        'motivo_atraso_inicio', 'motivo_atraso_termino', 'canaleta',
+        'motivo_atraso_inicio', 'motivo_atraso_termino',
     ).prefetch_related(
         'linhas', 'vias', 'equipes', 'servicos__servico', 'amv_blocos__mch', 'colaboradores',
-        'canaleta__anomalias', 'canaleta__lados', 'canaleta__dimensoes',
+        'canaleta_itens__anomalias', 'canaleta_itens__lados', 'canaleta_itens__dimensoes',
     ).filter(status=Rad.SINCRONIZADO).order_by('numero_rad')
 
     queryset = _aplicar_filtros(queryset, request.GET)

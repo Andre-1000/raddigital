@@ -219,6 +219,16 @@ class Rad(models.Model):
     # que ainda nao foi exportado (data_ultima_exportacao_excel IS
     # NULL), sem controle manual.
     data_ultima_exportacao_excel = models.DateTimeField(null=True, blank=True)
+    # data_ultimo_envio_drive (15/09/2026): mesmo padrao do campo
+    # acima -- NULL = nunca foi enviado ao Google Drive com sucesso.
+    # A partir desta mudanca, todo "Sincronizar" tenta enviar ao Drive
+    # em seguida automaticamente (nao e mais uma escolha separada) --
+    # mas essa segunda etapa pode falhar (sem internet naquele
+    # instante, API fora do ar, etc.) mesmo com o RAD ja sincronizado
+    # com sucesso. Este campo e o que permite avisar, na tela de
+    # Consulta e no detalhe do RAD, quais RADs ainda precisam ser
+    # reenviados ao Drive manualmente.
+    data_ultimo_envio_drive = models.DateTimeField(null=True, blank=True)
     status = models.CharField(
         max_length=20, choices=STATUS_CHOICES, default=SINCRONIZADO
     )
@@ -618,17 +628,38 @@ class RadAnexo(models.Model):
 
 class RadCanaleta(models.Model):
     """
-    30/07/2026: bloco "Anomalias" -- aberto quando o servico "Inspeção
-    de Canaleta" (area infra, CatServico.requer_canaleta) e
-    selecionado. Diferente do bloco AMV (que pode se repetir varias
-    vezes por RAD, um por MCH), aqui e sempre 1-para-1 com o RAD --
-    so existe uma inspecao de canaleta por RAD.
+    "Anomalias Observadas" (nome exibido na tela -- classe interna
+    mantida como RadCanaleta por compatibilidade de codigo/banco).
 
-    14/08/2026: ganhou o campo justificativa (texto livre, exigido pela
-    validacao -- VLD-045 -- somente quando grau_criticidade e Media,
-    Alta ou Critica). As antigas 5 medidas fixas (largura/altura/
-    comprimento) saíram daqui e viraram uma lista repetivel -- ver
-    RadCanaletaDimensao.
+    15/09/2026 (redesenhado): deixou de ser 1-para-1 com o RAD e virou
+    repetivel, mesmo padrao do bloco AMV -- ate LIMITE_ITENS_CANALETA
+    "Itens" por RAD (ver rad/validadores.py), cada um com seu proprio
+    Grau de Criticidade, Anomalias, Justificativa, Necessita Cautela,
+    Lado e Dimensoes. Bloco inteiro e OPCIONAL -- mesmo com o servico
+    "Inspeção de Canaleta" selecionado, zero itens e valido (decisao
+    do cliente); quando um item E adicionado, os campos dentro dele
+    continuam validados normalmente.
+
+    As 7 medidas de Dimensoes (antes uma lista separada e repetivel,
+    RadCanaletaDimensao, com botao "adicionar linha") viraram campos
+    DIRETOS aqui -- cada Item agora tem exatamente um conjunto de
+    medidas, sem lista aninhada. RadCanaletaDimensao NAO foi removida
+    do banco -- RADs sincronizados antes desta mudanca continuam com
+    os dados la, intactos (podem ter varias linhas) -- so parou de
+    receber registros novos a partir de agora.
+
+    Cada uma das 7 medidas pode ficar em branco quando marcada como
+    "Não identificado" no formulario -- por isso sao todas nullable.
+    Um valor NULL aqui SEMPRE significa "marcado como nao
+    identificado" num item novo (nunca "esquecido" -- a validacao
+    exige, pra cada campo, ou um valor ou a marcacao explicita) --
+    exceto em itens ANTIGOS (antes desta mudanca), onde NULL so
+    significa "esta informacao vivia em RadCanaletaDimensao, nao
+    aqui".
+
+    15/09/2026: Justificativa deixou de ser obrigatoria em QUALQUER
+    situacao (antes era exigida quando grau_criticidade era Media,
+    Alta ou Critica -- essa regra foi removida a pedido do cliente).
     """
 
     BAIXA = 'baixa'
@@ -642,26 +673,31 @@ class RadCanaleta(models.Model):
         (CRITICA, 'Crítica'),
     ]
 
-    rad = models.OneToOneField(
-        Rad, on_delete=models.CASCADE, related_name='canaleta', db_column='id_rad'
+    rad = models.ForeignKey(
+        Rad, on_delete=models.CASCADE, related_name='canaleta_itens', db_column='id_rad'
     )
     grau_criticidade = models.CharField(max_length=10, choices=GRAU_CRITICIDADE_CHOICES)
-    justificativa = models.TextField(
-        null=True, blank=True,
-        help_text=(
-            'Obrigatoria (VLD-045) quando grau_criticidade e Media, Alta '
-            'ou Critica. Sem limite de caracteres.'
-        ),
-    )
+    justificativa = models.TextField(null=True, blank=True)
     necessita_cautela = models.BooleanField()
+
+    # --- Dimensoes (15/09/2026: campos diretos, um conjunto por Item --
+    # ver docstring da classe) ---
+    largura_inicial = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    largura_final = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    altura_inicial = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    altura_final = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    comprimento = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    km_poste_inicial = models.CharField(max_length=20, null=True, blank=True)
+    km_poste_final = models.CharField(max_length=20, null=True, blank=True)
 
     class Meta:
         db_table = 'rad_canaleta'
-        verbose_name = 'Bloco Anomalias (Canaleta)'
-        verbose_name_plural = 'Blocos Anomalias (Canaleta)'
+        verbose_name = 'Anomalia Observada'
+        verbose_name_plural = 'Anomalias Observadas'
+        ordering = ['id']
 
     def __str__(self):
-        return f'Canaleta de {self.rad.numero_rad}'
+        return f'Anomalia Observada de {self.rad.numero_rad}'
 
 
 class RadCanaletaDimensao(models.Model):
@@ -672,6 +708,11 @@ class RadCanaletaDimensao(models.Model):
     do bloco Canaleta em vez de apontar direto pro Rad. 'ordem' guarda a
     posicao em que a linha foi preenchida no formulario, para exibir na
     mesma sequencia depois.
+
+    15/09/2026: DESCONTINUADA para registros novos -- as 7 medidas
+    viraram campos diretos em RadCanaleta (ver docstring daquela
+    classe). Este model/tabela NAO foi removido -- RADs sincronizados
+    antes desta mudanca continuam com os dados aqui, intactos.
     """
 
     canaleta = models.ForeignKey(

@@ -193,6 +193,11 @@ def _linha_resumo(rad):
         # ver, sem precisar abrir o detalhe, se o RAD ja entrou em
         # alguma exportacao Excel.
         'exportado_excel': rad.data_ultima_exportacao_excel is not None,
+        # 15/09/2026: usado por qualquer um com acesso a Consulta
+        # (nao so Administrador) para achar rapido quais RADs ainda
+        # nao foram enviados ao Google Drive -- ver
+        # exportar_docx_drive, que e quem marca esse campo.
+        'enviado_drive': rad.data_ultimo_envio_drive is not None,
     }
 
 
@@ -326,37 +331,50 @@ def _amv_resumo(rad):
 
 def _canaleta_resumo(rad):
     """
-    21/08/2026: bloco "Anomalias" (Canaleta) -- achado em auditoria:
-    era preenchido no formulario, validado e salvo no banco
-    corretamente, mas nunca aparecia de volta em nenhum lugar (nem na
-    tela de Consulta, nem na exportacao Word/Excel). Retorna None
-    quando o RAD nao tem esse bloco (servico "Inspecao de Canaleta"
-    nao selecionado) -- e sempre 1-para-1 com o RAD (RadCanaleta e
-    OneToOneField), nunca uma lista, ao contrario do bloco AMV.
+    "Anomalias Observadas" (21/08/2026, redesenhado 15/09/2026):
+    retorna uma LISTA de Itens agora, nao mais um unico objeto (nem
+    None) -- mesmo padrao do bloco AMV, ate 15 itens por RAD. Lista
+    vazia = nenhum item registrado (bloco e opcional).
+
+    RADs sincronizados antes desta mudanca tem exatamente 1 item, com
+    as Dimensoes guardadas na tabela antiga (RadCanaletaDimensao,
+    possivelmente varias linhas) em vez dos 7 campos diretos novos --
+    por isso cada item devolve tanto 'dimensao' (o conjunto novo,
+    todo None se o item for antigo) quanto 'dimensoes_antigas' (lista,
+    vazia se o item for novo). O frontend decide qual mostrar.
     """
-    canaleta = getattr(rad, 'canaleta', None)
-    if canaleta is None:
-        return None
-    return {
-        'grau_criticidade': canaleta.get_grau_criticidade_display(),
-        'necessita_cautela': canaleta.necessita_cautela,
-        'justificativa': canaleta.justificativa,
-        'anomalias': [a.get_anomalia_display() for a in canaleta.anomalias.all()],
-        'lados': [l.get_lado_display() for l in canaleta.lados.all()],
-        'dimensoes': [
-            {
-                'ordem': d.ordem,
-                'largura_inicial': str(d.largura_inicial),
-                'largura_final': str(d.largura_final),
-                'altura_inicial': str(d.altura_inicial),
-                'altura_final': str(d.altura_final),
-                'comprimento': str(d.comprimento),
-                'km_poste_inicial': d.km_poste_inicial,
-                'km_poste_final': d.km_poste_final,
-            }
-            for d in canaleta.dimensoes.all()
-        ],
-    }
+    itens = []
+    for canaleta in rad.canaleta_itens.all():
+        itens.append({
+            'grau_criticidade': canaleta.get_grau_criticidade_display(),
+            'necessita_cautela': canaleta.necessita_cautela,
+            'justificativa': canaleta.justificativa,
+            'anomalias': [a.get_anomalia_display() for a in canaleta.anomalias.all()],
+            'lados': [l.get_lado_display() for l in canaleta.lados.all()],
+            'dimensao': {
+                'largura_inicial': str(canaleta.largura_inicial) if canaleta.largura_inicial is not None else None,
+                'largura_final': str(canaleta.largura_final) if canaleta.largura_final is not None else None,
+                'altura_inicial': str(canaleta.altura_inicial) if canaleta.altura_inicial is not None else None,
+                'altura_final': str(canaleta.altura_final) if canaleta.altura_final is not None else None,
+                'comprimento': str(canaleta.comprimento) if canaleta.comprimento is not None else None,
+                'km_poste_inicial': canaleta.km_poste_inicial,
+                'km_poste_final': canaleta.km_poste_final,
+            },
+            'dimensoes_antigas': [
+                {
+                    'ordem': d.ordem,
+                    'largura_inicial': str(d.largura_inicial),
+                    'largura_final': str(d.largura_final),
+                    'altura_inicial': str(d.altura_inicial),
+                    'altura_final': str(d.altura_final),
+                    'comprimento': str(d.comprimento),
+                    'km_poste_inicial': d.km_poste_inicial,
+                    'km_poste_final': d.km_poste_final,
+                }
+                for d in canaleta.dimensoes.all()
+            ],
+        })
+    return itens
 
 
 def nome_de_quem_preencheu(rad):
@@ -492,6 +510,13 @@ def exportar_docx_drive(request, numero_rad):
             status=502,
         )
 
+    # 15/09/2026: so marca como enviado DEPOIS do upload confirmado --
+    # se a excecao acima disparasse antes, este campo continuaria NULL,
+    # exatamente o que sustenta o aviso "ainda nao enviado ao Drive"
+    # na tela de Consulta e no detalhe do RAD.
+    rad.data_ultimo_envio_drive = timezone.now()
+    rad.save(update_fields=['data_ultimo_envio_drive'])
+
     return JsonResponse({'link': link})
 
 
@@ -556,10 +581,10 @@ def exportar_excel(request):
     """
     queryset = Rad.objects.select_related(
         'local_inicial', 'local_final', 'tipo_manutencao', 'usuario',
-        'motivo_atraso_inicio', 'motivo_atraso_termino', 'canaleta',
+        'motivo_atraso_inicio', 'motivo_atraso_termino',
     ).prefetch_related(
         'linhas', 'vias', 'equipes', 'servicos__servico', 'amv_blocos__mch', 'colaboradores',
-        'canaleta__anomalias', 'canaleta__lados', 'canaleta__dimensoes',
+        'canaleta_itens__anomalias', 'canaleta_itens__lados', 'canaleta_itens__dimensoes',
     ).order_by('numero_rad')
 
     queryset = _aplicar_filtros(queryset, request.GET)
@@ -661,9 +686,8 @@ def detalhe_rad(request, numero_rad):
         rad = Rad.objects.select_related(
             'local_inicial', 'local_final', 'tipo_manutencao', 'usuario',
             'motivo_atraso_inicio', 'motivo_atraso_termino', 'usuario_cancelamento',
-            'canaleta',
         ).prefetch_related(
-            'canaleta__anomalias', 'canaleta__lados', 'canaleta__dimensoes',
+            'canaleta_itens__anomalias', 'canaleta_itens__lados', 'canaleta_itens__dimensoes',
         ).get(numero_rad=numero_rad)
     except Rad.DoesNotExist:
         return JsonResponse({'erro': 'RAD nao encontrado.'}, status=404)
@@ -754,6 +778,7 @@ def detalhe_rad(request, numero_rad):
                 ),
                 'pode_cancelar': pode_cancelar,  # PRM-037
                 'exportacao_pdf_disponivel': _exportacao_pdf_oficial_habilitada(),
+                'enviado_drive': rad.data_ultimo_envio_drive is not None,
             }
     )
 

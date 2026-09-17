@@ -40,20 +40,30 @@ SUB_ANOMALIAS_OBSTRUIDA_CANALETA = {
 }
 LADOS_CANALETA_VALIDOS = {'direito', 'esquerdo', 'entrevia'}
 
-# 14/08/2026: Grau de Criticidade Media/Alta/Critica passa a exigir o
-# campo Justificativa (VLD-045). Baixa continua sem exigir nada extra.
-GRAUS_CRITICIDADE_EXIGEM_JUSTIFICATIVA = {'media', 'alta', 'critica'}
-
-# 14/08/2026: Dimensoes deixou de ser um conjunto fixo de 5 medidas e
-# virou uma lista de linhas repetiveis (mesmo padrao do bloco AMV) --
-# no minimo 1, no maximo LIMITE_DIMENSOES_CANALETA.
-LIMITE_DIMENSOES_CANALETA = 10
-_CAMPOS_DIMENSAO_CANALETA = {
+# 15/09/2026: "Anomalias Observadas" foi redesenhada -- virou
+# repetivel (Itens, mesmo padrao do bloco AMV), ate LIMITE_ITENS_CANALETA
+# por RAD. Bloco inteiro e OPCIONAL, mesmo com o servico selecionado
+# (decisao do cliente) -- zero itens e valido; itens que EXISTEM
+# continuam totalmente validados. Justificativa deixou de ser
+# obrigatoria em qualquer situacao (GRAUS_CRITICIDADE_EXIGEM_JUSTIFICATIVA
+# e LIMITE_DIMENSOES_CANALETA de listas de linha foram removidos --
+# Dimensoes agora e um conjunto FIXO de 7 campos por item, nao mais
+# uma lista repetivel).
+LIMITE_ITENS_CANALETA = 15
+_CAMPOS_DIMENSAO_ITEM_CANALETA = {
     'largura_inicial': 'Largura Inicial',
     'largura_final': 'Largura Final',
     'altura_inicial': 'Altura Inicial',
     'altura_final': 'Altura Final',
     'comprimento': 'Comprimento',
+    'km_poste_inicial': 'Km/Poste Inicial',
+    'km_poste_final': 'Km/Poste Final',
+}
+# Campos de Dimensao que sao NUMERICOS (validados como numero, nao
+# negativos) -- os dois de Km/Poste sao texto livre com mascara
+# propria (mesmo padrao do Km/Poste de Localizacao), sem essa checagem.
+_CAMPOS_DIMENSAO_NUMERICOS_CANALETA = {
+    'largura_inicial', 'largura_final', 'altura_inicial', 'altura_final', 'comprimento',
 }
 
 
@@ -489,111 +499,109 @@ def _validar_bloco_amv(payload, erros):
             )
 
 
-def _validar_dimensoes_canaleta(canaleta, erros):
+def _validar_dimensao_item_canaleta(item, indice, erros):
     """
-    VLD-042 (revisado 14/08/2026): Dimensoes deixou de ser um unico
-    conjunto de 5 medidas e virou uma lista de linhas (mesma ideia do
-    bloco AMV) -- no minimo 1 linha, no maximo LIMITE_DIMENSOES_CANALETA.
-    Cada linha precisa das mesmas 5 medidas de antes, todas numericas e
-    nao-negativas.
+    VLD-042 (redesenhado 15/09/2026): Dimensoes agora e um conjunto
+    FIXO de 7 campos por Item (nao mais uma lista de linhas). Cada um
+    dos 7 pode ficar vazio SE E SOMENTE SE o respectivo campo
+    '<nome>_nao_identificado' vier True no payload -- essa e a unica
+    forma valida de pular um campo, pra nunca confundir "marcado como
+    nao identificado" com "esquecido por engano".
     """
-    dimensoes = canaleta.get('dimensoes') or []
-    if not dimensoes:
-        erros.append(_erro('VLD-042', 'canaleta.dimensoes', 'Adicione ao menos uma linha de Dimensões.'))
-        return
+    dimensao = item.get('dimensao') or {}
+    prefixo = f'canaleta_itens[{indice}].dimensao'
 
-    if len(dimensoes) > LIMITE_DIMENSOES_CANALETA:
-        erros.append(
-            _erro(
-                'VLD-042', 'canaleta.dimensoes',
-                f'No máximo {LIMITE_DIMENSOES_CANALETA} linhas de Dimensões.',
+    for campo, rotulo in _CAMPOS_DIMENSAO_ITEM_CANALETA.items():
+        nao_identificado = bool(dimensao.get(f'{campo}_nao_identificado'))
+        if nao_identificado:
+            continue
+
+        valor = dimensao.get(campo)
+        if valor is None or valor == '':
+            erros.append(
+                _erro(
+                    'VLD-042', f'{prefixo}.{campo}',
+                    f'Informe {rotulo} ou marque "Não identificado" (item {indice + 1}).',
+                )
             )
-        )
+            continue
 
-    for indice, linha in enumerate(dimensoes):
-        prefixo = f'canaleta.dimensoes[{indice}]'
-        for campo, rotulo in _CAMPOS_DIMENSAO_CANALETA.items():
-            valor = linha.get(campo) if isinstance(linha, dict) else None
-            if valor is None or valor == '':
+        if campo not in _CAMPOS_DIMENSAO_NUMERICOS_CANALETA:
+            continue  # Km/Poste e texto livre, sem checagem numerica
+
+        try:
+            if float(valor) < 0:
                 erros.append(
-                    _erro('VLD-042', f'{prefixo}.{campo}', f'Informe {rotulo} na linha {indice + 1}.')
+                    _erro('VLD-042', f'{prefixo}.{campo}', f'{rotulo} não pode ser negativo (item {indice + 1}).')
                 )
-                continue
-            try:
-                if float(valor) < 0:
-                    erros.append(
-                        _erro('VLD-042', f'{prefixo}.{campo}', f'{rotulo} não pode ser negativo (linha {indice + 1}).')
-                    )
-            except (TypeError, ValueError):
-                erros.append(
-                    _erro('VLD-042', f'{prefixo}.{campo}', f'{rotulo} deve ser um número (linha {indice + 1}).')
-                )
+        except (TypeError, ValueError):
+            erros.append(
+                _erro('VLD-042', f'{prefixo}.{campo}', f'{rotulo} deve ser um número (item {indice + 1}).')
+            )
 
 
 def _validar_bloco_canaleta(payload, erros):
     """
-    VLD-040 a VLD-045 (30/07/2026, revisado 14/08/2026): bloco
-    "Anomalias", exigido somente quando o servico "Inspeção de
-    Canaleta" (CatServico.requer_canaleta) foi selecionado. Diferente
-    do bloco AMV, e um unico bloco (nao uma lista) -- so existe 1
-    inspecao de canaleta por RAD.
+    VLD-040 a VLD-044 (30/07/2026, redesenhado 15/09/2026):
+    "Anomalias Observadas", associada ao servico "Inspeção de
+    Canaleta" (CatServico.requer_canaleta). Deixou de ser um unico
+    bloco e virou uma LISTA de Itens (mesmo padrao do bloco AMV), ate
+    LIMITE_ITENS_CANALETA por RAD.
 
-    Regras em cascata adicionadas em 14/08/2026 (mesmo padrao ja usado
-    para "Outros" em Servicos/Tipo de Defeito AMV: uma opcao "guarda-
-    chuva" so libera o campo seguinte quando ela propria e escolhida):
-      - "Obstruída" marcada -> exige ao menos um tipo de obstrução
-        (Vegetação/Lastro/Lixo/Dormentes/Entulho/Terra).
-      - Grau de Criticidade Média/Alta/Crítica -> exige Justificativa.
+    15/09/2026: o bloco inteiro passou a ser OPCIONAL -- mesmo com o
+    servico selecionado, zero itens e valido (decisao do cliente).
+    Cada item que EXISTE, porem, continua totalmente validado. VLD-045
+    (Justificativa obrigatoria em criticidade alta) foi removida --
+    Justificativa nunca mais e obrigatoria, em nenhuma situacao.
+
+    Regra em cascata mantida de 14/08/2026: "Obstruída" marcada exige
+    ao menos um tipo de obstrução (Vegetação/Lastro/Lixo/Dormentes/
+    Entulho/Terra).
     """
-    servicos_ids = payload.get('servicos') or []
-    canaleta_selecionada = CatServico.objects.filter(
-        id__in=servicos_ids, requer_canaleta=True
-    ).exists()
-    if not canaleta_selecionada:
-        return
+    itens = payload.get('canaleta_itens') or []
 
-    canaleta = payload.get('canaleta') or {}
-
-    anomalias = canaleta.get('anomalias') or []
-    if not anomalias:
-        erros.append(_erro('VLD-040', 'canaleta.anomalias', 'Selecione ao menos uma Anomalia.'))
-    elif any(a not in ANOMALIAS_CANALETA_VALIDAS for a in anomalias):
-        erros.append(_erro('VLD-040', 'canaleta.anomalias', 'Anomalia inválida.'))
-    elif 'obstruida' in anomalias and not any(
-        a in SUB_ANOMALIAS_OBSTRUIDA_CANALETA for a in anomalias
-    ):
+    if len(itens) > LIMITE_ITENS_CANALETA:
         erros.append(
             _erro(
-                'VLD-040', 'canaleta.anomalias',
-                'Selecione ao menos um tipo de obstrução (Vegetação, Lastro, Lixo, Dormentes, Entulho ou Terra).',
+                'VLD-040', 'canaleta_itens',
+                f'No máximo {LIMITE_ITENS_CANALETA} itens de Anomalias Observadas.',
             )
         )
 
-    grau = canaleta.get('grau_criticidade')
-    if not grau:
-        erros.append(_erro('VLD-041', 'canaleta.grau_criticidade', 'Selecione o Grau de Criticidade.'))
-    elif grau not in GRAUS_CRITICIDADE_VALIDOS:
-        erros.append(_erro('VLD-041', 'canaleta.grau_criticidade', 'Grau de Criticidade inválido.'))
-    elif grau in GRAUS_CRITICIDADE_EXIGEM_JUSTIFICATIVA and not str(
-        canaleta.get('justificativa') or ''
-    ).strip():
-        erros.append(
-            _erro(
-                'VLD-045', 'canaleta.justificativa',
-                'Informe a Justificativa quando o Grau de Criticidade for Média, Alta ou Crítica.',
+    for indice, item in enumerate(itens):
+        prefixo = f'canaleta_itens[{indice}]'
+
+        anomalias = item.get('anomalias') or []
+        if not anomalias:
+            erros.append(_erro('VLD-040', f'{prefixo}.anomalias', f'Selecione ao menos uma Anomalia (item {indice + 1}).'))
+        elif any(a not in ANOMALIAS_CANALETA_VALIDAS for a in anomalias):
+            erros.append(_erro('VLD-040', f'{prefixo}.anomalias', 'Anomalia inválida.'))
+        elif 'obstruida' in anomalias and not any(
+            a in SUB_ANOMALIAS_OBSTRUIDA_CANALETA for a in anomalias
+        ):
+            erros.append(
+                _erro(
+                    'VLD-040', f'{prefixo}.anomalias',
+                    f'Selecione ao menos um tipo de obstrução (item {indice + 1}).',
+                )
             )
-        )
 
-    _validar_dimensoes_canaleta(canaleta, erros)
+        grau = item.get('grau_criticidade')
+        if not grau:
+            erros.append(_erro('VLD-041', f'{prefixo}.grau_criticidade', f'Selecione o Grau de Criticidade (item {indice + 1}).'))
+        elif grau not in GRAUS_CRITICIDADE_VALIDOS:
+            erros.append(_erro('VLD-041', f'{prefixo}.grau_criticidade', 'Grau de Criticidade inválido.'))
 
-    if canaleta.get('necessita_cautela') is None:
-        erros.append(_erro('VLD-043', 'canaleta.necessita_cautela', 'Informe se necessita de cautela.'))
+        _validar_dimensao_item_canaleta(item, indice, erros)
 
-    lados = canaleta.get('lados') or []
-    if not lados:
-        erros.append(_erro('VLD-044', 'canaleta.lados', 'Selecione ao menos um Lado.'))
-    elif any(l not in LADOS_CANALETA_VALIDOS for l in lados):
-        erros.append(_erro('VLD-044', 'canaleta.lados', 'Lado inválido.'))
+        if item.get('necessita_cautela') is None:
+            erros.append(_erro('VLD-043', f'{prefixo}.necessita_cautela', f'Informe se necessita de cautela (item {indice + 1}).'))
+
+        lados = item.get('lados') or []
+        if not lados:
+            erros.append(_erro('VLD-044', f'{prefixo}.lados', f'Selecione ao menos um Lado (item {indice + 1}).'))
+        elif any(l not in LADOS_CANALETA_VALIDOS for l in lados):
+            erros.append(_erro('VLD-044', f'{prefixo}.lados', 'Lado inválido.'))
 
 
 def _remover_erros_de_campos_desabilitados(erros):
