@@ -51,12 +51,66 @@ def _obter_servico():
     return build('drive', 'v3', credentials=credenciais, cache_discovery=False)
 
 
+def arquivo_existe_no_drive(nome_arquivo):
+    """
+    17/09/2026: verifica se ja existe um arquivo com este nome exato
+    na pasta configurada (GOOGLE_DRIVE_FOLDER_ID), ignorando os que
+    estao na lixeira. Deve ser chamada ANTES de salvar_docx_no_drive.
+
+    Por que existe (achado em producao): o Google Drive permite varios
+    arquivos com o MESMO NOME na mesma pasta -- diferente de um
+    sistema de arquivos comum, onde o segundo "create" com o mesmo
+    nome falharia ou sobrescreveria. salvar_docx_no_drive sempre cria
+    um arquivo novo, sem checar nada -- entao cada chamada (o envio
+    automatico logo apos a sincronizacao + cada clique manual em
+    "Salvar no Drive") gerava uma copia nova. Caso real: RAD R00214
+    chegou a ter 3 copias na pasta.
+
+    Levanta DriveNaoConfiguradoError nas mesmas condicoes de
+    salvar_docx_no_drive -- quem chama trata do mesmo jeito (503).
+
+    Retorna True se ja existe, False caso contrario. nome_arquivo e
+    escapado (aspas simples) antes de entrar na query da API por
+    seguranca defensiva -- na pratica esse valor e sempre gerado
+    internamente (f'{rad.numero_rad}.docx', formato fixo R00000.docx),
+    nunca digitado por um usuario.
+    """
+    if not esta_configurado():
+        raise DriveNaoConfiguradoError(
+            'Integração com Google Drive não configurada. Contate o Administrador.'
+        )
+
+    nome_escapado = nome_arquivo.replace("'", "\\'")
+    servico = _obter_servico()
+    resultado = servico.files().list(
+        q=(
+            f"name = '{nome_escapado}' "
+            f"and '{os.environ['GOOGLE_DRIVE_FOLDER_ID']}' in parents "
+            f"and trashed = false"
+        ),
+        fields='files(id)',
+        pageSize=1,
+        # Mesmo motivo de supportsAllDrives=True em salvar_docx_no_drive
+        # (ver docstring abaixo) -- sem os dois parametros, a busca
+        # simplesmente nao enxerga nada dentro de um Shared Drive.
+        supportsAllDrives=True,
+        includeItemsFromAllDrives=True,
+    ).execute()
+    return bool(resultado.get('files'))
+
+
 def salvar_docx_no_drive(nome_arquivo, docx_bytes):
     """
     Sobe o arquivo .docx (bytes ja gerados por
     rad/exportacao_oficial.py::gerar_docx_oficial_bytes) para a pasta
     configurada em GOOGLE_DRIVE_FOLDER_ID. Retorna o link (webViewLink)
     do arquivo no Drive -- que ja abre direto no Google Docs.
+
+    17/09/2026: NAO faz nenhuma checagem de duplicata sozinha -- quem
+    chama deve ter chamado arquivo_existe_no_drive antes e confirmado
+    que nao existe (ver consulta/views.py::exportar_docx_drive). Esta
+    funcao permanece "burra" de proposito (so cria), pra manter as
+    duas responsabilidades separadas: verificar e criar.
 
     Levanta DriveNaoConfiguradoError se as variaveis de ambiente nao
     estiverem definidas -- quem chama deve tratar isso como uma

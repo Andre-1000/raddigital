@@ -479,6 +479,22 @@ def exportar_docx_drive(request, numero_rad):
     direto no Google Docs, no navegador, sem instalar nada. Mesma
     regra de acesso das demais exportacoes (_pode_exportar).
 
+    17/09/2026: antes de gerar/subir qualquer coisa, verifica se ja
+    existe um arquivo com esse nome na pasta do Drive
+    (arquivo_existe_no_drive) -- achado em producao: o Drive permite
+    varios arquivos com o mesmo nome na mesma pasta, entao sem essa
+    checagem cada chamada (o envio automatico da sincronizacao + cada
+    clique manual em "Salvar no Drive") criava uma copia nova (RAD
+    R00214 chegou a ter 3). A checagem roda ANTES de gerar o .docx de
+    proposito -- gerar o Word e o passo mais custoso desta view, e nao
+    tem sentido gastar esse processamento so pra descobrir depois que
+    o arquivo ja existia.
+
+    Se ja existir, nao sobe nada -- devolve 409 com uma mensagem
+    explicando isso (e aproveita pra corrigir data_ultimo_envio_drive
+    se por algum motivo ainda estivesse NULL, ver comentario abaixo).
+    Se nao existir, gera o Word e sobe, exatamente como antes.
+
     Retorna o link do arquivo no Drive em vez do arquivo em si -- quem
     chama (JS) abre esse link numa aba nova.
     """
@@ -490,13 +506,43 @@ def exportar_docx_drive(request, numero_rad):
     if not _pode_exportar(request.usuario_rad, rad):
         return JsonResponse({'erro': 'Acesso nao autorizado.'}, status=403)
 
+    from rad.google_drive import DriveNaoConfiguradoError, arquivo_existe_no_drive, salvar_docx_no_drive
+
+    nome_arquivo = f'{rad.numero_rad}.docx'
+
+    try:
+        ja_existe = arquivo_existe_no_drive(nome_arquivo)
+    except DriveNaoConfiguradoError as erro:
+        return JsonResponse({'erro': str(erro)}, status=503)
+    except Exception as erro:
+        print(f'[ERRO] Falha ao verificar existencia de {nome_arquivo} no Google Drive: {erro!r}')
+        return JsonResponse(
+            {'erro': 'Não foi possível verificar o Google Drive. Tente novamente ou contate o Administrador.'},
+            status=502,
+        )
+
+    if ja_existe:
+        # 17/09/2026: o arquivo ja existe -- corrige
+        # data_ultimo_envio_drive se ainda estivesse NULL (caso raro:
+        # o envio automatico da sincronizacao deu certo no Drive, mas
+        # a resposta nao chegou ao cliente por instabilidade de rede,
+        # entao o campo nunca foi marcado). Sem isso, o aviso "ainda
+        # nao enviado ao Drive" ficaria preso na tela mesmo com o
+        # arquivo realmente la.
+        if rad.data_ultimo_envio_drive is None:
+            rad.data_ultimo_envio_drive = timezone.now()
+            rad.save(update_fields=['data_ultimo_envio_drive'])
+        return JsonResponse(
+            {'erro': f'Já existe um arquivo "{nome_arquivo}" no Google Drive. Nada foi enviado novamente.'},
+            status=409,
+        )
+
     from rad.exportacao_oficial import gerar_docx_oficial_bytes
-    from rad.google_drive import DriveNaoConfiguradoError, salvar_docx_no_drive
 
     docx_bytes = gerar_docx_oficial_bytes(rad)
 
     try:
-        link = salvar_docx_no_drive(f'{rad.numero_rad}.docx', docx_bytes)
+        link = salvar_docx_no_drive(nome_arquivo, docx_bytes)
     except DriveNaoConfiguradoError as erro:
         return JsonResponse({'erro': str(erro)}, status=503)
     except Exception as erro:
@@ -504,7 +550,7 @@ def exportar_docx_drive(request, numero_rad):
         # real (falha de rede, credencial revogada, cota excedida etc.)
         # precisa aparecer no log do Render pra dar pra diagnosticar.
         # Mesmo padrao ja usado para falha de envio de e-mail (SMTP).
-        print(f'[ERRO] Falha ao salvar {rad.numero_rad}.docx no Google Drive: {erro!r}')
+        print(f'[ERRO] Falha ao salvar {nome_arquivo} no Google Drive: {erro!r}')
         return JsonResponse(
             {'erro': 'Não foi possível salvar no Google Drive. Tente novamente ou contate o Administrador.'},
             status=502,
