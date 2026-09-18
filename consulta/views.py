@@ -11,7 +11,10 @@ proprio login.
 layout oficial (rad/exportacao_oficial.py) -- o antigo layout simples
 (rad/exportacao.py, endpoints /pdf/ e /docx/) foi descontinuado.
 
-21/08/2026: nova exportacao em Excel (rad/exportacao_excel.py) --
+21/08/2026: nova exportacao em Excel (rad/exportacao_excel.py).
+17/09/2026: deixou de ser exclusiva do Administrador -- ver
+exportar_excel (Supervisor tambem, no resultado da Consulta) e
+exportar_meus_rads_excel (qualquer usuario, so os proprios RADs).
 
 21/08/2026: filtro por Servico executado (area + servico especifico +
 "Outros" solto) -- ver _aplicar_filtros. Isso muda a regra PRM-030
@@ -62,6 +65,11 @@ def _aplicar_filtros(queryset, params):
     explicitas: MCH e Linha da MCH (do bloco AMV, valor unico por RAD),
     e -- desde 21/08/2026 -- Servico executado (ver bloco
     servico_areas/servico_ids/servico_outros abaixo).
+
+    17/09/2026: o filtro status_exportacao (Exportado/Nao exportado)
+    foi removido junto com o selo correspondente na tela -- a
+    exportacao Excel deixou de ter qualquer acompanhamento visual de
+    quem ja exportou o que.
     """
     if params.get('numero_rad'):
         queryset = queryset.filter(numero_rad=params['numero_rad'])
@@ -107,17 +115,6 @@ def _aplicar_filtros(queryset, params):
         queryset = queryset.filter(
             data_hora_real_inicio__lte=parse_datetime_aware(params['hr_inicio_ate'])
         )
-    # status_exportacao (21/08/2026): filtro do Administrador na tela
-    # de Consulta para mostrar so RADs ja exportados para Excel, so os
-    # nao exportados, ou todos (sem informar o parametro). Reaproveitado
-    # tanto por listar_rads (o que aparece na tela) quanto por
-    # exportar_excel (o que entra no arquivo) -- garante que o botao
-    # "Exportar" sempre exporta exatamente os RADs que estao sendo
-    # exibidos como resultado da pesquisa, nunca um conjunto diferente.
-    if params.get('status_exportacao') == 'exportado':
-        queryset = queryset.filter(data_ultima_exportacao_excel__isnull=False)
-    elif params.get('status_exportacao') == 'nao_exportado':
-        queryset = queryset.filter(data_ultima_exportacao_excel__isnull=True)
 
     # Servico executado (21/08/2026) -- tres formas de marcar, todas
     # combinadas em OR entre si e com o mesmo comportamento do filtro
@@ -189,10 +186,6 @@ def _linha_resumo(rad):
         'hora_prog_inicio': rad.hora_prog_inicio.isoformat(),
         'hora_real_inicio': rad.hora_real_inicio.isoformat(),
         'dispositivo': rad.get_dispositivo_display(),
-        # 21/08/2026: usado pelo Administrador na tela de Consulta para
-        # ver, sem precisar abrir o detalhe, se o RAD ja entrou em
-        # alguma exportacao Excel.
-        'exportado_excel': rad.data_ultima_exportacao_excel is not None,
         # 15/09/2026: usado por qualquer um com acesso a Consulta
         # (nao so Administrador) para achar rapido quais RADs ainda
         # nao foram enviados ao Google Drive -- ver
@@ -610,20 +603,25 @@ def exportar_pdf_oficial(request, numero_rad):
 
 
 @requer_token
-@requer_perfil(UsuarioPerfil.ADMINISTRADOR)
+@requer_perfil(UsuarioPerfil.SUPERVISOR, UsuarioPerfil.ADMINISTRADOR)
 def exportar_excel(request):
     """
-    GET /consulta/rads/exportar-excel/?<mesmos filtros de listar_rads, incluindo status_exportacao>
-    21/08/2026. Acesso: somente Administrador -- essa tela fica
-    reservada, diferente da Consulta (Supervisor+Administrador).
+    GET /consulta/rads/exportar-excel/?<mesmos filtros de listar_rads>
+    21/08/2026. Acesso: Supervisor e Administrador -- mesmo grupo que
+    ja acessa a tela de Consulta (listar_rads). Ate 17/09/2026 era
+    exclusivo do Administrador; passou a acompanhar o mesmo acesso da
+    tela, ja que exportar e so uma forma de levar embora o resultado
+    de uma consulta que a pessoa ja podia ver na tela.
 
     Exporta exatamente o mesmo conjunto de RADs que a tela de Consulta
     mostra como resultado com os filtros aplicados (mesma funcao
-    _aplicar_filtros de listar_rads) -- nao ha regra implicita de "so
-    exporta o que nunca foi exportado" aqui; quem decide isso e o
-    filtro status_exportacao ('exportado' / 'nao_exportado' / ausente
-    = todos), escolhido pelo Administrador na propria tela antes de
-    clicar em "Exportar".
+    _aplicar_filtros de listar_rads).
+
+    17/09/2026: nao ha mais nenhum filtro/selo de "ja exportado" --
+    cada clique so gera o arquivo com o resultado atual da consulta,
+    sem acompanhamento de quem ja exportou o que antes. Para a
+    exportacao do proprio usuario comum (tela "RADs Preenchidos"), ver
+    exportar_meus_rads_excel.
     """
     queryset = Rad.objects.select_related(
         'local_inicial', 'local_final', 'tipo_manutencao', 'usuario',
@@ -657,6 +655,59 @@ def exportar_excel(request):
         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     )
     nome_arquivo = f'rads_export_{agora.strftime("%Y%m%d_%H%M%S")}.xlsx'
+    resposta['Content-Disposition'] = f'attachment; filename="{nome_arquivo}"'
+    return resposta
+
+
+@requer_token
+def exportar_meus_rads_excel(request):
+    """
+    GET /consulta/meus-rads/exportar-excel/
+    17/09/2026. Espelha listar_meus_rads: qualquer usuario autenticado,
+    qualquer perfil, exporta em Excel SOMENTE os proprios RADs -- os
+    mesmos que aparecem na tela "RADs Preenchidos". Sem filtros (essa
+    tela nao tem filtro nenhum, so pagina e mostra tudo que a pessoa
+    mesma preencheu) -- ignora deliberadamente qualquer parametro que
+    venha na URL, ao contrario de exportar_excel.
+
+    Existe separada de exportar_excel (em vez de uma unica view
+    decidindo por perfil) para casar exatamente com a divisao ja
+    existente entre listar_rads/listar_meus_rads -- assim um
+    Supervisor ou Administrador que abrir "RADs Preenchidos" tambem
+    exporta so os proprios RADs por ali, igual a qualquer um, em vez
+    de acidentalmente levar o RAD de todo mundo so por ter perfil
+    administrativo.
+    """
+    queryset = Rad.objects.select_related(
+        'local_inicial', 'local_final', 'tipo_manutencao', 'usuario',
+        'motivo_atraso_inicio', 'motivo_atraso_termino',
+    ).prefetch_related(
+        'linhas', 'vias', 'equipes', 'servicos__servico', 'amv_blocos__mch', 'colaboradores',
+        'canaleta_itens__anomalias', 'canaleta_itens__lados', 'canaleta_itens__dimensoes',
+    ).filter(usuario_id=request.usuario_rad.login).order_by('numero_rad')
+
+    rads = list(queryset)
+
+    if not rads:
+        return JsonResponse(
+            {'erro': 'Você ainda não tem nenhum RAD preenchido para exportar.'},
+            status=404,
+        )
+
+    from rad.exportacao_excel import gerar_excel_bytes
+
+    excel_bytes = gerar_excel_bytes(rads)
+
+    agora = timezone.now()
+    Rad.objects.filter(id_rad__in=[rad.id_rad for rad in rads]).update(
+        data_ultima_exportacao_excel=agora
+    )
+
+    resposta = HttpResponse(
+        excel_bytes,
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
+    nome_arquivo = f'meus_rads_export_{agora.strftime("%Y%m%d_%H%M%S")}.xlsx'
     resposta['Content-Disposition'] = f'attachment; filename="{nome_arquivo}"'
     return resposta
 

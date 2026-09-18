@@ -23,8 +23,12 @@
 -- "Bolsão", "Retirada de Objeto da Via" -- todos servicos simples,
 -- sem bloco especial associado (confirmado com o cliente).
 -- Mudança de negócio 17/09/2026: adicionado ao grupo Corretiva --
--- "Executado por outra equipe" -- serviço simples, sem bloco
--- especial associado.
+-- "Executado por outra equipe".
+-- Mudança de negócio 17/09/2026 (revisão do mesmo dia): adicionados
+-- ao grupo Corretiva -- "Socaria em via corrida" e "Socaria em AMV"
+-- (substituem "Socadora", que foi DESATIVADA -- o grupo Mecanizada
+-- ja tinha um servico de nome parecido, mas o cliente quer a Socaria
+-- separada por contexto dentro de Corretiva).
 -- Nenhum serviço é removido de verdade do banco — RadServico tem FK
 -- PROTECT contra CatServico e RADs antigos podem referenciá-los.
 --
@@ -62,10 +66,12 @@ INSERT INTO cat_servicos (nome, descricao, requer_amv, requer_descricao, requer_
   ('Bolsão', 'Serviço do grupo Corretiva.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'corretiva', TRUE),
   ('Retirada de Objeto da Via', 'Serviço do grupo Corretiva.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'corretiva', TRUE),
   ('Executado por outra equipe', 'Serviço do grupo Corretiva.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'corretiva', TRUE),
+  ('Socaria em via corrida', 'Serviço do grupo Corretiva.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'corretiva', TRUE),
+  ('Socaria em AMV', 'Serviço do grupo Corretiva.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'corretiva', TRUE),
   ('Esmerilhadora', 'Serviço do grupo Mecanizada.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'mecanizada', TRUE),
   ('Desguarnecedora', 'Serviço do grupo Mecanizada.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'mecanizada', TRUE),
   ('Descarga de lastro', 'Serviço do grupo Mecanizada.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'mecanizada', TRUE),
-  ('Socadora', 'Serviço do grupo Mecanizada.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'mecanizada', TRUE),
+  ('Socadora', 'Serviço do grupo Mecanizada.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'mecanizada', FALSE),
   ('Outros', 'Serviço não contemplado na lista padrão. Ao selecionar esta opção, o sistema exibe automaticamente um campo de texto para descrição do serviço.', FALSE, TRUE, FALSE, FALSE, FALSE, FALSE, 'geral', TRUE)
 ON CONFLICT (nome) DO UPDATE SET
   descricao = EXCLUDED.descricao,
@@ -78,5 +84,5 @@ ON CONFLICT (nome) DO UPDATE SET
   area = EXCLUDED.area,
   ativo = EXCLUDED.ativo;
 
--- Total: 31 registros (6 inativos: Ajuste, Limpeza, Lubrificação,
--- Esmerilhamento, Socaria, Controle de Vegetação)
+-- Total: 33 registros (7 inativos: Ajuste, Limpeza, Lubrificação,
+-- Esmerilhamento, Socaria, Controle de Vegetação, Socadora)

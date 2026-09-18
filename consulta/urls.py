@@ -9,8 +9,15 @@ urlpatterns = [
     path('meus-rads/', views.listar_meus_rads, name='listar_meus_rads'),
     # exportar-excel/ precisa vir ANTES de rads/<str:numero_rad>/ --
     # senao o Django casaria "exportar-excel" como se fosse um
-    # numero_rad, e essa rota nunca seria alcancada.
+    # numero_rad, e essa rota nunca seria alcancada. Mesmo motivo pra
+    # meus-rads/exportar-excel/ vir antes de meus-rads/ na ordem de
+    # leitura nao importa aqui (prefixos diferentes), mas mantido
+    # perto da rota irma por clareza.
     path('rads/exportar-excel/', views.exportar_excel, name='exportar_excel'),
+    # 17/09/2026: exportacao do proprio usuario (tela "RADs
+    # Preenchidos") -- ver exportar_meus_rads_excel, espelha
+    # listar_meus_rads.
+    path('meus-rads/exportar-excel/', views.exportar_meus_rads_excel, name='exportar_meus_rads_excel'),
     path('rads/<str:numero_rad>/', views.detalhe_rad, name='detalhe_rad'),
     path('rads/<str:numero_rad>/mensagem/', views.mensagem_copiar, name='mensagem_copiar'),
     path('rads/<str:numero_rad>/docx-oficial/', views.exportar_docx_oficial, name='exportar_docx_oficial'),

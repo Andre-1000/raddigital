@@ -9,8 +9,19 @@
 
 {% block conteudo %}
 <div id="conteudo-protegido" style="display:none;">
-  <h1 style="font-size:1.3rem;">RADs Preenchidos</h1>
-  <p class="texto-suave" style="margin-top:-0.5rem;">Somente os RADs que você mesmo preencheu.</p>
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+    <div>
+      <h1 style="font-size:1.3rem;">RADs Preenchidos</h1>
+      <p class="texto-suave" style="margin-top:-0.5rem;">Somente os RADs que você mesmo preencheu.</p>
+    </div>
+    <!-- 17/09/2026: exportacao Excel deixou de ser exclusiva do
+         Administrador -- qualquer usuario pode baixar em Excel os
+         proprios RADs que aparecem nesta tela (ver
+         consulta/views.py::exportar_meus_rads_excel). -->
+    <button type="button" class="botao botao--secundaria" id="botao-exportar-excel" style="width:auto; min-height:36px; padding:0 0.9rem;">
+      Exportar Excel
+    </button>
+  </div>
 
   <div id="aviso-meus-rads" style="margin-top:1rem;"></div>
 
@@ -48,13 +59,12 @@
     }
 
     // 17/09/2026: mesmo selo "Drive" ja usado na tela de Consultar
-    // RADs (Supervisor/Administrador) -- aqui aparece pro proprio
-    // tecnico, que tambem tem interesse em saber se o RAD que ele
-    // preencheu ja foi salvo no Google Drive (o envio automatico na
-    // sincronizacao pode falhar por motivo pontual -- ver
-    // detalhe_rad.html e consulta/views.py::_linha_resumo). RAD
-    // cancelado nao tem bloco de Exportar/Drive, entao o selo fica de
-    // fora nesse caso.
+    // RADs -- aqui aparece pro proprio tecnico, que tambem tem
+    // interesse em saber se o RAD que ele preencheu ja foi salvo no
+    // Google Drive (o envio automatico na sincronizacao pode falhar
+    // por motivo pontual -- ver detalhe_rad.html e
+    // consulta/views.py::_linha_resumo). RAD cancelado nao tem bloco
+    // de Exportar/Drive, entao o selo fica de fora nesse caso.
     function seloDrive(rad) {
       if (rad.status === 'cancelado') return '';
       return rad.enviado_drive
@@ -116,6 +126,45 @@
         aviso.innerHTML = '<div class="aviso aviso--erro">Erro de conexão ao carregar seus RADs.</div>';
       }
     }
+
+    // ---- Exportar Excel (17/09/2026) -------------------------------
+    // Sempre exporta TODOS os proprios RADs (sem filtro nenhum, essa
+    // tela nao tem filtro) -- ver
+    // consulta/views.py::exportar_meus_rads_excel.
+    const botaoExportar = document.getElementById('botao-exportar-excel');
+    botaoExportar.addEventListener('click', async function () {
+      aviso.innerHTML = '';
+      botaoExportar.disabled = true;
+      const textoOriginal = botaoExportar.textContent;
+      botaoExportar.textContent = 'Exportando…';
+
+      try {
+        const resposta = await RadAuth.requisicaoAutenticada('/consulta/meus-rads/exportar-excel/');
+
+        if (!resposta.ok) {
+          const corpo = await resposta.json().catch(function () { return {}; });
+          aviso.innerHTML = `<div class="aviso aviso--erro">${corpo.erro || 'Não foi possível gerar a exportação.'}</div>`;
+          return;
+        }
+
+        const blob = await resposta.blob();
+        const urlObjeto = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = urlObjeto;
+        link.download = 'meus_rads_export.xlsx';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(urlObjeto);
+
+        aviso.innerHTML = '<div class="aviso aviso--sucesso">Exportação gerada.</div>';
+      } catch (erro) {
+        aviso.innerHTML = '<div class="aviso aviso--erro">Erro de conexão ao exportar.</div>';
+      } finally {
+        botaoExportar.disabled = false;
+        botaoExportar.textContent = textoOriginal;
+      }
+    });
 
     await carregarLista(1);
   });
