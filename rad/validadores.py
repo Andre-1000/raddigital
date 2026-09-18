@@ -27,16 +27,22 @@ NOME_TIPO_MANUTENCAO_VPM001 = 'VPM001'
 # como listas simples de string (nao dependem de import do model)
 # porque a validacao roda antes de qualquer objeto ser criado.
 GRAUS_CRITICIDADE_VALIDOS = {'baixa', 'media', 'alta', 'critica'}
+# 17/09/2026: adicionada 'esgoto' -- novo tipo de obstrucao (junto de
+# Vegetacao/Lastro/Lixo/Dormentes/Entulho/Terra). Precisa estar tanto
+# aqui (validacao geral de anomalia) quanto em
+# SUB_ANOMALIAS_OBSTRUIDA_CANALETA abaixo (regra em cascata de
+# "Obstruida"). Mesmo valor usado em rad_form.js e rad/models.py
+# (RadCanaletaAnomalia.ANOMALIA_CHOICES) -- os tres precisam bater.
 ANOMALIAS_CANALETA_VALIDAS = {
     'limpa', 'obstruida', 'ausente', 'quebrada', 'vegetacao',
-    'lastro', 'lixo', 'dormentes', 'entulho', 'terra',
+    'lastro', 'lixo', 'dormentes', 'entulho', 'terra', 'esgoto',
 }
 # 14/08/2026: Vegetacao/Lastro/Lixo/Dormentes/Entulho/Terra deixaram de
 # ser anomalias "soltas" na tela -- agora sao sub-opcoes que so fazem
 # sentido (e so aparecem no formulario) quando "Obstruida" tambem foi
 # marcada. VLD-040 passa a exigir ao menos uma delas nesse caso.
 SUB_ANOMALIAS_OBSTRUIDA_CANALETA = {
-    'vegetacao', 'lastro', 'lixo', 'dormentes', 'entulho', 'terra',
+    'vegetacao', 'lastro', 'lixo', 'dormentes', 'entulho', 'terra', 'esgoto',
 }
 LADOS_CANALETA_VALIDOS = {'direito', 'esquerdo', 'entrevia'}
 
@@ -131,7 +137,7 @@ def _validar_km_poste(payload, erros):
     """
     VLD-047 (14/09/2026): Km/Poste virou dois campos (Inicial e
     Final). Cada um precisa ter ALGUM valor digitado -- nao precisa
-    estar completo (o padrao XXX/XXX + XXX pode ficar parcial), mas
+    estar completo (o padrao XX/XX + XXX pode ficar parcial), mas
     nao pode ficar vazio. Obrigatoriedade fixa, nao mais controlavel
     via Configuracoes (ver _MAPA_CHAVE_CONFIG_PARA_CAMPO_PAYLOAD acima).
     """
@@ -556,7 +562,7 @@ def _validar_bloco_canaleta(payload, erros):
 
     Regra em cascata mantida de 14/08/2026: "Obstruída" marcada exige
     ao menos um tipo de obstrução (Vegetação/Lastro/Lixo/Dormentes/
-    Entulho/Terra).
+    Entulho/Terra/Esgoto -- este ultimo adicionado 17/09/2026).
     """
     itens = payload.get('canaleta_itens') or []
 

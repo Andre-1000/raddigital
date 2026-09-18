@@ -88,8 +88,9 @@ class Rad(models.Model):
     # obrigatorio ter algum valor -- ver VLD-047). Este campo antigo
     # (km_poste) NAO foi removido -- so parou de ser preenchido em
     # RADs novos -- porque os formatos sao incompativeis entre si (o
-    # antigo era "XX/XX - XX/XX" num unico campo; o novo e "XXX/XXX +
-    # XXX" em cada um dos dois campos) e nao da pra migrar os dados
+    # antigo era "XX/XX - XX/XX" num unico campo; o novo e "XX/XX +
+    # XXX" em cada um dos dois campos, ajustado 17/09/2026 de "XXX/XXX
+    # + XXX" para o tamanho atual) e nao da pra migrar os dados
     # antigos sem inventar digitos. RADs sincronizados antes desta
     # mudanca continuam com o valor deles aqui, intacto -- ver
     # Rad.texto_km_poste, que unifica a exibicao dos dois formatos.
@@ -755,6 +756,12 @@ class RadCanaletaAnomalia(models.Model):
     DORMENTES = 'dormentes'
     ENTULHO = 'entulho'
     TERRA = 'terra'
+    # 17/09/2026: novo tipo de obstrucao -- mesmo valor usado em
+    # rad_form.js (SUB_ANOMALIAS_OBSTRUIDA_CANALETA) e
+    # rad/validadores.py (ANOMALIAS_CANALETA_VALIDAS e
+    # SUB_ANOMALIAS_OBSTRUIDA_CANALETA). Os tres precisam do mesmo
+    # valor 'esgoto' pra aceitar/exibir corretamente.
+    ESGOTO = 'esgoto'
     ANOMALIA_CHOICES = [
         (LIMPA, 'Limpa'),
         (OBSTRUIDA, 'Obstruída'),
@@ -766,6 +773,7 @@ class RadCanaletaAnomalia(models.Model):
         (DORMENTES, 'Dormentes'),
         (ENTULHO, 'Entulho'),
         (TERRA, 'Terra'),
+        (ESGOTO, 'Esgoto'),
     ]
 
     canaleta = models.ForeignKey(

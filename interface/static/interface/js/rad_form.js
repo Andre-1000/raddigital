@@ -162,8 +162,8 @@ document.addEventListener('DOMContentLoaded', async function () {
       vias: [],
       equipes: ['VP'],
       // 14/09/2026: Km/Poste virou dois campos (Inicial e Final) --
-      // ver aplicarMascaraKmPoste mais abaixo para o novo padrao
-      // "XXX/XXX + XXX".
+      // ver aplicarMascaraKmPosteNova mais abaixo. 17/09/2026: padrao
+      // mudou de "XXX/XXX + XXX" para "XX/XX + XXX".
       km_poste_inicial: '',
       km_poste_final: '',
       tipo_veiculo: '',
@@ -368,17 +368,19 @@ document.addEventListener('DOMContentLoaded', async function () {
     ['VP']
   );
 
-  // 14/09/2026: Km/Poste virou dois campos (Inicial e Final), padrao
-  // novo "XXX/XXX + XXX" (3 digitos / 3 digitos + 3 digitos). Funcao
-  // de mascara PROPRIA, separada de aplicarMascaraKmPoste (mais
-  // abaixo) -- aquela continua com o padrao antigo "XX/XX - XX/XX",
-  // ainda usado pelas linhas de Dimensoes do bloco Canaleta, que nao
-  // muda nesta mudanca.
+  // 14/09/2026: Km/Poste virou dois campos (Inicial e Final).
+  // 17/09/2026: padrao mudou de "XXX/XXX + XXX" para "XX/XX + XXX"
+  // (2 digitos / 2 digitos + 3 digitos), mesmas regras de antes --
+  // so o tamanho dos dois primeiros grupos diminuiu. Funcao de
+  // mascara PROPRIA, separada de aplicarMascaraKmPoste (mais abaixo)
+  // -- aquela continua com o padrao antigo "XX/XX - XX/XX", ainda
+  // usado pelas linhas antigas de Dimensoes (RadCanaletaDimensao,
+  // descontinuada para RADs novos).
   function aplicarMascaraKmPosteNova(valorDigitado) {
-    const digitos = valorDigitado.replace(/\D/g, '').slice(0, 9);
+    const digitos = valorDigitado.replace(/\D/g, '').slice(0, 7);
     let resultado = digitos;
-    if (digitos.length > 3) resultado = digitos.slice(0, 3) + '/' + digitos.slice(3);
-    if (digitos.length > 6) resultado = resultado.slice(0, 7) + ' + ' + digitos.slice(6);
+    if (digitos.length > 2) resultado = digitos.slice(0, 2) + '/' + digitos.slice(2);
+    if (digitos.length > 4) resultado = resultado.slice(0, 5) + ' + ' + digitos.slice(4);
     return resultado;
   }
 
@@ -1248,6 +1250,12 @@ document.addEventListener('DOMContentLoaded', async function () {
     { valor: 'ausente', rotulo: 'Ausente' },
     { valor: 'quebrada', rotulo: 'Quebrada' },
   ];
+  // 17/09/2026: adicionada "Esgoto" como tipo de obstrução, junto das
+  // demais (Vegetação, Lastro, Lixo, Dormentes, Entulho, Terra) -- ver
+  // tambem rad/validadores.py (ANOMALIAS_CANALETA_VALIDAS e
+  // SUB_ANOMALIAS_OBSTRUIDA_CANALETA) e rad/models.py
+  // (RadCanaletaAnomalia.ANOMALIA_CHOICES), que precisam do mesmo
+  // valor 'esgoto' para aceitar/exibir corretamente.
   const SUB_ANOMALIAS_OBSTRUIDA_CANALETA = [
     { valor: 'vegetacao', rotulo: 'Vegetação' },
     { valor: 'lastro', rotulo: 'Lastro' },
@@ -1255,6 +1263,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     { valor: 'dormentes', rotulo: 'Dormentes' },
     { valor: 'entulho', rotulo: 'Entulho' },
     { valor: 'terra', rotulo: 'Terra' },
+    { valor: 'esgoto', rotulo: 'Esgoto' },
   ];
   const LADOS_CANALETA = [
     { valor: 'direito', rotulo: 'Direito' },
@@ -1266,8 +1275,8 @@ document.addEventListener('DOMContentLoaded', async function () {
   // 15/09/2026: Dimensoes agora e um conjunto FIXO de 7 campos por
   // Item (nao mais uma lista de linhas) -- cada um com seu proprio
   // checkbox "Não identificado". Km/Poste Inicial/Final usam a MESMA
-  // mascara nova do Km/Poste de Localizacao (aplicarMascaraKmPosteNova,
-  // padrao "XXX/XXX + XXX") -- pedido do cliente.
+  // mascara nova do Km/Poste de Localizacao (aplicarMascaraKmPosteNova).
+  // 17/09/2026: padrao mudou de "XXX/XXX + XXX" para "XX/XX + XXX".
   const CAMPOS_DIMENSAO_ITEM_CANALETA = [
     ['largura_inicial', 'Largura Inicial (m)', 'numero'],
     ['largura_final', 'Largura Final (m)', 'numero'],
@@ -1353,8 +1362,8 @@ document.addEventListener('DOMContentLoaded', async function () {
       } else {
         input.type = 'text';
         input.inputMode = 'numeric';
-        input.placeholder = 'XXX/XXX + XXX';
-        input.maxLength = 13;
+        input.placeholder = 'XX/XX + XXX';
+        input.maxLength = 11;
       }
       input.value = item.dimensao[chave];
       input.disabled = !!item.dimensao[`${chave}_nao_identificado`];

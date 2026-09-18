@@ -22,6 +22,9 @@
 -- "Inspeção Corretiva AMV", "Instalação de Tala", "Socaria Manual",
 -- "Bolsão", "Retirada de Objeto da Via" -- todos servicos simples,
 -- sem bloco especial associado (confirmado com o cliente).
+-- Mudança de negócio 17/09/2026: adicionado ao grupo Corretiva --
+-- "Executado por outra equipe" -- serviço simples, sem bloco
+-- especial associado.
 -- Nenhum serviço é removido de verdade do banco — RadServico tem FK
 -- PROTECT contra CatServico e RADs antigos podem referenciá-los.
 --
@@ -58,6 +61,7 @@ INSERT INTO cat_servicos (nome, descricao, requer_amv, requer_descricao, requer_
   ('Socaria Manual', 'Serviço do grupo Corretiva.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'corretiva', TRUE),
   ('Bolsão', 'Serviço do grupo Corretiva.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'corretiva', TRUE),
   ('Retirada de Objeto da Via', 'Serviço do grupo Corretiva.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'corretiva', TRUE),
+  ('Executado por outra equipe', 'Serviço do grupo Corretiva.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'corretiva', TRUE),
   ('Esmerilhadora', 'Serviço do grupo Mecanizada.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'mecanizada', TRUE),
   ('Desguarnecedora', 'Serviço do grupo Mecanizada.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'mecanizada', TRUE),
   ('Descarga de lastro', 'Serviço do grupo Mecanizada.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'mecanizada', TRUE),
@@ -74,5 +78,5 @@ ON CONFLICT (nome) DO UPDATE SET
   area = EXCLUDED.area,
   ativo = EXCLUDED.ativo;
 
--- Total: 30 registros (6 inativos: Ajuste, Limpeza, Lubrificação,
+-- Total: 31 registros (6 inativos: Ajuste, Limpeza, Lubrificação,
 -- Esmerilhamento, Socaria, Controle de Vegetação)
