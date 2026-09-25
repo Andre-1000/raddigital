@@ -269,17 +269,14 @@
         },
       },
       {
+        // 18/09/2026 (revisado): "Serviços Executados" deixou de usar
+        // o sistema generico de campos{} -- cada area (Geral, Infra,
+        // Corretiva, Mecanizada, AMV) precisa virar sua PROPRIA linha
+        // (rotulo = area, valor = servicos daquela area), nao dava
+        // pra fazer isso com um unico par rotulo/valor fixo. Ver
+        // 'especial' abaixo e montarSecaoServicos.
         titulo: 'Serviços Executados',
-        campos: {
-          // 18/09/2026: rotulo do campo mudou de "Serviços
-          // Executados" (identico ao titulo da secao logo acima,
-          // repetido sem necessidade) para "Serviços" -- cada item
-          // ja vem com o nome do bloco/area entre parenteses (ver
-          // consulta/views.py::detalhe_rad), entao o rotulo do campo
-          // nao precisa mais repetir "Executados" pra dar contexto.
-          servicos: 'Serviços',
-          outros_servico_desc: 'Descrição de Outros Serviços',
-        },
+        especial: 'servicos',
       },
       {
         titulo: 'Terceiros',
@@ -333,11 +330,62 @@
       return escapar(String(valor));
     }
 
+    // 18/09/2026: "Serviços Executados" agrupado por area -- cada
+    // area (Geral, Infra, Corretiva, Mecanizada, AMV) vira sua propria
+    // linha (campo-leitura), rotulo = nome da area, valor = os
+    // servicos daquela area. dados.servicos ja vem nessa ordem fixa
+    // do backend (ver consulta/views.py::_servicos_por_area) -- so
+    // entram areas que o RAD realmente tem algum servico.
+    function montarSecaoServicos(gruposPorArea, outrosDesc) {
+      const temGrupos = gruposPorArea && gruposPorArea.length > 0;
+      if (!temGrupos && !outrosDesc) return null;
+
+      const secaoEl = document.createElement('div');
+      secaoEl.className = 'secao-detalhe';
+
+      const titulo = document.createElement('h2');
+      titulo.className = 'titulo-secao';
+      titulo.textContent = 'Serviços Executados';
+      secaoEl.appendChild(titulo);
+
+      const grade = document.createElement('div');
+      grade.className = 'grade-campos grade-dados';
+
+      (gruposPorArea || []).forEach(function (grupo) {
+        const bloco = document.createElement('div');
+        bloco.className = 'campo-leitura';
+        bloco.innerHTML = `
+          <span class="campo-leitura__rotulo">${escapar(grupo.area)}</span>
+          <span class="campo-leitura__valor">${formatarValor(grupo.servicos)}</span>
+        `;
+        grade.appendChild(bloco);
+      });
+
+      if (outrosDesc) {
+        const bloco = document.createElement('div');
+        bloco.className = 'campo-leitura';
+        bloco.innerHTML = `
+          <span class="campo-leitura__rotulo">Descrição de Outros Serviços</span>
+          <span class="campo-leitura__valor">${formatarValor(outrosDesc)}</span>
+        `;
+        grade.appendChild(bloco);
+      }
+
+      secaoEl.appendChild(grade);
+      return secaoEl;
+    }
+
     function renderizarCampos(dados) {
       const container = document.getElementById('secoes-dados');
       container.innerHTML = '';
 
       SECOES.forEach(function (secao) {
+        if (secao.especial === 'servicos') {
+          const secaoServicos = montarSecaoServicos(dados.servicos, dados.outros_servico_desc);
+          if (secaoServicos) container.appendChild(secaoServicos);
+          return;
+        }
+
         const chavesPresentes = Object.keys(secao.campos).filter((chave) => chave in dados && dados[chave]);
         if (chavesPresentes.length === 0) return; // secao inteira desabilitada, ou (VPM001) sem nenhuma descricao preenchida
 

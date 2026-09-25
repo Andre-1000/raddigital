@@ -385,6 +385,35 @@ def nome_de_quem_preencheu(rad):
     return rad.usuario.login
 
 
+_ORDEM_AREAS_SERVICO = ['geral', 'infra', 'corretiva', 'mecanizada', 'amv']
+
+
+def _servicos_por_area(rad):
+    """
+    18/09/2026 (revisado): agrupa os servicos do RAD por area (Geral,
+    Infra, Corretiva, Mecanizada, AMV) -- cada area vira uma LINHA
+    propria no detalhe do RAD (rotulo = nome da area, valor = os
+    servicos daquela area), em vez de repetir o nome da area ao lado
+    de cada servico entre parenteses no mesmo campo. Ordem fixa (nao
+    alfabetica), mesma ORDEM_GRUPOS_SERVICO usada em rad_form.js --
+    so entram areas que o RAD realmente tem algum servico.
+    """
+    nomes_por_area = {}
+    rotulo_por_area = {}
+    for rs in rad.servicos.all():
+        codigo = rs.servico.area
+        nomes_por_area.setdefault(codigo, []).append(rs.servico.nome)
+        rotulo_por_area[codigo] = rs.servico.get_area_display()
+
+    resultado = []
+    for codigo in _ORDEM_AREAS_SERVICO:
+        nomes = nomes_por_area.get(codigo)
+        if not nomes:
+            continue
+        resultado.append({'area': rotulo_por_area[codigo], 'servicos': sorted(nomes)})
+    return resultado
+
+
 def _exportacao_pdf_oficial_habilitada():
     """
     22/07/2026: le o interruptor da tela de Configuracoes
@@ -834,22 +863,18 @@ def detalhe_rad(request, numero_rad):
                     rad.motivo_atraso_termino.nome if rad.motivo_atraso_termino else None
                 ),
                 'desc_motivo_atraso_termino': rad.desc_motivo_atraso_termino,
-                # 18/09/2026: cada servico agora vem com o nome do
-                # bloco/area (Geral, Infra, Corretiva, Mecanizada, AMV)
-                # junto -- achado em producao: o detalhe do RAD so
-                # mostrava o nome do servico ("Inspeção"), sem
-                # nenhuma pista de qual bloco ele pertencia (o titulo
-                # da propria secao ja se chama "Serviços Executados",
-                # entao repetir isso no rotulo do campo so confundia).
-                # Ordenado por area+nome pra ficar visualmente
-                # agrupado mesmo sendo uma lista simples.
-                'servicos': [
-                    f'{rs.servico.nome} ({rs.servico.get_area_display()})'
-                    for rs in sorted(
-                        rad.servicos.all(),
-                        key=lambda rs: (rs.servico.area, rs.servico.nome),
-                    )
-                ],
+                # 18/09/2026 (revisado): ver _servicos_por_area -- cada
+                # area (Geral, Infra, Corretiva, Mecanizada, AMV) vira
+                # um campo separado no detalhe, nao mais texto colado
+                # entre parenteses no mesmo campo que o servico. Chave
+                # da resposta continua 'servicos' (so o FORMATO do
+                # valor mudou, de lista de nomes para lista de grupos
+                # por area) -- _remover_campos_desabilitados (acima)
+                # usa a chave 'servicos' pra identificar o campo
+                # quando o Administrador desabilita "Servicos
+                # Executados" em Configuracoes; renomear a chave
+                # quebraria esse desabilitar sem ninguem perceber.
+                'servicos': _servicos_por_area(rad),
                 'outros_servico_desc': rad.outros_servico_desc,
                 'desc_foto_1': rad.desc_foto_1,
                 'desc_foto_2': rad.desc_foto_2,
