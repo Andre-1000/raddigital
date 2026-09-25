@@ -785,6 +785,7 @@ def detalhe_rad(request, numero_rad):
             'motivo_atraso_inicio', 'motivo_atraso_termino', 'usuario_cancelamento',
         ).prefetch_related(
             'canaleta_itens__anomalias', 'canaleta_itens__lados', 'canaleta_itens__dimensoes',
+            'servicos__servico',
         ).get(numero_rad=numero_rad)
     except Rad.DoesNotExist:
         return JsonResponse({'erro': 'RAD nao encontrado.'}, status=404)
@@ -833,7 +834,22 @@ def detalhe_rad(request, numero_rad):
                     rad.motivo_atraso_termino.nome if rad.motivo_atraso_termino else None
                 ),
                 'desc_motivo_atraso_termino': rad.desc_motivo_atraso_termino,
-                'servicos': list(rad.servicos.values_list('servico__nome', flat=True)),
+                # 18/09/2026: cada servico agora vem com o nome do
+                # bloco/area (Geral, Infra, Corretiva, Mecanizada, AMV)
+                # junto -- achado em producao: o detalhe do RAD so
+                # mostrava o nome do servico ("Inspeção"), sem
+                # nenhuma pista de qual bloco ele pertencia (o titulo
+                # da propria secao ja se chama "Serviços Executados",
+                # entao repetir isso no rotulo do campo so confundia).
+                # Ordenado por area+nome pra ficar visualmente
+                # agrupado mesmo sendo uma lista simples.
+                'servicos': [
+                    f'{rs.servico.nome} ({rs.servico.get_area_display()})'
+                    for rs in sorted(
+                        rad.servicos.all(),
+                        key=lambda rs: (rs.servico.area, rs.servico.nome),
+                    )
+                ],
                 'outros_servico_desc': rad.outros_servico_desc,
                 'desc_foto_1': rad.desc_foto_1,
                 'desc_foto_2': rad.desc_foto_2,

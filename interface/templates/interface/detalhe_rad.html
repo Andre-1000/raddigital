@@ -271,7 +271,13 @@
       {
         titulo: 'Serviços Executados',
         campos: {
-          servicos: 'Serviços Executados',
+          // 18/09/2026: rotulo do campo mudou de "Serviços
+          // Executados" (identico ao titulo da secao logo acima,
+          // repetido sem necessidade) para "Serviços" -- cada item
+          // ja vem com o nome do bloco/area entre parenteses (ver
+          // consulta/views.py::detalhe_rad), entao o rotulo do campo
+          // nao precisa mais repetir "Executados" pra dar contexto.
+          servicos: 'Serviços',
           outros_servico_desc: 'Descrição de Outros Serviços',
         },
       },
