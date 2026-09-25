@@ -10,6 +10,50 @@ document.addEventListener('DOMContentLoaded', async function () {
   const statusRascunho = document.getElementById('status-rascunho');
   const avisoFormulario = document.getElementById('aviso-formulario');
 
+  // 18/09/2026: sincroniza a exibicao do formulario com as
+  // configuracoes de campo definidas pelo Administrador em
+  // Configuracoes (habilitado/obrigatorio). Ate aqui essas
+  // configuracoes so afetavam a validacao no servidor e a tela de
+  // Consultar RADs -- o formulario de preenchimento continuava
+  // sempre com os asteriscos fixos do HTML e nunca escondia nenhum
+  // campo, mesmo desabilitado (achado em producao: Administrador
+  // marcou OS como opcional e o asterisco continuou aparecendo).
+  //
+  // So cobre os campos com um data-config-campo="<chave>" no HTML --
+  // ver novo_rad.html. Ficaram de fora, de proposito, campos cuja
+  // visibilidade ja depende de outra logica condicional (N. Falha,
+  // motivo/descricao do atraso no termino, descricao de "Outros"
+  // servico, Equipes Envolvidas, Data de Preenchimento) -- misturar
+  // as duas fontes de visibilidade sem testar caso a caso teria mais
+  // risco de quebrar alguma coisa do que valor. Para esses, a
+  // configuracao continua valendo so no servidor, como ja era.
+  async function aplicarConfiguracoesDeCampo() {
+    let campos;
+    try {
+      const resposta = await RadAuth.requisicaoAutenticada('/configuracoes/campos/');
+      if (!resposta.ok) return;
+      campos = (await resposta.json()).campos;
+    } catch (erro) {
+      return; // offline ou falha de rede -- formulario segue com o padrao fixo do HTML
+    }
+
+    campos.forEach(function (campo) {
+      const container = document.querySelector(`[data-config-campo="${campo.chave}"]`);
+      if (container) {
+        container.style.display = campo.habilitado ? '' : 'none';
+      }
+
+      // So atualiza o marcador (* ou "(opcional)") se o campo estiver
+      // visivel -- um campo escondido nao precisa de marcador nenhum.
+      const marcador = document.getElementById(`marcador-${campo.chave}`);
+      if (marcador && campo.habilitado) {
+        marcador.textContent = campo.obrigatorio ? '*' : '(opcional)';
+        marcador.className = campo.obrigatorio ? 'obrigatorio' : 'texto-suave';
+      }
+    });
+  }
+  await aplicarConfiguracoesDeCampo();
+
   // 26/08/2026 (achado de auditoria de seguranca -- XSS armazenado):
   // nome de colaborador (cadastro, pode vir de importacao CSV feita
   // por um Administrador) e detalhes de MCH (catalogo) sao inseridos

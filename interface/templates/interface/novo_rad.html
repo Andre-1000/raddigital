@@ -49,13 +49,13 @@
       <h2 style="font-size:1rem;">Identificação</h2>
 
       <div class="grade-campos grade-campos--compacta">
-      <div class="campo">
-        <label for="campo-numero-os">OS <span class="obrigatorio">*</span></label>
+      <div class="campo" data-config-campo="numero_os">
+        <label for="campo-numero-os">OS <span class="obrigatorio" id="marcador-numero_os">*</span></label>
         <input type="number" id="campo-numero-os" inputmode="numeric" min="1" max="9999999" required>
       </div>
 
-      <div class="campo">
-        <label for="campo-numero-sa">N° SA <span class="obrigatorio">*</span></label>
+      <div class="campo" data-config-campo="numero_sa">
+        <label for="campo-numero-sa">N° SA <span class="obrigatorio" id="marcador-numero_sa">*</span></label>
         <input type="text" id="campo-numero-sa" inputmode="numeric" maxlength="10" required>
       </div>
 
@@ -93,26 +93,26 @@
     <div class="cartao" id="secao-localizacao" style="margin-top:1rem;">
       <h2 style="font-size:1rem;">Localização</h2>
 
-      <div class="campo">
-        <label for="campo-local-inicial">Local Inicial <span class="obrigatorio">*</span></label>
+      <div class="campo" data-config-campo="local_inicial">
+        <label for="campo-local-inicial">Local Inicial <span class="obrigatorio" id="marcador-local_inicial">*</span></label>
         <input type="text" id="campo-local-inicial" autocomplete="off" placeholder="Buscar por código ou nome…" required>
         <div class="pilha" id="resultados-local-inicial" style="margin-top:0.5rem;"></div>
       </div>
 
-      <div class="campo">
-        <label for="campo-local-final">Local Final <span class="obrigatorio">*</span></label>
+      <div class="campo" data-config-campo="local_final">
+        <label for="campo-local-final">Local Final <span class="obrigatorio" id="marcador-local_final">*</span></label>
         <input type="text" id="campo-local-final" autocomplete="off" placeholder="Buscar por código ou nome…" required>
         <div class="pilha" id="resultados-local-final" style="margin-top:0.5rem;"></div>
       </div>
 
-      <div class="campo">
-        <label>Linha <span class="obrigatorio">*</span></label>
+      <div class="campo" data-config-campo="linhas">
+        <label>Linha <span class="obrigatorio" id="marcador-linhas">*</span></label>
         <div class="grupo-chips" id="chips-linhas"></div>
         <p class="campo__ajuda" id="ajuda-linhas"></p>
       </div>
 
-      <div class="campo">
-        <label>Via <span class="obrigatorio">*</span></label>
+      <div class="campo" data-config-campo="vias">
+        <label>Via <span class="obrigatorio" id="marcador-vias">*</span></label>
         <div class="grupo-chips" id="chips-vias"></div>
         <p class="campo__ajuda" id="ajuda-vias"></p>
       </div>
@@ -145,8 +145,8 @@
         <button type="button" id="botao-ajuda-tipo-manutencao" class="selo selo--online" style="border:none; cursor:pointer;" aria-label="O que significa cada tipo de manutenção?">?</button>
       </h2>
 
-      <div class="campo">
-        <label for="campo-tipo-manutencao">Tipo de Manutenção <span class="obrigatorio">*</span></label>
+      <div class="campo" data-config-campo="tipo_manutencao">
+        <label for="campo-tipo-manutencao">Tipo de Manutenção <span class="obrigatorio" id="marcador-tipo_manutencao">*</span></label>
         <select id="campo-tipo-manutencao" required>
           <option value="">Selecione…</option>
         </select>
@@ -162,16 +162,16 @@
       <h2 style="font-size:1rem;">Horários</h2>
 
       <div class="duas-colunas">
-        <div class="campo">
-          <label for="campo-hp-inicio">Horário Programado de Início <span class="obrigatorio">*</span></label>
+        <div class="campo" data-config-campo="hora_prog_inicio">
+          <label for="campo-hp-inicio">Horário Programado de Início <span class="obrigatorio" id="marcador-hora_prog_inicio">*</span></label>
           <input type="time" id="campo-hp-inicio" required>
           <p class="campo__ajuda">
             Data: <input type="date" id="campo-data-hp-inicio" style="width:auto; display:inline-block; min-height:auto; padding:0.3rem 0.5rem;">
           </p>
         </div>
 
-        <div class="campo">
-          <label for="campo-hp-termino">Horário Programado de Término <span class="obrigatorio">*</span></label>
+        <div class="campo" data-config-campo="hora_prog_termino">
+          <label for="campo-hp-termino">Horário Programado de Término <span class="obrigatorio" id="marcador-hora_prog_termino">*</span></label>
           <input type="time" id="campo-hp-termino" required>
           <p class="campo__ajuda">
             Data: <input type="date" id="campo-data-hp-termino" style="width:auto; display:inline-block; min-height:auto; padding:0.3rem 0.5rem;">
@@ -181,16 +181,16 @@
       </div>
 
       <div class="duas-colunas">
-        <div class="campo">
-          <label for="campo-hr-inicio">Horário Real de Início <span class="obrigatorio">*</span></label>
+        <div class="campo" data-config-campo="hora_real_inicio">
+          <label for="campo-hr-inicio">Horário Real de Início <span class="obrigatorio" id="marcador-hora_real_inicio">*</span></label>
           <input type="time" id="campo-hr-inicio" required>
           <p class="campo__ajuda">
             Data: <input type="date" id="campo-data-hr-inicio" style="width:auto; display:inline-block; min-height:auto; padding:0.3rem 0.5rem;">
           </p>
         </div>
 
-        <div class="campo">
-          <label for="campo-hr-termino">Horário Real de Término <span class="obrigatorio">*</span></label>
+        <div class="campo" data-config-campo="hora_real_termino">
+          <label for="campo-hr-termino">Horário Real de Término <span class="obrigatorio" id="marcador-hora_real_termino">*</span></label>
           <input type="time" id="campo-hr-termino" required>
           <p class="campo__ajuda">
             Data: <input type="date" id="campo-data-hr-termino" style="width:auto; display:inline-block; min-height:auto; padding:0.3rem 0.5rem;">
@@ -228,8 +228,8 @@
       </div>
     </div>
 
-    <div class="cartao" id="secao-servicos" style="margin-top:1rem;">
-      <h2 style="font-size:1rem;">Serviços Executados <span class="obrigatorio">*</span></h2>
+    <div class="cartao" id="secao-servicos" style="margin-top:1rem;" data-config-campo="servicos">
+      <h2 style="font-size:1rem;">Serviços Executados <span class="obrigatorio" id="marcador-servicos">*</span></h2>
       <button type="button" class="botao botao--secundaria" id="botao-sobre-servicos"
               style="width:auto; min-height:36px; padding:0 0.9rem; margin-bottom:0.9rem; font-size:0.85rem;">
         O que é cada serviço?
@@ -310,8 +310,8 @@
       <p class="texto-suave centro" id="contador-itens-canaleta" style="font-size:0.8rem; margin-top:0.4rem;"></p>
     </div>
 
-    <div class="cartao" id="secao-colaboradores" style="margin-top:1rem;">
-      <h2 style="font-size:1rem;">Colaboradores e Participantes</h2>
+    <div class="cartao" id="secao-colaboradores" style="margin-top:1rem;" data-config-campo="colaboradores">
+      <h2 style="font-size:1rem;">Colaboradores e Participantes <span class="obrigatorio" id="marcador-colaboradores">*</span></h2>
 
       <div class="pilha" id="lista-colaboradores-adicionados"></div>
       <p class="texto-suave" id="mensagem-sem-colaboradores" style="font-size:0.85rem;">
@@ -390,8 +390,8 @@
     <div class="cartao" id="secao-responsaveis" style="margin-top:1rem;">
       <h2 style="font-size:1rem;">Responsáveis e Detalhes</h2>
 
-      <div class="campo">
-        <label for="campo-responsavel-atividade">Responsável Atividade <span class="obrigatorio">*</span></label>
+      <div class="campo" data-config-campo="responsavel_atividade">
+        <label for="campo-responsavel-atividade">Responsável Atividade <span class="obrigatorio" id="marcador-responsavel_atividade">*</span></label>
         <input type="text" id="campo-responsavel-atividade" autocomplete="off" maxlength="200" required>
         <div class="pilha" id="resultados-responsavel-atividade" style="margin-top:0.5rem;"></div>
       </div>
@@ -410,8 +410,8 @@
            Nome (texto, 50 caracteres) e Hora (padrao 00:00). O nome da
            Entrega é preenchido automaticamente a partir da Abertura,
            mas pode ser editado (ver rad_form.js). -->
-      <div class="campo">
-        <label>Op CCM - Abertura <span class="texto-suave">(opcional)</span></label>
+      <div class="campo" data-config-campo="operador_ccm_abertura">
+        <label>Op CCM - Abertura <span class="texto-suave" id="marcador-operador_ccm_abertura">(opcional)</span></label>
         <div class="duas-colunas">
           <div>
             <label for="campo-operador-ccm-abertura-nome" class="texto-suave" style="font-size:0.8rem;">Nome</label>
@@ -424,8 +424,8 @@
         </div>
       </div>
 
-      <div class="campo">
-        <label>Op CCM - Entrega <span class="texto-suave">(opcional)</span></label>
+      <div class="campo" data-config-campo="operador_ccm_entrega">
+        <label>Op CCM - Entrega <span class="texto-suave" id="marcador-operador_ccm_entrega">(opcional)</span></label>
         <div class="duas-colunas">
           <div>
             <label for="campo-operador-ccm-entrega-nome" class="texto-suave" style="font-size:0.8rem;">Nome</label>
@@ -439,20 +439,20 @@
         <p class="campo__ajuda">O nome é preenchido automaticamente a partir da Abertura, mas pode ser editado.</p>
       </div>
 
-      <div class="campo">
-        <label for="campo-descricao-tecnica">Descrição Técnica da Atividade <span class="texto-suave">(opcional)</span></label>
+      <div class="campo" data-config-campo="descricao_tecnica_atividade">
+        <label for="campo-descricao-tecnica">Descrição Técnica da Atividade <span class="texto-suave" id="marcador-descricao_tecnica_atividade">(opcional)</span></label>
         <textarea id="campo-descricao-tecnica"></textarea>
       </div>
 
-      <div class="campo">
-        <label for="campo-materiais-utilizados">Materiais Utilizados <span class="texto-suave">(opcional)</span></label>
+      <div class="campo" data-config-campo="materiais_utilizados">
+        <label for="campo-materiais-utilizados">Materiais Utilizados <span class="texto-suave" id="marcador-materiais_utilizados">(opcional)</span></label>
         <textarea id="campo-materiais-utilizados" maxlength="2000"></textarea>
       </div>
     </div>
 
     <!-- Observações Gerais fica abaixo dos anexos de proposito
          (decisao registrada em docs/NOTAS_LAYOUT_FRONTEND.md) -->
-    <div class="cartao" id="secao-observacoes" style="margin-top:1rem;">
+    <div class="cartao" id="secao-observacoes" style="margin-top:1rem;" data-config-campo="observacoes_gerais">
       <h2 style="font-size:1rem;">Observações Gerais</h2>
       <div class="campo">
         <label for="campo-observacoes-gerais" style="display:none;">Observações Gerais</label>
