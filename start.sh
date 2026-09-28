@@ -10,4 +10,8 @@ if not Usuario.objects.filter(login='teste.dev').exists():
 else:
     print('Usuario teste.dev ja existe')
 EOF
-exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60
+# 28/09/2026: --access-logfile - liga o log de acesso -- cada requisicao
+# vira uma linha nos Logs do Render (caminho + bytes enviados), para
+# descobrir o que causa os picos de banda de saida. Pode ser removido
+# depois de identificada a causa.
+exec gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 60 --access-logfile -
