@@ -33,9 +33,10 @@
       <!-- Rotulo mantido, so escondido visualmente (display:none) --
            o <label for="campo-login"> continua associado ao campo
            pra quem usa leitor de tela, mesmo padrao ja usado em
-           "Observações Gerais" (novo_rad.html). O pedido era remover
-           a ESCRITA visivel, nao a acessibilidade do campo. -->
-      <label for="campo-login" style="display:none;">Login ou e-mail</label>
+           "Observações Gerais" (novo_rad.html). 28/09/2026: texto
+           atualizado para "Login (matrícula)" -- o login deixou de
+           aceitar e-mail (ver usuarios/views.py::login). -->
+      <label for="campo-login" style="display:none;">Login (matrícula)</label>
       <input type="text" id="campo-login" name="login" autocomplete="username" autocapitalize="off" required>
     </div>
     <div class="campo">
