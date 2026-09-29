@@ -18,13 +18,24 @@
 {% block conteudo %}
 <div class="cartao" style="max-width:380px; margin:2.5rem auto 0;">
   <h1 style="font-size:1.3rem;">Entrar</h1>
-  <p class="texto-suave" style="margin-top:-0.25rem;">Informe seu login ou e-mail e sua senha para continuar.</p>
+  <p class="texto-suave" style="margin-top:-0.25rem;">Informe sua matrícula e sua senha para continuar.</p>
 
   <div id="aviso-login"></div>
 
   <form id="form-login" novalidate>
+    <!-- 28/09/2026: retangulo de alerta pedido pelo cliente, no lugar
+         do rotulo "Login ou e-mail" acima do campo -- reaproveita o
+         mesmo estilo .aviso ja usado no resto do sistema
+         (aviso--atencao), em vez de criar uma classe nova so pra isso. -->
+    <div class="aviso aviso--atencao" style="margin-bottom:0.75rem;">Logue com sua matrícula.</div>
+
     <div class="campo">
-      <label for="campo-login">Login ou e-mail</label>
+      <!-- Rotulo mantido, so escondido visualmente (display:none) --
+           o <label for="campo-login"> continua associado ao campo
+           pra quem usa leitor de tela, mesmo padrao ja usado em
+           "Observações Gerais" (novo_rad.html). O pedido era remover
+           a ESCRITA visivel, nao a acessibilidade do campo. -->
+      <label for="campo-login" style="display:none;">Login ou e-mail</label>
       <input type="text" id="campo-login" name="login" autocomplete="username" autocapitalize="off" required>
     </div>
     <div class="campo">
