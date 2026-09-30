@@ -70,6 +70,17 @@ def tela_dashboard(request):
     return render(request, 'interface/dashboard.html')
 
 
+def tela_sync_bd(request):
+    """
+    30/09/2026. Tela "Sync BD" -- exclusiva do Administrador. Envia os
+    RADs para uma planilha do Google (rad/google_sheets.py), 1 RAD = 1
+    linha. O guard real está nos endpoints da API (dashboard/views.py,
+    sync_bd_dados/sync_bd_sincronizar, @requer_perfil(ADMINISTRADOR)) --
+    mesmo padrão das demais telas administrativas.
+    """
+    return render(request, 'interface/sync_bd.html')
+
+
 def tela_novo_rad(request):
     return render(request, 'interface/novo_rad.html')
 

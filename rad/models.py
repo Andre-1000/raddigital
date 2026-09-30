@@ -230,6 +230,13 @@ class Rad(models.Model):
     # Consulta e no detalhe do RAD, quais RADs ainda precisam ser
     # reenviados ao Drive manualmente.
     data_ultimo_envio_drive = models.DateTimeField(null=True, blank=True)
+    # data_ultima_sincronizacao_planilha (30/09/2026): mesmo padrao dos
+    # dois campos acima -- NULL = este RAD ainda nao foi enviado como
+    # linha na planilha do Google (BD_RadDigital). Preenchido pela tela
+    # "Sync BD" (exclusiva do Administrador, ver dashboard/views.py::
+    # sync_bd_sincronizar), que so processa RADs com este campo NULL --
+    # e o que evita mandar a mesma linha duas vezes.
+    data_ultima_sincronizacao_planilha = models.DateTimeField(null=True, blank=True)
     status = models.CharField(
         max_length=20, choices=STATUS_CHOICES, default=SINCRONIZADO
     )

@@ -87,6 +87,13 @@
       <span class="cartao-acao__rotulo">Configurações de Campos</span>
       <span class="cartao-acao__descricao">Habilitar, desabilitar e tornar campos obrigatórios</span>
     </a>
+
+    <!-- 30/09/2026: exclusivo do Administrador (nao Supervisor) --
+         diferente dos demais links administrativos acima. -->
+    <a href="{% url 'interface:sync_bd' %}" class="cartao cartao--interativo cartao-acao" id="link-sync-bd" style="display:none;">
+      <span class="cartao-acao__rotulo">Sync BD</span>
+      <span class="cartao-acao__descricao">Enviar os RADs para a planilha do Google</span>
+    </a>
   </div>
 
   <div class="cartao" style="margin-top:1rem;">
@@ -111,6 +118,7 @@
     }
     if (RadAuth.temPerfil('administrador')) {
       document.getElementById('link-configuracoes').style.display = '';
+      document.getElementById('link-sync-bd').style.display = '';
     }
 
     document.getElementById('botao-sair').addEventListener('click', function () {

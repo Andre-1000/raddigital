@@ -1,0 +1,159 @@
+{% extends "interface/base.html" %}
+{% block titulo %}Sync BD — Sistema RAD{% endblock %}
+
+{% block cabecalho_extra %}
+<style>
+  .container-app { max-width: var(--largura-app-administrativa); }
+
+  .grade-metricas {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+  .cartao-metrica {
+    text-align: center;
+    padding: 1.4rem 1rem;
+  }
+  .cartao-metrica__valor {
+    font-size: 2.1rem;
+    font-weight: 700;
+    color: var(--cor-primaria);
+    line-height: 1.1;
+  }
+  .cartao-metrica__rotulo {
+    margin-top: 0.4rem;
+    font-size: 0.85rem;
+    color: var(--cor-tinta-suave);
+  }
+</style>
+{% endblock %}
+
+{% block conteudo %}
+<div id="conteudo-protegido" style="display:none;">
+  <a href="{% url 'interface:inicio' %}" class="texto-suave" style="font-size:0.85rem;">&larr; Voltar para o Início</a>
+  <h1 style="font-size:1.3rem; margin-top:0.5rem;">Sync BD</h1>
+  <p class="texto-suave" style="margin-top:-0.5rem;">
+    Envia os RADs para a planilha do Google (base de dados externa, 1 RAD = 1 linha).
+  </p>
+
+  <div id="aviso-sync-bd" style="margin-top:1rem;"></div>
+
+  <div class="grade-metricas">
+    <div class="cartao cartao-metrica">
+      <div class="cartao-metrica__valor" id="valor-total-preenchidos">—</div>
+      <div class="cartao-metrica__rotulo">Total de RAD Preenchidos</div>
+    </div>
+    <div class="cartao cartao-metrica">
+      <div class="cartao-metrica__valor" id="valor-total-sincronizados">—</div>
+      <div class="cartao-metrica__rotulo">RAD Sincronizados</div>
+    </div>
+    <div class="cartao cartao-metrica">
+      <div class="cartao-metrica__valor" id="valor-total-nao-sincronizados">—</div>
+      <div class="cartao-metrica__rotulo">RAD Não Sincronizados</div>
+    </div>
+  </div>
+
+  <div class="cartao" style="margin-top:1rem;">
+    <div class="pilha">
+      <button type="button" class="botao botao--secundaria" id="botao-atualizar">Atualizar</button>
+      <button type="button" class="botao botao--primaria" id="botao-sincronizar">Sincronizar</button>
+    </div>
+    <p class="texto-suave" style="font-size:0.78rem; margin-top:0.75rem; margin-bottom:0;">
+      Cada clique em "Sincronizar" processa até 600 RADs pendentes.
+      Se sobrar algum, é só clicar de novo — o que já foi enviado não é reenviado.
+    </p>
+  </div>
+</div>
+{% endblock %}
+
+{% block script_extra %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!RadAuth.exigirSessao()) return;
+    if (!RadAuth.temPerfil('administrador')) {
+      window.location.href = '{% url "interface:inicio" %}';
+      return;
+    }
+    document.getElementById('conteudo-protegido').style.display = '';
+
+    const aviso = document.getElementById('aviso-sync-bd');
+    const valorTotal = document.getElementById('valor-total-preenchidos');
+    const valorSincronizados = document.getElementById('valor-total-sincronizados');
+    const valorNaoSincronizados = document.getElementById('valor-total-nao-sincronizados');
+    const botaoAtualizar = document.getElementById('botao-atualizar');
+    const botaoSincronizar = document.getElementById('botao-sincronizar');
+
+    function aplicarContadores(dados) {
+      valorTotal.textContent = dados.total_rad_preenchidos;
+      valorSincronizados.textContent = dados.total_rad_sincronizados;
+      valorNaoSincronizados.textContent = dados.total_rad_nao_sincronizados;
+    }
+
+    async function carregarContadores() {
+      aviso.innerHTML = '';
+      botaoAtualizar.disabled = true;
+      const textoOriginal = botaoAtualizar.textContent;
+      botaoAtualizar.textContent = 'Atualizando…';
+
+      try {
+        const resposta = await RadAuth.requisicaoAutenticada('/dashboard/sync-bd/');
+        if (!resposta.ok) {
+          aviso.innerHTML = '<div class="aviso aviso--erro">Não foi possível carregar os números.</div>';
+          return;
+        }
+        aplicarContadores(await resposta.json());
+      } catch (erro) {
+        aviso.innerHTML = '<div class="aviso aviso--erro">Erro de conexão ao carregar os números.</div>';
+      } finally {
+        botaoAtualizar.disabled = false;
+        botaoAtualizar.textContent = textoOriginal;
+      }
+    }
+
+    botaoAtualizar.addEventListener('click', carregarContadores);
+
+    botaoSincronizar.addEventListener('click', async function () {
+      aviso.innerHTML = '';
+      botaoSincronizar.disabled = true;
+      botaoAtualizar.disabled = true;
+      const textoOriginal = botaoSincronizar.textContent;
+      botaoSincronizar.textContent = 'Sincronizando…';
+
+      try {
+        const resposta = await RadAuth.requisicaoAutenticada('/dashboard/sync-bd/sincronizar/', {
+          method: 'POST',
+        });
+        const corpo = await resposta.json().catch(function () { return {}; });
+
+        if (!resposta.ok) {
+          aviso.innerHTML = `<div class="aviso aviso--erro">${corpo.erro || 'Não foi possível sincronizar.'}</div>`;
+          // Mesmo com erro, o backend pode ter processado alguns
+          // lotes antes de falhar -- atualiza os numeros com o que
+          // veio na resposta, se vier.
+          if ('total_rad_preenchidos' in corpo) aplicarContadores(corpo);
+          return;
+        }
+
+        aplicarContadores(corpo);
+
+        if (corpo.processados === 0) {
+          aviso.innerHTML = '<div class="aviso aviso--sucesso">Nenhum RAD pendente — tudo já está sincronizado.</div>';
+        } else if (corpo.total_rad_nao_sincronizados > 0) {
+          aviso.innerHTML = `<div class="aviso aviso--atencao">${corpo.processados} RAD(s) sincronizado(s) neste clique. Ainda restam ${corpo.total_rad_nao_sincronizados} — clique em Sincronizar de novo para continuar.</div>`;
+        } else {
+          aviso.innerHTML = `<div class="aviso aviso--sucesso">${corpo.processados} RAD(s) sincronizado(s). Tudo em dia!</div>`;
+        }
+      } catch (erro) {
+        aviso.innerHTML = '<div class="aviso aviso--erro">Erro de conexão ao sincronizar.</div>';
+      } finally {
+        botaoSincronizar.disabled = false;
+        botaoAtualizar.disabled = false;
+        botaoSincronizar.textContent = textoOriginal;
+      }
+    });
+
+    carregarContadores();
+  });
+</script>
+{% endblock %}

@@ -38,6 +38,12 @@ ja existiam no sistema, sem nenhum campo novo:
     marcado no filtro de Servico Executado -- decisao do cliente).
   - percentual_atraso_termino ganhou irmao total_atraso_termino (o
     card agora alterna entre % e numero absoluto).
+
+30/09/2026: adicionado "Sync BD" -- sync_bd_dados e
+sync_bd_sincronizar, exclusivos do Administrador (nao Supervisor, ao
+contrario do resto deste arquivo). Envia os RADs para uma planilha do
+Google (rad/google_sheets.py), 1 RAD = 1 linha, servindo como base de
+dados externa consultavel fora do sistema.
 """
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.db.models import Avg, Count, Q
@@ -331,3 +337,136 @@ def exportar_excel(request):
     nome_arquivo = f'dashboard_export_{agora.strftime("%Y%m%d_%H%M%S")}.xlsx'
     resposta['Content-Disposition'] = f'attachment; filename="{nome_arquivo}"'
     return resposta
+
+
+# ---------------------------------------------------------------------------
+# Sync BD (30/09/2026) -- exclusivo do Administrador
+# ---------------------------------------------------------------------------
+
+# Quantos RADs vao em CADA chamada a API do Sheets (um "lote"). Manter
+# baixo (nao centenas) evita segurar memoria demais de uma vez so --
+# ver docstring de sync_bd_sincronizar para o raciocinio completo.
+TAMANHO_LOTE_SYNC_BD = 200
+
+# Quantos RADs no MAXIMO um unico clique em "Sincronizar" processa,
+# mesmo que existam muitos mais pendentes -- protege contra estourar o
+# timeout de 60s do gunicorn (ver start.sh) quando ha um backlog grande
+# (ex.: primeira vez que a funcionalidade e usada, com todo o historico
+# pendente). Se sobrar RAD nao sincronizado depois do limite, o proprio
+# contador "Não sincronizados" na tela mostra isso -- um segundo clique
+# continua de onde parou, sem duplicar nada (cada RAD so e processado
+# uma vez, marcado assim que a linha dele e confirmada na planilha).
+MAXIMO_RADS_POR_CLIQUE_SYNC_BD = 600
+
+_PREFETCH_SYNC_BD = (
+    'linhas', 'vias', 'equipes', 'servicos__servico', 'amv_blocos__mch', 'colaboradores',
+    'canaleta_itens__anomalias', 'canaleta_itens__lados', 'canaleta_itens__dimensoes',
+)
+_SELECT_RELATED_SYNC_BD = (
+    'local_inicial', 'local_final', 'tipo_manutencao', 'usuario',
+    'motivo_atraso_inicio', 'motivo_atraso_termino',
+)
+
+
+def _contadores_sync_bd():
+    """
+    30/09/2026. Os 3 numeros da tela "Sync BD". Inclui RADs CANCELADOS
+    tanto no total quanto no que vai pra planilha (decisao do cliente --
+    diferente do resto deste arquivo, que so conta Sincronizado).
+    """
+    total = Rad.objects.count()
+    sincronizados = Rad.objects.filter(
+        data_ultima_sincronizacao_planilha__isnull=False
+    ).count()
+    return {
+        'total_rad_preenchidos': total,
+        'total_rad_sincronizados': sincronizados,
+        'total_rad_nao_sincronizados': total - sincronizados,
+    }
+
+
+@requer_token
+@requer_perfil(UsuarioPerfil.ADMINISTRADOR)
+def sync_bd_dados(request):
+    """
+    GET /dashboard/sync-bd/
+    Exclusivo do Administrador. Os 3 numeros da tela "Sync BD" -- usado
+    tanto para carregar a tela quanto pelo botao "Atualizar".
+    """
+    return JsonResponse(_contadores_sync_bd())
+
+
+@requer_token
+@requer_perfil(UsuarioPerfil.ADMINISTRADOR)
+def sync_bd_sincronizar(request):
+    """
+    POST /dashboard/sync-bd/sincronizar/
+    Exclusivo do Administrador. Envia para a planilha do Google
+    (rad/google_sheets.py) todo RAD com data_ultima_sincronizacao_planilha
+    NULA -- inclusive cancelados (decisao do cliente).
+
+    Processa em LOTES de TAMANHO_LOTE_SYNC_BD, cada lote numa unica
+    chamada a API (values().append() aceita varias linhas de uma vez) --
+    e o que evita tanto uma chamada de API por RAD (lento, esbarra em
+    cota) quanto carregar milhares de RADs na memoria de uma vez so
+    (risco real aqui, com o historico de estouro de memoria do
+    servico -- ver conversa sobre o plano de 512MB do Render). Cada
+    lote so e marcado como sincronizado DEPOIS que a chamada a API
+    confirma -- se um lote falhar no meio do caminho, os lotes
+    anteriores ja processados ficam marcados (nao se perde nem duplica
+    nada), e a resposta avisa quantos RADs faltam pro Administrador
+    tentar de novo.
+
+    MAXIMO_RADS_POR_CLIQUE_SYNC_BD limita quanto um UNICO clique
+    processa, para nunca chegar perto do timeout de 60s do gunicorn
+    mesmo com um backlog grande -- um segundo clique continua de onde
+    parou.
+    """
+    from rad.google_sheets import SheetsNaoConfiguradoError, enviar_linhas, montar_linha
+
+    pendentes = Rad.objects.select_related(*_SELECT_RELATED_SYNC_BD).prefetch_related(
+        *_PREFETCH_SYNC_BD
+    ).filter(
+        data_ultima_sincronizacao_planilha__isnull=True
+    ).order_by('id_rad')[:MAXIMO_RADS_POR_CLIQUE_SYNC_BD]
+
+    pendentes = list(pendentes)
+
+    if not pendentes:
+        return JsonResponse({'processados': 0, **_contadores_sync_bd()})
+
+    total_processado = 0
+    agora = timezone.now()
+
+    for inicio in range(0, len(pendentes), TAMANHO_LOTE_SYNC_BD):
+        lote = pendentes[inicio:inicio + TAMANHO_LOTE_SYNC_BD]
+
+        try:
+            linhas = [montar_linha(rad) for rad in lote]
+            enviar_linhas(linhas)
+        except SheetsNaoConfiguradoError as erro:
+            return JsonResponse(
+                {'erro': str(erro), 'processados': total_processado, **_contadores_sync_bd()},
+                status=503,
+            )
+        except Exception as erro:
+            # Mesmo padrao ja usado em rad/google_drive.py -- resposta
+            # generica pro cliente, erro real no log do Render pra
+            # diagnosticar (falha de rede, cota da API excedida, etc.).
+            print(f'[ERRO] Falha ao enviar lote pra planilha (Sync BD): {erro!r}')
+            return JsonResponse(
+                {
+                    'erro': 'Não foi possível enviar um dos lotes para a planilha. Tente novamente.',
+                    'processados': total_processado,
+                    **_contadores_sync_bd(),
+                },
+                status=502,
+            )
+
+        ids_do_lote = [rad.id_rad for rad in lote]
+        Rad.objects.filter(id_rad__in=ids_do_lote).update(
+            data_ultima_sincronizacao_planilha=agora
+        )
+        total_processado += len(lote)
+
+    return JsonResponse({'processados': total_processado, **_contadores_sync_bd()})
