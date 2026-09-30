@@ -86,15 +86,23 @@ IndexedDB (offline-first, sem framework front-end).
 7. Nomes de tabela/coluna em `catalogos/models.py` e `rad/models.py` seguem
    exatamente os arquivos seed — não renomear um lado sem o outro.
 
-## ⚠️ Achado de segurança pendente (30/07/2026) — prioridade alta
+## Autenticação — histórico e estado atual
 
-Auditoria informal contra OWASP Top 10:2025 encontrou que o login
-(`usuarios/views.py::login`) **não usa senha nenhuma** — qualquer requisição com um
-login existente no banco recebe token válido de 7 dias na hora. Logins seguem padrão
-`nome.sobrenome` (previsível), sem rate limit. É o único achado 🔴 da auditoria e tem
-implicação de LGPD (dado pessoal de colaboradores exposto por autenticação fraca).
-André ainda não decidiu implementar senha/PIN — perguntar sobre isso se o assunto de
-segurança voltar à tona, não presumir que já foi resolvido.
+- **30/07/2026 (resolvido):** o login passou a exigir senha de verdade. Antes disso,
+  qualquer requisição com um login existente no banco recebia token válido de 7 dias
+  sem provar identidade nenhuma (achado 🔴 de auditoria informal contra OWASP Top
+  10:2025, com implicação de LGPD). Hoje `usuarios/views.py::login` verifica senha
+  por hash (PBKDF2), com rate limit por tentativas (`MAXIMO_TENTATIVAS_LOGIN`,
+  `BLOQUEIO_LOGIN_MINUTOS`) e mensagem de erro genérica (evita enumeração de conta).
+- **28/09/2026:** o login passou a aceitar **somente a matrícula** (campo `login` do
+  model `Usuario`) — deixou de aceitar e-mail. O e-mail continua existindo no
+  cadastro, mas fica reservado exclusivamente para o fluxo de "Esqueci minha senha"
+  (`usuarios/views.py::solicitar_redefinicao_senha`), que não mudou.
+- `usuarios/tests.py::TestLogin` está desatualizado desde 30/07/2026 — os testes
+  fazem login sem enviar senha, então falham contra o `login()` atual. O projeto não
+  roda essa suíte automaticamente (ver "O que NÃO fazer" abaixo), então isso não
+  bloqueia deploy, mas os testes mentem se alguém rodar `pytest` esperando que
+  passem. Ainda não corrigido — avisar André se o assunto de testes voltar à tona.
 
 ## Convenções de código
 
@@ -167,5 +175,3 @@ André está aprendendo programação do zero (Python/Django). Preferências del
 - Não usar o conector Git para tentar escrever no repo — é só leitura; sempre
   gerar arquivo pronto para download. Não gastar tempo tentando reconectar/
   reinstalar o app achando que vai destravar escrita — já foi tentado à exaustão.
-- Não presumir que o achado de segurança (login sem senha) já foi resolvido sem
-  confirmar com André.
