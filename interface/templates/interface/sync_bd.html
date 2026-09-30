@@ -55,12 +55,28 @@
   </div>
 
   <div class="cartao" style="margin-top:1rem;">
-    <div class="pilha">
+    <!-- 30/09/2026: escolha de quantidade -- pedido do cliente, com
+         receio de mandar o backlog inteiro de uma vez. "O restante"
+         ainda tem um teto de seguranca no backend (600 por clique) --
+         se sobrar RAD pendente depois disso, o aviso avisa e um novo
+         clique continua de onde parou. -->
+    <div class="campo" style="max-width:220px;">
+      <label for="campo-quantidade-sync">Quantidade a enviar</label>
+      <select id="campo-quantidade-sync">
+        <option value="5">5</option>
+        <option value="10" selected>10</option>
+        <option value="25">25</option>
+        <option value="50">50</option>
+        <option value="restante">O restante</option>
+      </select>
+    </div>
+
+    <div class="pilha" style="margin-top:0.75rem;">
       <button type="button" class="botao botao--secundaria" id="botao-atualizar">Atualizar</button>
-      <button type="button" class="botao botao--primaria" id="botao-sincronizar">Sincronizar</button>
+      <button type="button" class="botao botao--primaria" id="botao-sincronizar">Enviar para a planilha</button>
     </div>
     <p class="texto-suave" style="font-size:0.78rem; margin-top:0.75rem; margin-bottom:0;">
-      Cada clique em "Sincronizar" processa até 600 RADs pendentes.
+      "O restante" processa até 600 RADs pendentes por clique, por segurança.
       Se sobrar algum, é só clicar de novo — o que já foi enviado não é reenviado.
     </p>
   </div>
@@ -118,11 +134,20 @@
       botaoSincronizar.disabled = true;
       botaoAtualizar.disabled = true;
       const textoOriginal = botaoSincronizar.textContent;
-      botaoSincronizar.textContent = 'Sincronizando…';
+      botaoSincronizar.textContent = 'Enviando…';
+
+      // 30/09/2026: quantidade escolhida pelo Administrador -- valores
+      // "5"/"10"/"25"/"50" viram numero antes de enviar; "restante"
+      // segue como string (o backend trata como "sem limite proprio,
+      // usa o teto de seguranca").
+      const valorSelecionado = document.getElementById('campo-quantidade-sync').value;
+      const quantidade = valorSelecionado === 'restante' ? 'restante' : Number(valorSelecionado);
 
       try {
         const resposta = await RadAuth.requisicaoAutenticada('/dashboard/sync-bd/sincronizar/', {
           method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ quantidade: quantidade }),
         });
         const corpo = await resposta.json().catch(function () { return {}; });
 

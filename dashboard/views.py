@@ -45,6 +45,8 @@ contrario do resto deste arquivo). Envia os RADs para uma planilha do
 Google (rad/google_sheets.py), 1 RAD = 1 linha, servindo como base de
 dados externa consultavel fora do sistema.
 """
+import json
+
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.db.models import Avg, Count, Q
 from django.http import HttpResponse, JsonResponse
@@ -401,9 +403,21 @@ def sync_bd_dados(request):
 def sync_bd_sincronizar(request):
     """
     POST /dashboard/sync-bd/sincronizar/
+    Body: {"quantidade": 5|10|25|50|"restante"}
     Exclusivo do Administrador. Envia para a planilha do Google
-    (rad/google_sheets.py) todo RAD com data_ultima_sincronizacao_planilha
+    (rad/google_sheets.py) RADs com data_ultima_sincronizacao_planilha
     NULA -- inclusive cancelados (decisao do cliente).
+
+    30/09/2026 (revisado): a quantidade processada NESTE clique agora e
+    escolhida pelo Administrador (lista pre-definida na tela -- 5, 10,
+    25, 50 ou "o restante") em vez de sempre tentar o maximo permitido
+    de uma vez -- pedido do cliente, com receio de mandar o backlog
+    inteiro de uma tacada so. "restante" (ou quantidade ausente/
+    invalida) cai no maximo de seguranca de sempre
+    (MAXIMO_RADS_POR_CLIQUE_SYNC_BD); um numero especifico e sempre
+    limitado a esse maximo tambem (min()), nunca ultrapassa -- a
+    escolha do Administrador so reduz o lote, nunca aumenta o teto de
+    seguranca contra o timeout do gunicorn.
 
     Processa em LOTES de TAMANHO_LOTE_SYNC_BD, cada lote numa unica
     chamada a API (values().append() aceita varias linhas de uma vez) --
@@ -417,18 +431,35 @@ def sync_bd_sincronizar(request):
     nada), e a resposta avisa quantos RADs faltam pro Administrador
     tentar de novo.
 
-    MAXIMO_RADS_POR_CLIQUE_SYNC_BD limita quanto um UNICO clique
-    processa, para nunca chegar perto do timeout de 60s do gunicorn
-    mesmo com um backlog grande -- um segundo clique continua de onde
-    parou.
+    MAXIMO_RADS_POR_CLIQUE_SYNC_BD continua sendo o teto absoluto de
+    quanto um UNICO clique processa, para nunca chegar perto do
+    timeout de 60s do gunicorn mesmo com um backlog grande -- um
+    segundo clique continua de onde parou.
     """
     from rad.google_sheets import SheetsNaoConfiguradoError, enviar_linhas, montar_linha
+
+    try:
+        corpo = json.loads(request.body or '{}')
+    except json.JSONDecodeError:
+        corpo = {}
+
+    quantidade_solicitada = corpo.get('quantidade')
+    if quantidade_solicitada in (None, '', 'restante'):
+        limite = MAXIMO_RADS_POR_CLIQUE_SYNC_BD
+    else:
+        try:
+            limite = int(quantidade_solicitada)
+        except (TypeError, ValueError):
+            limite = MAXIMO_RADS_POR_CLIQUE_SYNC_BD
+        # Nunca deixa a escolha do Administrador passar do teto de
+        # seguranca -- so pode reduzir o lote, nunca aumentar.
+        limite = max(1, min(limite, MAXIMO_RADS_POR_CLIQUE_SYNC_BD))
 
     pendentes = Rad.objects.select_related(*_SELECT_RELATED_SYNC_BD).prefetch_related(
         *_PREFETCH_SYNC_BD
     ).filter(
         data_ultima_sincronizacao_planilha__isnull=True
-    ).order_by('id_rad')[:MAXIMO_RADS_POR_CLIQUE_SYNC_BD]
+    ).order_by('id_rad')[:limite]
 
     pendentes = list(pendentes)
 
