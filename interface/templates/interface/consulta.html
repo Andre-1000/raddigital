@@ -40,6 +40,11 @@
           <option value="">Todos</option>
           <option value="sincronizado">Sincronizado</option>
           <option value="cancelado">Cancelado</option>
+          <!-- 30/09/2026: atalho pra achar RADs cujo Word ainda nao foi
+               salvo no Google Drive (ver consulta/views.py::_aplicar_filtros).
+               Nao e um status de verdade do RAD -- so o valor enviado
+               na busca. Exclui cancelados de proposito. -->
+          <option value="nao_enviado_drive">Não sincronizados (Drive)</option>
         </select>
       </div>
 

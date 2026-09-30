@@ -70,6 +70,17 @@ def _aplicar_filtros(queryset, params):
     foi removido junto com o selo correspondente na tela -- a
     exportacao Excel deixou de ter qualquer acompanhamento visual de
     quem ja exportou o que.
+
+    30/09/2026: o parametro 'status' ganhou um valor especial,
+    'nao_enviado_drive' (rotulo na tela: "Não sincronizados (Drive)") --
+    nao e um status de verdade do RAD (que so tem sincronizado/
+    cancelado), e sim um atalho pra achar RADs cujo Word ainda nao foi
+    salvo no Google Drive (data_ultimo_envio_drive NULO). RADs
+    cancelados ficam de fora de proposito: eles nao tem o bloco de
+    Exportar/Drive (ver detalhe_rad.html) e nao mostram o selo "Drive
+    pendente" na lista, entao nunca "faltam" ir pro Drive. Como
+    exportar_excel reaproveita esta mesma funcao, o botao "Exportar
+    Excel" respeita esse filtro tambem.
     """
     if params.get('numero_rad'):
         queryset = queryset.filter(numero_rad=params['numero_rad'])
@@ -77,8 +88,13 @@ def _aplicar_filtros(queryset, params):
         queryset = queryset.filter(numero_os=params['numero_os'])
     if params.get('numero_sa'):
         queryset = queryset.filter(numero_sa=params['numero_sa'])
-    if params.get('status'):
-        queryset = queryset.filter(status=params['status'])
+    status_filtro = params.get('status')
+    if status_filtro == 'nao_enviado_drive':
+        queryset = queryset.filter(
+            status=Rad.SINCRONIZADO, data_ultimo_envio_drive__isnull=True
+        )
+    elif status_filtro:
+        queryset = queryset.filter(status=status_filtro)
     if params.get('data_de'):
         queryset = queryset.filter(data_preenchimento__gte=parse_data(params['data_de']))
     if params.get('data_ate'):
