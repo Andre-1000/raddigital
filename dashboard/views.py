@@ -51,6 +51,7 @@ from django.contrib.postgres.aggregates import ArrayAgg
 from django.db.models import Avg, Count, Q
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 
 from colaboradores.models import ColaboradorCadastro
 from comum.datas import parse_data
@@ -398,12 +399,23 @@ def sync_bd_dados(request):
     return JsonResponse(_contadores_sync_bd())
 
 
+@csrf_exempt
 @requer_token
 @requer_perfil(UsuarioPerfil.ADMINISTRADOR)
 def sync_bd_sincronizar(request):
     """
     POST /dashboard/sync-bd/sincronizar/
     Body: {"quantidade": 5|10|25|50|"restante"}
+
+    30/09/2026: @csrf_exempt necessario -- esta e a UNICA rota deste
+    arquivo que recebe POST (dados/exportar_excel/sync_bd_dados sao
+    GET). O sistema RAD nao usa sessao/cookie do Django (autenticacao
+    e por token, ver usuarios/decorators.py), entao a protecao CSRF
+    padrao do Django so atrapalha aqui -- mesmo padrao ja aplicado em
+    toda rota POST do sistema (usuarios/views.py, rad/views.py etc.).
+    Bug real encontrado em producao: sem isso, o Django bloqueava a
+    requisicao com 403 antes de chegar no codigo da view, e o
+    frontend so via uma mensagem generica de erro.
     Exclusivo do Administrador. Envia para a planilha do Google
     (rad/google_sheets.py) RADs com data_ultima_sincronizacao_planilha
     NULA -- inclusive cancelados (decisao do cliente).
