@@ -101,12 +101,14 @@ class TestValidacoesBasicas:
         payload = _payload_valido_base(servicos=[servico_inspecao.id], numero_os=-5)
         assert 'VLD-001' in _codigos(validar_payload_sincronizacao(payload, hoje=HOJE))
 
-    def test_vld_001_os_acima_de_7_digitos(self, servico_inspecao):
-        payload = _payload_valido_base(servicos=[servico_inspecao.id], numero_os=10_000_000)
+    def test_vld_001_os_acima_de_11_digitos(self, servico_inspecao):
+        # 30/09/2026: limite passou de 7 para 11 digitos (ver
+        # rad/validadores.py::LIMITE_DIGITOS_OS) -- 12 digitos continua recusado.
+        payload = _payload_valido_base(servicos=[servico_inspecao.id], numero_os=100_000_000_000)
         assert 'VLD-001' in _codigos(validar_payload_sincronizacao(payload, hoje=HOJE))
 
-    def test_os_com_exatamente_7_digitos_e_valida(self, servico_inspecao):
-        payload = _payload_valido_base(servicos=[servico_inspecao.id], numero_os=9_999_999)
+    def test_os_com_exatamente_11_digitos_e_valida(self, servico_inspecao):
+        payload = _payload_valido_base(servicos=[servico_inspecao.id], numero_os=99_999_999_999)
         assert 'VLD-001' not in _codigos(validar_payload_sincronizacao(payload, hoje=HOJE))
 
     def test_vld_028_numero_sa_vazio(self, servico_inspecao):

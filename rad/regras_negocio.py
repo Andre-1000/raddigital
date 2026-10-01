@@ -54,11 +54,21 @@ def _travar_os(numero_os):
     e receberiam Numero de Execucao = 1). O lock consultivo trava pelo
     proprio valor da OS, existam ou nao linhas gravadas, e e liberado
     automaticamente no COMMIT/ROLLBACK da transacao (passo 6).
+
+    30/09/2026: a chave do lock passou a ser o HASH do numero da OS em
+    texto (hashtext), nao o proprio numero. A forma com duas chaves de
+    32 bits, pg_advisory_xact_lock(int, int), so aceita OS ate ~2,1
+    bilhoes -- uma OS de 11 digitos (ex.: 71000006649) derrubava a
+    sincronizacao com "function pg_advisory_xact_lock(integer, bigint)
+    does not exist" (erro 500). Com o hash, qualquer tamanho de OS
+    funciona. Duas OS diferentes cairem na mesma chave so por colisao
+    de hash de 32 bits, o que e raro e inofensivo: so faz uma esperar
+    a outra por alguns milissegundos.
     """
     with connection.cursor() as cursor:
         cursor.execute(
-            f'SELECT pg_advisory_xact_lock({_NAMESPACE_LOCK_OS}::int, %s)',
-            [numero_os],
+            f'SELECT pg_advisory_xact_lock({_NAMESPACE_LOCK_OS}, hashtext(%s::text))',
+            [str(numero_os)],
         )
 
 

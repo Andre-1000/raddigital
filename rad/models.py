@@ -48,7 +48,11 @@ class Rad(models.Model):
         unique=True,
         help_text='ID visivel. Formato R00001. Gerado na sincronizacao.',
     )
-    numero_os = models.IntegerField(help_text='OS informada pelo usuario. Pode se repetir.')
+    # 30/09/2026: BigIntegerField (antes IntegerField, ate ~2,1 bilhoes) --
+    # as OS reais da operacao tem 11 digitos (ex.: 71000006649), o que
+    # estourava o IntegerField do Postgres. O limite de digitos aceito
+    # na sincronizacao fica em rad/validadores.py::LIMITE_DIGITOS_OS.
+    numero_os = models.BigIntegerField(help_text='OS informada pelo usuario. Pode se repetir.')
     numero_sa = models.CharField(
         max_length=10,
         help_text='N. SA. Numerico, ate 10 caracteres. Campo obrigatorio, independente da OS.',

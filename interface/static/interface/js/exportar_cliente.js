@@ -52,6 +52,25 @@ const ExportarCliente = (function () {
 
     const nomesColaboradores = (rascunho.colaboradores || []).map((p) => p.nome);
 
+    // 30/09/2026: as linhas de Terceiros so entram quando algum dos
+    // servicos SELECIONADOS pede aquele dado -- mesma regra que o
+    // formulario ja usa pra mostrar ou esconder cada campo (ver
+    // rad_form.js::atualizarVisibilidadeServicos). Antes, as 5 linhas
+    // apareciam sempre (como "N/A") em qualquer RAD, mesmo sem nenhum
+    // servico de Terceiros selecionado (ex.: so "Manutencao em AMV").
+    //   - Encarregados/Ajudantes/Motorista: servico com requer_terceiros.
+    //   - Op Maquina: servico com terceiros_tem_op_maquina.
+    //   - Volume: servico com terceiros_tem_volume.
+    const servicosSelecionados = (catalogos.servicos || []).filter(
+      (s) => (rascunho.servicos || []).includes(s.id)
+    );
+    function algumServicoTem(flag) {
+      return servicosSelecionados.some((s) => s[flag]);
+    }
+    const mostrarTerceiros = algumServicoTem('requer_terceiros');
+    const mostrarOpMaquina = algumServicoTem('terceiros_tem_op_maquina');
+    const mostrarVolume = algumServicoTem('terceiros_tem_volume');
+
     const partesAtraso = [];
     if (rascunho.id_motivo_atraso_inicio) {
       let motivo = nomePorCodigo(catalogos.motivos_atraso, 'id', rascunho.id_motivo_atraso_inicio);
@@ -98,11 +117,21 @@ const ExportarCliente = (function () {
       ['hora_real_inicio', 'Início', ouNA(rascunho.hora_real_inicio)],
       ['hora_real_termino', 'Término', ouNA(rascunho.hora_real_termino)],
       ['servicos', 'Serviços realizados', textoServicos], // duplicado, igual ao backend (EFD 3.13)
-      ['terceiros_num_encarregados', 'N° Encarregados (Terceiros)', ouNA(rascunho.terceiros_num_encarregados)],
-      ['terceiros_num_op_maquina', 'N° Op Máquina (Terceiros)', ouNA(rascunho.terceiros_num_op_maquina)],
-      ['terceiros_num_ajudantes', 'N° Ajudantes (Terceiros)', ouNA(rascunho.terceiros_num_ajudantes)],
-      ['terceiros_num_motorista', 'N° Motorista (Terceiros)', ouNA(rascunho.terceiros_num_motorista)],
-      ['terceiros_volume', 'Volume (Terceiros)', ouNA(rascunho.terceiros_volume)],
+      ...(mostrarTerceiros
+        ? [['terceiros_num_encarregados', 'N° Encarregados (Terceiros)', ouNA(rascunho.terceiros_num_encarregados)]]
+        : []),
+      ...(mostrarOpMaquina
+        ? [['terceiros_num_op_maquina', 'N° Op Máquina (Terceiros)', ouNA(rascunho.terceiros_num_op_maquina)]]
+        : []),
+      ...(mostrarTerceiros
+        ? [
+            ['terceiros_num_ajudantes', 'N° Ajudantes (Terceiros)', ouNA(rascunho.terceiros_num_ajudantes)],
+            ['terceiros_num_motorista', 'N° Motorista (Terceiros)', ouNA(rascunho.terceiros_num_motorista)],
+          ]
+        : []),
+      ...(mostrarVolume
+        ? [['terceiros_volume', 'Volume (Terceiros)', ouNA(rascunho.terceiros_volume)]]
+        : []),
       ['materiais_utilizados', 'Equipamentos utilizados', ouNA(rascunho.materiais_utilizados)],
       ['motivo_atraso_inicio', 'Motivo dos atrasos', textoMotivoAtrasos],
       ['colaboradores', 'Responsável', listaOuNA(nomesColaboradores)],

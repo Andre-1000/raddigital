@@ -22,6 +22,15 @@ NOME_SERVICO_OUTROS = 'Outros'
 NOME_TIPO_MANUTENCAO_FALHA = 'Falha'
 NOME_TIPO_MANUTENCAO_VPM001 = 'VPM001'
 
+# 30/09/2026: maximo de digitos da OS. Antes era 7; as OS reais da
+# operacao tem 11 digitos (ex.: 71000006649). O banco guarda a OS em um
+# BigIntegerField (rad/models.py::Rad.numero_os), que comporta bem mais
+# que isso -- este e um limite de NEGOCIO, nao tecnico: para aceitar OS
+# maiores no futuro, basta mudar este numero (e o max= do campo em
+# interface/templates/interface/novo_rad.html, que precisa acompanhar).
+LIMITE_DIGITOS_OS = 11
+LIMITE_VALOR_OS = 10 ** LIMITE_DIGITOS_OS - 1
+
 # 30/07/2026: choices validas do bloco Canaleta -- espelham
 # rad.models.RadCanaleta/RadCanaletaAnomalia/RadCanaletaLado, mas
 # como listas simples de string (nao dependem de import do model)
@@ -78,13 +87,19 @@ def _erro(codigo, campo, mensagem):
 
 
 def _validar_os(payload, erros):
-    """VLD-001: OS vazia ou invalida (deve ser numerica, 1 a 7 digitos, > 0)."""
+    """
+    VLD-001: OS vazia ou invalida (deve ser numerica, 1 a
+    LIMITE_DIGITOS_OS digitos, > 0). Ate 30/09/2026 o limite era 7
+    digitos -- ver a nota em LIMITE_DIGITOS_OS.
+    """
     numero_os = payload.get('numero_os')
     if numero_os is None or not isinstance(numero_os, int) or numero_os <= 0:
         erros.append(_erro('VLD-001', 'numero_os', 'Informe uma OS com caracteres validos.'))
         return
-    if numero_os > 9_999_999:
-        erros.append(_erro('VLD-001', 'numero_os', 'A OS deve ter no maximo 7 digitos.'))
+    if numero_os > LIMITE_VALOR_OS:
+        erros.append(
+            _erro('VLD-001', 'numero_os', f'A OS deve ter no maximo {LIMITE_DIGITOS_OS} digitos.')
+        )
 
 
 def _validar_numero_sa(payload, erros):
@@ -731,9 +746,16 @@ def _aplicar_configuracao_obrigatoriedade(payload, erros):
     permite tornar QUALQUER campo suportado (ver mapa acima) obrigatorio
     ou opcional, por cima das regras fixas de cada _validar_* function.
 
-    - obrigatorio=False no config: solta a exigencia -- remove qualquer
-      erro que uma validacao fixa acima ja tenha lancado para aquele
-      campo (ex.: Responsavel Atividade pode ser tornado opcional).
+    - obrigatorio=False no config: solta a exigencia de PREENCHER -- se
+      o campo veio em branco, remove os erros que uma validacao fixa
+      acima ja tenha lancado para ele (ex.: Responsavel Atividade pode
+      ser tornado opcional). Se o campo veio PREENCHIDO, os erros de
+      formato/tamanho/valor continuam valendo: "opcional" quer dizer
+      "pode ficar vazio", nunca "aceita qualquer coisa". (Ate
+      30/09/2026 esta regra apagava TODOS os erros do campo, inclusive
+      de formato -- uma OS de 11 digitos, acima do limite, passava pela
+      validacao quando a OS estava como opcional e so estourava depois,
+      no banco, como erro 500 generico.)
     - obrigatorio=True no config: adiciona um erro generico se o campo
       estiver vazio, mesmo quando a regra fixa normalmente nao exigiria
       (ex.: Km/Poste pode ser tornado obrigatorio) -- MAS somente se o
@@ -766,7 +788,8 @@ def _aplicar_configuracao_obrigatoriedade(payload, erros):
         )
 
         if not config.obrigatorio:
-            erros[:] = [e for e in erros if e['campo'] != campo_payload]
+            if vazio:
+                erros[:] = [e for e in erros if e['campo'] != campo_payload]
         elif campo_esta_visivel and vazio and not any(e['campo'] == campo_payload for e in erros):
             erros.append(
                 _erro(
