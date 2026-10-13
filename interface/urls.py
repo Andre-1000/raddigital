@@ -11,6 +11,7 @@ urlpatterns = [
     path('inicio/', views.tela_inicio, name='inicio'),
     path('consultar/', views.tela_consulta, name='consulta'),
     path('consultar/<str:numero_rad>/', views.tela_detalhe_rad, name='detalhe_rad'),
+    path('consultar/<str:numero_rad>/editar/', views.tela_editar_rad, name='editar_rad'),
     path('meus-rads/', views.tela_meus_rads, name='meus_rads'),
     path('gerenciar-usuarios/', views.tela_gerenciar_usuarios, name='gerenciar_usuarios'),
     path('configuracoes/', views.tela_configuracoes, name='configuracoes'),

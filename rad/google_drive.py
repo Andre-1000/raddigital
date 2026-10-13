@@ -160,3 +160,57 @@ def salvar_docx_no_drive(nome_arquivo, docx_bytes):
         supportsAllDrives=True,
     ).execute()
     return arquivo.get('webViewLink')
+
+
+def substituir_docx_no_drive(nome_arquivo, docx_bytes):
+    """
+    13/10/2026: troca o CONTEUDO do arquivo ja existente na pasta pelo
+    Word novo (usado depois que o Administrador edita um RAD ja
+    enviado). Mantem o mesmo arquivo -- mesmo ID e mesmo link --, so
+    atualiza o conteudo; nao cria copia.
+
+    Se (por causa do bug antigo de duplicatas) houver MAIS de um arquivo
+    com este nome, atualiza o mais antigo e NAO apaga os outros --
+    apagar arquivo no Drive e irreversivel e nao foi pedido. Quem chama
+    recebe `copias_extras` e avisa o Administrador para limpar a mao.
+    Se o arquivo nao existir, cria (mesmo efeito de salvar_docx_no_drive).
+
+    Retorna (link, copias_extras).
+    """
+    if not esta_configurado():
+        raise DriveNaoConfiguradoError(
+            'Integração com Google Drive não configurada. Contate o Administrador.'
+        )
+
+    from googleapiclient.http import MediaIoBaseUpload
+
+    nome_escapado = nome_arquivo.replace("'", "\\'")
+    servico = _obter_servico()
+    encontrados = servico.files().list(
+        q=(
+            f"name = '{nome_escapado}' "
+            f"and '{os.environ['GOOGLE_DRIVE_FOLDER_ID']}' in parents "
+            f"and trashed = false"
+        ),
+        fields='files(id, createdTime)',
+        orderBy='createdTime',
+        pageSize=20,
+        supportsAllDrives=True,
+        includeItemsFromAllDrives=True,
+    ).execute().get('files', [])
+
+    if not encontrados:
+        return salvar_docx_no_drive(nome_arquivo, docx_bytes), 0
+
+    midia = MediaIoBaseUpload(
+        io.BytesIO(docx_bytes),
+        mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        resumable=False,
+    )
+    arquivo = servico.files().update(
+        fileId=encontrados[0]['id'],
+        media_body=midia,
+        fields='id, webViewLink',
+        supportsAllDrives=True,
+    ).execute()
+    return arquivo.get('webViewLink'), len(encontrados) - 1

@@ -31,6 +31,12 @@ NOME_TIPO_MANUTENCAO_VPM001 = 'VPM001'
 LIMITE_DIGITOS_OS = 11
 LIMITE_VALOR_OS = 10 ** LIMITE_DIGITOS_OS - 1
 
+# 30/09/2026: maximo de caracteres do Responsavel Atividade (VLD-029).
+# O formulario (interface/static/interface/js/regras_campos.js) avisa o
+# usuario NA HORA quando o texto passa disso -- os dois numeros precisam
+# ser iguais; rad/test_regras_campos_consistencia.py falha se divergirem.
+LIMITE_CARACTERES_RESPONSAVEL_ATIVIDADE = 50
+
 # 30/07/2026: choices validas do bloco Canaleta -- espelham
 # rad.models.RadCanaleta/RadCanaletaAnomalia/RadCanaletaLado, mas
 # como listas simples de string (nao dependem de import do model)
@@ -312,19 +318,20 @@ def _validar_colaboradores(payload, erros):
 
 
 def _validar_responsavel_atividade(payload, erros):
-    """VLD-029: obrigatorio, no maximo 50 caracteres."""
+    """VLD-029: obrigatorio, no maximo LIMITE_CARACTERES_RESPONSAVEL_ATIVIDADE (50) caracteres."""
     valor = payload.get('responsavel_atividade')
     if not valor or not str(valor).strip():
         erros.append(
             _erro('VLD-029', 'responsavel_atividade', 'Informe o Responsável Atividade.')
         )
         return
-    if len(str(valor)) > 50:
+    if len(str(valor)) > LIMITE_CARACTERES_RESPONSAVEL_ATIVIDADE:
         erros.append(
             _erro(
                 'VLD-029',
                 'responsavel_atividade',
-                'O Responsável Atividade deve ter no máximo 50 caracteres.',
+                'O Responsável Atividade deve ter no máximo '
+                f'{LIMITE_CARACTERES_RESPONSAVEL_ATIVIDADE} caracteres.',
             )
         )
 

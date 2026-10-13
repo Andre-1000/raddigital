@@ -22,7 +22,7 @@ original (servicos, por serem campo de multipla selecao, nao eram
 filtraveis) -- decisao do cliente, ver conversa de alinhamento.
 """
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import F, Q
 from django.http import FileResponse, HttpResponse, JsonResponse
 from django.utils import timezone
 
@@ -90,8 +90,12 @@ def _aplicar_filtros(queryset, params):
         queryset = queryset.filter(numero_sa=params['numero_sa'])
     status_filtro = params.get('status')
     if status_filtro == 'nao_enviado_drive':
+        # 13/10/2026: tambem entram os RADs EDITADOS depois do ultimo
+        # envio (o Word no Drive esta velho e precisa ser reenviado).
         queryset = queryset.filter(
-            status=Rad.SINCRONIZADO, data_ultimo_envio_drive__isnull=True
+            Q(data_ultimo_envio_drive__isnull=True)
+            | Q(data_ultima_edicao__gt=F('data_ultimo_envio_drive')),
+            status=Rad.SINCRONIZADO,
         )
     elif status_filtro:
         queryset = queryset.filter(status=status_filtro)
@@ -206,7 +210,7 @@ def _linha_resumo(rad):
         # (nao so Administrador) para achar rapido quais RADs ainda
         # nao foram enviados ao Google Drive -- ver
         # exportar_docx_drive, que e quem marca esse campo.
-        'enviado_drive': rad.data_ultimo_envio_drive is not None,
+        'enviado_drive': rad.data_ultimo_envio_drive is not None and not rad.drive_desatualizado,
     }
 
 
@@ -544,7 +548,12 @@ def exportar_docx_drive(request, numero_rad):
     if not _pode_exportar(request.usuario_rad, rad):
         return JsonResponse({'erro': 'Acesso nao autorizado.'}, status=403)
 
-    from rad.google_drive import DriveNaoConfiguradoError, arquivo_existe_no_drive, salvar_docx_no_drive
+    from rad.google_drive import (
+        DriveNaoConfiguradoError,
+        arquivo_existe_no_drive,
+        salvar_docx_no_drive,
+        substituir_docx_no_drive,
+    )
 
     nome_arquivo = f'{rad.numero_rad}.docx'
 
@@ -559,7 +568,7 @@ def exportar_docx_drive(request, numero_rad):
             status=502,
         )
 
-    if ja_existe:
+    if ja_existe and not rad.drive_desatualizado:
         # 17/09/2026: o arquivo ja existe -- corrige
         # data_ultimo_envio_drive se ainda estivesse NULL (caso raro:
         # o envio automatico da sincronizacao deu certo no Drive, mas
@@ -567,6 +576,11 @@ def exportar_docx_drive(request, numero_rad):
         # entao o campo nunca foi marcado). Sem isso, o aviso "ainda
         # nao enviado ao Drive" ficaria preso na tela mesmo com o
         # arquivo realmente la.
+        #
+        # 13/10/2026: se o RAD foi EDITADO depois do ultimo envio
+        # (rad.drive_desatualizado), o arquivo existente esta velho --
+        # nesse caso NAO cai aqui: segue para gerar o Word novo e
+        # substituir o conteudo do arquivo ja existente (mais abaixo).
         if rad.data_ultimo_envio_drive is None:
             rad.data_ultimo_envio_drive = timezone.now()
             rad.save(update_fields=['data_ultimo_envio_drive'])
@@ -579,8 +593,14 @@ def exportar_docx_drive(request, numero_rad):
 
     docx_bytes = gerar_docx_oficial_bytes(rad)
 
+    copias_extras = 0
     try:
-        link = salvar_docx_no_drive(nome_arquivo, docx_bytes)
+        if ja_existe:
+            # RAD editado depois do ultimo envio: troca o conteudo do
+            # arquivo existente (mesmo link), sem criar copia.
+            link, copias_extras = substituir_docx_no_drive(nome_arquivo, docx_bytes)
+        else:
+            link = salvar_docx_no_drive(nome_arquivo, docx_bytes)
     except DriveNaoConfiguradoError as erro:
         return JsonResponse({'erro': str(erro)}, status=503)
     except Exception as erro:
@@ -601,7 +621,7 @@ def exportar_docx_drive(request, numero_rad):
     rad.data_ultimo_envio_drive = timezone.now()
     rad.save(update_fields=['data_ultimo_envio_drive'])
 
-    return JsonResponse({'link': link})
+    return JsonResponse({'link': link, 'copias_extras': copias_extras})
 
 
 @requer_token
@@ -842,6 +862,8 @@ def detalhe_rad(request, numero_rad):
     pode_cancelar = (
         UsuarioPerfil.ADMINISTRADOR in perfis_usuario and rad.status != Rad.CANCELADO
     )
+    eh_administrador = UsuarioPerfil.ADMINISTRADOR in perfis_usuario
+    ultima_edicao = rad.edicoes.select_related('usuario').first()
 
     resposta = _remover_campos_desabilitados(
             {
@@ -931,8 +953,29 @@ def detalhe_rad(request, numero_rad):
                     rad.data_cancelamento.isoformat() if rad.data_cancelamento else None
                 ),
                 'pode_cancelar': pode_cancelar,  # PRM-037
+                # 13/10/2026: edicao pelo Administrador (rad/edicao.py).
+                # editado_em/editado_por aparecem para todos que podem ver
+                # o RAD (transparencia: o tecnico sabe que o que ele
+                # preencheu foi alterado); o historico campo a campo e o
+                # motivo so para o Administrador.
+                'pode_editar': eh_administrador and rad.status != Rad.CANCELADO,
+                'editado_em': (
+                    rad.data_ultima_edicao.isoformat() if rad.data_ultima_edicao else None
+                ),
+                'editado_por': ultima_edicao.usuario.login if ultima_edicao else None,
+                'drive_desatualizado': rad.drive_desatualizado,
+                'planilha_desatualizada': rad.planilha_desatualizada,
+                'edicoes': [
+                    {
+                        'data': e.data.isoformat(),
+                        'login_usuario': e.usuario.login,
+                        'motivo': e.motivo,
+                        'alteracoes': e.alteracoes,
+                    }
+                    for e in rad.edicoes.select_related('usuario')
+                ] if eh_administrador else [],
                 'exportacao_pdf_disponivel': _exportacao_pdf_oficial_habilitada(),
-                'enviado_drive': rad.data_ultimo_envio_drive is not None,
+                'enviado_drive': rad.data_ultimo_envio_drive is not None and not rad.drive_desatualizado,
             }
     )
 

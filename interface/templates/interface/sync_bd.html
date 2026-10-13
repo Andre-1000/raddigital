@@ -48,6 +48,12 @@
       <div class="cartao-metrica__valor" id="valor-total-sincronizados">—</div>
       <div class="cartao-metrica__rotulo">RAD Sincronizados</div>
     </div>
+    <!-- 13/10/2026: RADs que ja estao na planilha mas foram editados
+         pelo Administrador depois -- a linha da planilha esta velha. -->
+    <div class="cartao cartao-metrica">
+      <div class="cartao-metrica__valor" id="valor-total-desatualizados">—</div>
+      <div class="cartao-metrica__rotulo">RAD Editados (planilha desatualizada)</div>
+    </div>
     <div class="cartao cartao-metrica">
       <div class="cartao-metrica__valor" id="valor-total-nao-sincronizados">—</div>
       <div class="cartao-metrica__rotulo">RAD Não Sincronizados</div>
@@ -78,6 +84,7 @@
     <p class="texto-suave" style="font-size:0.78rem; margin-top:0.75rem; margin-bottom:0;">
       "O restante" processa até 600 RADs pendentes por clique, por segurança.
       Se sobrar algum, é só clicar de novo — o que já foi enviado não é reenviado.
+      RADs editados depois do envio têm a linha atualizada na planilha (não viram linha nova).
     </p>
   </div>
 </div>
@@ -96,6 +103,7 @@
     const aviso = document.getElementById('aviso-sync-bd');
     const valorTotal = document.getElementById('valor-total-preenchidos');
     const valorSincronizados = document.getElementById('valor-total-sincronizados');
+    const valorDesatualizados = document.getElementById('valor-total-desatualizados');
     const valorNaoSincronizados = document.getElementById('valor-total-nao-sincronizados');
     const botaoAtualizar = document.getElementById('botao-atualizar');
     const botaoSincronizar = document.getElementById('botao-sincronizar');
@@ -103,6 +111,7 @@
     function aplicarContadores(dados) {
       valorTotal.textContent = dados.total_rad_preenchidos;
       valorSincronizados.textContent = dados.total_rad_sincronizados;
+      valorDesatualizados.textContent = dados.total_rad_desatualizados;
       valorNaoSincronizados.textContent = dados.total_rad_nao_sincronizados;
     }
 
@@ -162,12 +171,22 @@
 
         aplicarContadores(corpo);
 
-        if (corpo.processados === 0) {
+        // 13/10/2026: "atualizados" = RADs editados depois do envio, cuja
+        // linha na planilha foi atualizada no lugar (nao e linha nova).
+        const novos = corpo.processados || 0;
+        const atualizados = corpo.atualizados || 0;
+        const pendentes = (corpo.total_rad_nao_sincronizados || 0) + (corpo.total_rad_desatualizados || 0);
+        const partes = [];
+        if (novos) partes.push(`${novos} novo(s) enviado(s)`);
+        if (atualizados) partes.push(`${atualizados} atualizado(s)`);
+        const resumo = partes.join(' e ');
+
+        if (novos + atualizados === 0) {
           aviso.innerHTML = '<div class="aviso aviso--sucesso">Nenhum RAD pendente — tudo já está sincronizado.</div>';
-        } else if (corpo.total_rad_nao_sincronizados > 0) {
-          aviso.innerHTML = `<div class="aviso aviso--atencao">${corpo.processados} RAD(s) sincronizado(s) neste clique. Ainda restam ${corpo.total_rad_nao_sincronizados} — clique em Sincronizar de novo para continuar.</div>`;
+        } else if (pendentes > 0) {
+          aviso.innerHTML = `<div class="aviso aviso--atencao">${resumo} neste clique. Ainda restam ${pendentes} — clique de novo para continuar.</div>`;
         } else {
-          aviso.innerHTML = `<div class="aviso aviso--sucesso">${corpo.processados} RAD(s) sincronizado(s). Tudo em dia!</div>`;
+          aviso.innerHTML = `<div class="aviso aviso--sucesso">${resumo}. Tudo em dia!</div>`;
         }
       } catch (erro) {
         aviso.innerHTML = '<div class="aviso aviso--erro">Erro de conexão ao sincronizar.</div>';

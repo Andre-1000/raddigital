@@ -670,3 +670,87 @@ class TestIntegracaoComApiDeLogin:
             reverse('consulta:listar_rads'), HTTP_AUTHORIZATION=f'Token {token}'
         )
         assert resposta_protegida.status_code == 200
+
+
+@pytest.mark.django_db
+class TestAvisosDeRegraPorCampoComDomReal:
+    """
+    30/09/2026. Avisos de regra na hora, abaixo de cada campo (OS,
+    N° SA, Responsavel Atividade, Data da Atividade, Km/Poste, Terceiros
+    e o limite de caracteres de qualquer campo), e bloqueio do envio
+    enquanto um campo visivel estiver fora da regra. Roda o rad_form.js
+    verdadeiro com DOM real (jsdom) -- ver js_tests/teste_regras_campos.js.
+    """
+
+    def test_avisos_de_regra_no_formulario_real(self, tmp_path):
+        import subprocess
+        from pathlib import Path
+
+        from django.template.loader import render_to_string
+
+        html = render_to_string('interface/novo_rad.html')
+        caminho_html = tmp_path / 'novo_rad_renderizado.html'
+        caminho_html.write_text(html)
+
+        script = Path(__file__).resolve().parent / 'js_tests' / 'teste_regras_campos.js'
+        resultado = subprocess.run(
+            ['node', str(script), str(caminho_html)],
+            capture_output=True, text=True, timeout=60,
+            cwd=str(Path(__file__).resolve().parent / 'js_tests'),
+        )
+        assert resultado.returncode == 0, (
+            f'Teste dos avisos de regra falhou:\n{resultado.stdout}\n{resultado.stderr}'
+        )
+        assert 'Todos os testes passaram.' in resultado.stdout
+
+
+@pytest.mark.django_db
+class TestTelaEditarRad:
+    """
+    13/10/2026. Tela "Editar RAD" (Administrador): o mesmo formulario do
+    Novo RAD em modo edicao. Aqui: a rota existe e entrega a pagina em
+    modo edicao; o teste jsdom roda o rad_form.js verdadeiro nesse modo.
+    """
+
+    def test_rota_entrega_o_formulario_em_modo_edicao(self, client):
+        resposta = client.get('/consultar/R00001/editar/')
+        assert resposta.status_code == 200
+        html = resposta.content.decode()
+        assert 'window.RAD_EDICAO = { numero_rad: "R00001" }' in html
+        assert 'id="campo-motivo-edicao"' in html
+        assert 'id="lista-anexos-existentes"' in html
+        assert 'Salvar alterações' in html
+
+    def test_novo_rad_normal_nao_tem_nada_de_edicao(self, client):
+        html = client.get('/novo-rad/').content.decode()
+        assert 'RAD_EDICAO' not in html
+        assert 'campo-motivo-edicao' not in html
+        assert 'Apagar rascunho' in html
+
+    def test_detalhe_tem_botao_de_editar_e_historico(self, client):
+        html = client.get('/consultar/R00001/').content.decode()
+        assert 'id="botao-editar-rad"' in html
+        assert 'id="lista-historico-edicoes"' in html
+
+    def test_modo_edicao_com_dom_real(self, tmp_path):
+        import subprocess
+        from pathlib import Path
+
+        from django.template.loader import render_to_string
+
+        html = render_to_string(
+            'interface/novo_rad.html', {'modo_edicao': True, 'numero_rad': 'R00001'}
+        )
+        caminho_html = tmp_path / 'editar_rad_renderizado.html'
+        caminho_html.write_text(html)
+
+        script = Path(__file__).resolve().parent / 'js_tests' / 'teste_edicao_rad.js'
+        resultado = subprocess.run(
+            ['node', str(script), str(caminho_html)],
+            capture_output=True, text=True, timeout=60,
+            cwd=str(Path(__file__).resolve().parent / 'js_tests'),
+        )
+        assert resultado.returncode == 0, (
+            f'Teste do modo edicao falhou:\n{resultado.stdout}\n{resultado.stderr}'
+        )
+        assert 'TODOS OS TESTES PASSARAM' in resultado.stdout

@@ -123,3 +123,62 @@ def enviar_linhas(linhas):
         insertDataOption='INSERT_ROWS',
         body={'values': linhas},
     ).execute()
+
+
+def atualizar_linhas(pares):
+    """
+    13/10/2026: atualiza, na planilha, as linhas de RADs que JA foram
+    enviados antes e depois foram editados pelo Administrador.
+
+    pares: lista de (numero_rad, linha) -- `linha` no formato de
+    montar_linha. A coluna A da planilha e o "Número RAD" (primeira
+    coluna de rad.exportacao_excel.COLUNAS) e e por ela que a linha e
+    localizada: le a coluna A inteira numa unica chamada e acha a
+    posicao de cada RAD. Se um RAD nao for encontrado (linha apagada a
+    mao na planilha, por exemplo), ele e ACRESCENTADO no fim em vez de
+    ser ignorado -- assim a planilha nunca fica sem o RAD. Se o mesmo
+    numero aparecer em mais de uma linha (envio duplicado antigo),
+    atualiza a PRIMEIRA ocorrencia.
+
+    Retorna (atualizadas, acrescentadas). Levanta
+    SheetsNaoConfiguradoError se nao estiver configurado.
+    """
+    if not pares:
+        return 0, 0
+
+    if not esta_configurado():
+        raise SheetsNaoConfiguradoError(
+            'Integração com Google Sheets não configurada. Contate o Administrador.'
+        )
+
+    aba = os.getenv('GOOGLE_SHEETS_ABA') or ABA_PADRAO
+    id_planilha = os.environ['GOOGLE_SHEETS_SPREADSHEET_ID']
+    servico = _obter_servico()
+
+    coluna_a = servico.spreadsheets().values().get(
+        spreadsheetId=id_planilha, range=f"'{aba}'!A:A",
+    ).execute().get('values', [])
+
+    posicao_por_rad = {}
+    for indice, linha_a in enumerate(coluna_a, start=1):
+        if linha_a and indice > 1:  # linha 1 e o cabecalho
+            posicao_por_rad.setdefault(str(linha_a[0]).strip(), indice)
+
+    atualizacoes = []
+    novas = []
+    for numero_rad, linha in pares:
+        posicao = posicao_por_rad.get(numero_rad)
+        if posicao is None:
+            novas.append(linha)
+        else:
+            atualizacoes.append({'range': f"'{aba}'!A{posicao}", 'values': [linha]})
+
+    if atualizacoes:
+        servico.spreadsheets().values().batchUpdate(
+            spreadsheetId=id_planilha,
+            body={'valueInputOption': 'USER_ENTERED', 'data': atualizacoes},
+        ).execute()
+    if novas:
+        enviar_linhas(novas)
+
+    return len(atualizacoes), len(novas)

@@ -41,6 +41,7 @@ const URLS_APP_SHELL = [
   '/static/interface/js/regras_horario.js',
   '/static/interface/js/validadores_arquivos.js',
   '/static/interface/js/exportar_cliente.js',
+  '/static/interface/js/regras_campos.js',
   '/static/interface/js/rad_form.js',
   '/static/interface/js/vendor/jspdf.umd.min.js',
 ];

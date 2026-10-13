@@ -241,6 +241,14 @@ class Rad(models.Model):
     # sync_bd_sincronizar), que so processa RADs com este campo NULL --
     # e o que evita mandar a mesma linha duas vezes.
     data_ultima_sincronizacao_planilha = models.DateTimeField(null=True, blank=True)
+    # data_ultima_edicao (13/10/2026): preenchido quando o Administrador
+    # edita um RAD ja sincronizado (ver rad/edicao.py). NULL = nunca foi
+    # editado. Serve de referencia para saber se o Word no Drive e a
+    # linha na planilha ficaram DESATUALIZADOS: se esta data e posterior
+    # a data_ultimo_envio_drive / data_ultima_sincronizacao_planilha, o
+    # conteudo la fora e anterior a edicao e precisa ser reenviado
+    # (ver propriedades drive_desatualizado / planilha_desatualizada).
+    data_ultima_edicao = models.DateTimeField(null=True, blank=True)
     status = models.CharField(
         max_length=20, choices=STATUS_CHOICES, default=SINCRONIZADO
     )
@@ -324,6 +332,57 @@ class Rad(models.Model):
                 partes.append(f'Final: {self.km_poste_final}')
             return ' | '.join(partes)
         return self.km_poste or None
+
+    @property
+    def drive_desatualizado(self):
+        """True se o Word no Drive e anterior a ultima edicao do RAD."""
+        return bool(
+            self.data_ultima_edicao
+            and self.data_ultimo_envio_drive
+            and self.data_ultima_edicao > self.data_ultimo_envio_drive
+        )
+
+    @property
+    def planilha_desatualizada(self):
+        """True se a linha na planilha e anterior a ultima edicao do RAD."""
+        return bool(
+            self.data_ultima_edicao
+            and self.data_ultima_sincronizacao_planilha
+            and self.data_ultima_edicao > self.data_ultima_sincronizacao_planilha
+        )
+
+
+class RadEdicao(models.Model):
+    """
+    Historico de edicoes feitas pelo Administrador num RAD ja
+    sincronizado (13/10/2026). Uma linha por edicao salva: quem, quando,
+    o motivo (obrigatorio) e a lista campo a campo do que mudou
+    (`alteracoes`: [{"campo": ..., "antes": ..., "depois": ...}]).
+    Nunca e editado nem apagado pelo sistema -- e o rastro de auditoria.
+    """
+
+    rad = models.ForeignKey(
+        Rad, on_delete=models.CASCADE, related_name='edicoes', db_column='id_rad'
+    )
+    usuario = models.ForeignKey(
+        Usuario,
+        on_delete=models.PROTECT,
+        to_field='login',
+        db_column='login_usuario',
+        related_name='edicoes_de_rad',
+    )
+    data = models.DateTimeField()
+    motivo = models.TextField()
+    alteracoes = models.JSONField(default=list)
+
+    class Meta:
+        db_table = 'rad_edicoes'
+        verbose_name = 'Edição de RAD'
+        verbose_name_plural = 'Edições de RAD'
+        ordering = ['-data', '-id']
+
+    def __str__(self):
+        return f'Edição de {self.rad.numero_rad} por {self.usuario_id} em {self.data:%d/%m/%Y %H:%M}'
 
 
 class RadLinha(models.Model):
@@ -566,6 +625,19 @@ class RadColaborador(models.Model):
         return f'{self.nome} ({self.get_tipo_display()})'
 
 
+class _AnexoVisivelManager(models.Manager):
+    """
+    Manager padrao de RadAnexo: so devolve anexos NAO ocultos. Como e o
+    manager padrao, tudo que ja le `rad.anexos` (detalhe, Word oficial,
+    contagens de exportacao) passa a ignorar fotos ocultadas pelo
+    Administrador sem precisar de nenhum filtro extra em cada lugar.
+    Use `RadAnexo.todos` quando precisar enxergar tambem os ocultos.
+    """
+
+    def get_queryset(self):
+        return super().get_queryset().filter(oculto=False)
+
+
 class RadAnexo(models.Model):
     """
     Referencias aos arquivos anexados (fotos e PDF). Arquivos ficam no
@@ -616,6 +688,25 @@ class RadAnexo(models.Model):
     caminho_servidor = models.CharField(max_length=500)
     tamanho_bytes = models.IntegerField()
     data_upload = models.DateTimeField()
+    # 13/10/2026: ocultar != apagar. Quando o Administrador "remove" uma
+    # foto ao editar o RAD, o registro (e o arquivo no storage) continua
+    # existindo -- so deixa de aparecer no detalhe e no Word. Guarda
+    # quem ocultou e quando; o motivo fica no historico da edicao
+    # (RadEdicao).
+    oculto = models.BooleanField(default=False)
+    ocultado_por = models.ForeignKey(
+        Usuario,
+        on_delete=models.PROTECT,
+        to_field='login',
+        db_column='login_ocultou',
+        related_name='anexos_ocultados',
+        null=True,
+        blank=True,
+    )
+    data_ocultacao = models.DateTimeField(null=True, blank=True)
+
+    objects = _AnexoVisivelManager()
+    todos = models.Manager()
 
     class Meta:
         db_table = 'rad_anexos'

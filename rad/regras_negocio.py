@@ -94,8 +94,28 @@ def gerar_numero_execucao(numero_os):
     protege ate o fim da transacao atual.
     """
     _travar_os(numero_os)
-    quantidade_existente = Rad.objects.filter(numero_os=numero_os).count()
-    return quantidade_existente + 1
+    return proxima_execucao_da_os(numero_os)
+
+
+def proxima_execucao_da_os(numero_os, excluindo_id_rad=None):
+    """
+    Proximo numero de execucao livre para a OS: maior numero ja usado + 1.
+
+    13/10/2026: antes era "quantidade de RADs da OS + 1". Sao a mesma
+    coisa enquanto nao existem buracos na numeracao -- mas a edicao de
+    RAD pelo Administrador (rad/edicao.py) pode mover um RAD de uma OS
+    para outra, deixando um buraco (ex.: execucoes 1 e 3 na OS antiga).
+    Com "contagem + 1" o proximo RAD receberia 3 de novo (duplicado);
+    com "maior + 1" recebe 4. `excluindo_id_rad` ignora o proprio RAD
+    que esta sendo editado.
+    """
+    from django.db.models import Max
+
+    consulta = Rad.objects.filter(numero_os=numero_os)
+    if excluindo_id_rad is not None:
+        consulta = consulta.exclude(id_rad=excluindo_id_rad)
+    maior = consulta.aggregate(m=Max('numero_execucao'))['m'] or 0
+    return maior + 1
 
 
 @transaction.atomic
@@ -426,76 +446,17 @@ def _limites_de_foto_do_payload(payload):
     )
 
 
-@transaction.atomic
-def processar_sincronizacao(payload, usuario, fotos_intervencao=None, fotos_acao=None, pdfs=None):
+def montar_dados_rad(payload, horarios, tipo_manutencao):
     """
-    Ponto de entrada da view de sincronizacao. Orquestra, nesta ordem:
+    Converte o payload (ja validado) nos campos de valor unico do Rad.
+    Nao inclui usuario, dispositivo, data_sincronizacao nem
+    sync_id_tentativa (dados de ORIGEM do RAD, que so existem na criacao
+    -- ver processar_sincronizacao) nem numero_rad/numero_execucao.
 
-    1. Calculo dos horarios derivados (regras_horario) -- necessario
-       antes de validar, pois VLD-012/013 dependem dos DateTime
-       completos ja calculados.
-    2. Validacao completa (RG-VLD-001 a 003, VLD-001 a 045, incluindo
-       os anexos e a configuracao de obrigatoriedade customizada do
-       Administrador). Se houver qualquer erro, nao toca o banco nem o
-       storage de arquivos (RG-VLD-002) e retorna (None, erros).
-    3. Persistencia atomica do RAD (geracao do numero de execucao e do
-       numero do RAD, idempotencia por sync_id_tentativa).
-    4. Criacao das tabelas relacionadas e upload dos anexos -- pulada
-       quando a chamada foi idempotente (RAD ja existia), para nao
-       duplicar linhas nem arquivos.
-
-    fotos_intervencao/fotos_acao/pdfs: listas de UploadedFile
-    (request.FILES), opcionais.
-
-    Retorna (rad, erros). Exatamente um dos dois sera "vazio":
-    erros == [] quando rad foi criado/recuperado; rad is None quando ha
-    erros de validacao.
+    13/10/2026: extraida de processar_sincronizacao para ser reaproveitada
+    pela edicao do Administrador (rad/edicao.py) -- e o que garante que
+    um RAD editado passa pelas MESMAS conversoes de um RAD novo.
     """
-    fotos_intervencao = fotos_intervencao or []
-    fotos_acao = fotos_acao or []
-    pdfs = pdfs or []
-
-    sync_id_tentativa = payload.get('sync_id_tentativa')
-    if sync_id_tentativa:
-        rad_existente = Rad.objects.filter(sync_id_tentativa=sync_id_tentativa).first()
-        if rad_existente is not None:
-            # Idempotencia (PADROES_E_DIRETRIZES 5.2): reenvio do mesmo
-            # sync_id_tentativa retorna o RAD ja gravado sem revalidar --
-            # evita que um reenvio com payload incompleto (ex.: cliente
-            # reenviando so o identificador apos timeout) seja rejeitado
-            # por engano quando o RAD ja foi persistido com sucesso.
-            return rad_existente, []
-
-    horarios = _preparar_horarios(payload)
-
-    tipo_manutencao = None
-    if payload.get('id_tipo_manutencao'):
-        tipo_manutencao = CatTipoManutencao.objects.filter(
-            id=payload['id_tipo_manutencao']
-        ).first()
-
-    payload_validacao = {
-        **payload,
-        **horarios,
-        '_tipo_manutencao_e_falha': bool(
-            tipo_manutencao and tipo_manutencao.nome == 'Falha'
-        ),
-        # 30/07/2026: usado por VLD-033 -- comentarios de foto
-        # (desc_foto_1..4) viram obrigatorios quando o Tipo de
-        # Manutencao e VPM001.
-        '_tipo_manutencao_e_vpm001': bool(
-            tipo_manutencao and tipo_manutencao.nome == 'VPM001'
-        ),
-    }
-
-    erros = validar_payload_sincronizacao(
-        payload_validacao, hoje=timezone.localdate()
-    )
-    limite_intervencao, limite_acao = _limites_de_foto_do_payload(payload)
-    erros += validar_anexos(fotos_intervencao, fotos_acao, pdfs, limite_intervencao, limite_acao)
-    if erros:
-        return None, erros
-
     local_inicial = CatLocal.objects.get(sigla=payload['id_local_inicial'])
     local_final = CatLocal.objects.get(sigla=payload['id_local_final'])
     motivo_inicio = (
@@ -566,12 +527,90 @@ def processar_sincronizacao(payload, usuario, fotos_intervencao=None, fotos_acao
         'operador_ccm_entrega_nome': payload.get('operador_ccm_entrega_nome') or None,
         'operador_ccm_entrega_hora': parse_hora(payload.get('operador_ccm_entrega_hora')),
         'descricao_tecnica_atividade': payload.get('descricao_tecnica_atividade') or None,
-        'usuario': usuario,
-        'dispositivo': payload.get('dispositivo', Rad.DESCONHECIDO),
-        'data_sincronizacao': timezone.now(),
-        'sync_id_tentativa': payload['sync_id_tentativa'],
         **{k: v for k, v in horarios.items() if k not in ('atraso_inicio', 'atraso_termino')},
     }
+    return dados_rad
+
+
+@transaction.atomic
+def processar_sincronizacao(payload, usuario, fotos_intervencao=None, fotos_acao=None, pdfs=None):
+    """
+    Ponto de entrada da view de sincronizacao. Orquestra, nesta ordem:
+
+    1. Calculo dos horarios derivados (regras_horario) -- necessario
+       antes de validar, pois VLD-012/013 dependem dos DateTime
+       completos ja calculados.
+    2. Validacao completa (RG-VLD-001 a 003, VLD-001 a 045, incluindo
+       os anexos e a configuracao de obrigatoriedade customizada do
+       Administrador). Se houver qualquer erro, nao toca o banco nem o
+       storage de arquivos (RG-VLD-002) e retorna (None, erros).
+    3. Persistencia atomica do RAD (geracao do numero de execucao e do
+       numero do RAD, idempotencia por sync_id_tentativa).
+    4. Criacao das tabelas relacionadas e upload dos anexos -- pulada
+       quando a chamada foi idempotente (RAD ja existia), para nao
+       duplicar linhas nem arquivos.
+
+    fotos_intervencao/fotos_acao/pdfs: listas de UploadedFile
+    (request.FILES), opcionais.
+
+    Retorna (rad, erros). Exatamente um dos dois sera "vazio":
+    erros == [] quando rad foi criado/recuperado; rad is None quando ha
+    erros de validacao.
+    """
+    fotos_intervencao = fotos_intervencao or []
+    fotos_acao = fotos_acao or []
+    pdfs = pdfs or []
+
+    sync_id_tentativa = payload.get('sync_id_tentativa')
+    if sync_id_tentativa:
+        rad_existente = Rad.objects.filter(sync_id_tentativa=sync_id_tentativa).first()
+        if rad_existente is not None:
+            # Idempotencia (PADROES_E_DIRETRIZES 5.2): reenvio do mesmo
+            # sync_id_tentativa retorna o RAD ja gravado sem revalidar --
+            # evita que um reenvio com payload incompleto (ex.: cliente
+            # reenviando so o identificador apos timeout) seja rejeitado
+            # por engano quando o RAD ja foi persistido com sucesso.
+            return rad_existente, []
+
+    horarios = _preparar_horarios(payload)
+
+    tipo_manutencao = None
+    if payload.get('id_tipo_manutencao'):
+        tipo_manutencao = CatTipoManutencao.objects.filter(
+            id=payload['id_tipo_manutencao']
+        ).first()
+
+    payload_validacao = {
+        **payload,
+        **horarios,
+        '_tipo_manutencao_e_falha': bool(
+            tipo_manutencao and tipo_manutencao.nome == 'Falha'
+        ),
+        # 30/07/2026: usado por VLD-033 -- comentarios de foto
+        # (desc_foto_1..4) viram obrigatorios quando o Tipo de
+        # Manutencao e VPM001.
+        '_tipo_manutencao_e_vpm001': bool(
+            tipo_manutencao and tipo_manutencao.nome == 'VPM001'
+        ),
+    }
+
+    erros = validar_payload_sincronizacao(
+        payload_validacao, hoje=timezone.localdate()
+    )
+    limite_intervencao, limite_acao = _limites_de_foto_do_payload(payload)
+    erros += validar_anexos(fotos_intervencao, fotos_acao, pdfs, limite_intervencao, limite_acao)
+    if erros:
+        return None, erros
+
+    dados_rad = montar_dados_rad(payload, horarios, tipo_manutencao)
+    dados_rad.update(
+        {
+            'usuario': usuario,
+            'dispositivo': payload.get('dispositivo', Rad.DESCONHECIDO),
+            'data_sincronizacao': timezone.now(),
+            'sync_id_tentativa': payload['sync_id_tentativa'],
+        }
+    )
 
     rad, criado = sincronizar_rad(dados_rad)
     if criado:

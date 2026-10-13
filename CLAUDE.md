@@ -104,6 +104,31 @@ IndexedDB (offline-first, sem framework front-end).
   bloqueia deploy, mas os testes mentem se alguém rodar `pytest` esperando que
   passem. Ainda não corrigido — avisar André se o assunto de testes voltar à tona.
 
+## Edição de RAD pelo Administrador (13/10/2026)
+
+O Administrador pode editar um RAD já sincronizado (botão "Editar este RAD" no
+detalhe → `/consultar/<numero_rad>/editar/`). Decisões que não devem ser desfeitas
+sem combinar com o André:
+- Edita NO LUGAR (mesmo `numero_rad`), qualquer campo, passando pelas MESMAS
+  validações de um RAD novo (`rad/edicao.py::editar_rad` reaproveita
+  `validar_payload_sincronizacao` e `regras_negocio.montar_dados_rad`).
+- **Motivo obrigatório** e **histórico** (`RadEdicao`: quem, quando, motivo, antes/depois
+  por campo). RAD cancelado não é editável.
+- Foto "removida" é **ocultada** (`RadAnexo.oculto`), nunca apagada. O manager padrão
+  `RadAnexo.objects` já exclui os ocultos (tudo que lê `rad.anexos` os ignora);
+  `RadAnexo.todos` enxerga todos.
+- Editar **não reenvia nada sozinho**: só preenche `Rad.data_ultima_edicao`. Drive e
+  planilha ficam "desatualizados" (`Rad.drive_desatualizado` / `planilha_desatualizada`)
+  até o reenvio MANUAL — "Salvar no Drive" troca o conteúdo do arquivo existente
+  (`google_drive.substituir_docx_no_drive`, sem criar cópia) e o Sync BD atualiza a
+  linha existente pela coluna A (`google_sheets.atualizar_linhas`). Motivo: gerar o Word
+  com fotos é o passo mais pesado de memória (Render 512MB).
+- Trocou a OS → novo `numero_execucao` na OS nova (maior existente + 1); a OS antiga
+  fica com "buraco". `regras_negocio.proxima_execucao_da_os` usa MAIOR+1 (não contagem+1)
+  justamente por isso.
+- A tela de edição é o mesmo `novo_rad.html` + `rad_form.js` em modo edição
+  (`window.RAD_EDICAO`); nesse modo nada é lido/gravado no IndexedDB.
+
 ## Convenções de código
 
 - Comentários e docstrings em português, sem acentos em identificadores de código

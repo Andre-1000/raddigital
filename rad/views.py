@@ -222,3 +222,125 @@ def remover_anexo(request, numero_rad, id_anexo):
     anexo.delete()
 
     return JsonResponse({'removido': True, 'numero_rad': numero_rad})
+
+
+# ---------------------------------------------------------------------------
+# Edicao de RAD ja sincronizado (13/10/2026) -- exclusivo do Administrador.
+# Regras e motivos de projeto em rad/edicao.py.
+# ---------------------------------------------------------------------------
+
+def _anexos_para_edicao(rad):
+    return [
+        {
+            'id': a.id,
+            'tipo_arquivo': a.tipo_arquivo,
+            'categoria_foto': a.categoria_foto,
+            'categoria_foto_rotulo': a.get_categoria_foto_display() if a.categoria_foto else None,
+            'nome_original': a.nome_original,
+            'tamanho_bytes': a.tamanho_bytes,
+        }
+        for a in rad.anexos.all()
+    ]
+
+
+@requer_token
+@requer_perfil(UsuarioPerfil.ADMINISTRADOR)
+def dados_edicao(request, numero_rad):
+    """
+    GET /rad/<numero_rad>/dados-edicao/
+    Entrega o RAD no formato do rascunho do formulario (para a tela de
+    edicao carregar) + os anexos visiveis. 409 se o RAD esta cancelado
+    (cancelamento e irreversivel e o RAD deixa de ser editavel).
+    """
+    from .edicao import RadNaoEncontradoError, carregar_rad_para_edicao, montar_rascunho
+
+    try:
+        rad = carregar_rad_para_edicao(numero_rad)
+    except RadNaoEncontradoError:
+        return JsonResponse({'erro': 'RAD nao encontrado.'}, status=404)
+
+    if rad.status == Rad.CANCELADO:
+        return JsonResponse({'erro': 'RAD cancelado nao pode ser editado.'}, status=409)
+
+    return JsonResponse(
+        {
+            'numero_rad': rad.numero_rad,
+            'numero_execucao': rad.numero_execucao,
+            'rascunho': montar_rascunho(rad),
+            'anexos': _anexos_para_edicao(rad),
+        }
+    )
+
+
+@csrf_exempt
+@require_POST
+@requer_token
+@requer_perfil(UsuarioPerfil.ADMINISTRADOR)
+def editar(request, numero_rad):
+    """
+    POST /rad/<numero_rad>/editar/
+    Mesmo formato de /rad/sincronizar/ (JSON, ou multipart com 'dados' +
+    arquivos NOVOS), com duas chaves extras dentro de 'dados':
+      motivo_edicao   -- texto, obrigatorio;
+      ocultar_anexos  -- lista de ids de anexos existentes a ocultar.
+    Qualquer erro de validacao devolve 422 e nao grava nada. Sem
+    nenhuma diferenca real em relacao ao que ja estava gravado, tambem
+    devolve 422 ("Nenhuma alteracao").
+    """
+    from .edicao import RadCanceladoError, RadNaoEncontradoError, editar_rad
+
+    fotos_intervencao = []
+    fotos_acao = []
+    pdfs = []
+    if request.content_type.startswith('multipart/form-data'):
+        try:
+            dados_brutos = json.loads(request.POST.get('dados') or '{}')
+        except json.JSONDecodeError:
+            return JsonResponse({'erro': 'Campo "dados" invalido.'}, status=400)
+        fotos_intervencao = request.FILES.getlist('fotos_intervencao_verificada')
+        fotos_acao = request.FILES.getlist('fotos_acao_realizada')
+        pdfs = request.FILES.getlist('pdf')
+    else:
+        try:
+            dados_brutos = json.loads(request.body or '{}')
+        except json.JSONDecodeError:
+            return JsonResponse({'erro': 'Corpo da requisicao invalido.'}, status=400)
+
+    motivo = dados_brutos.pop('motivo_edicao', '')
+    ids_ocultar = dados_brutos.pop('ocultar_anexos', []) or []
+    if not isinstance(motivo, str):
+        motivo = ''
+    try:
+        ids_ocultar = [int(i) for i in ids_ocultar]
+    except (TypeError, ValueError):
+        return JsonResponse({'erro': 'ocultar_anexos invalido.'}, status=400)
+
+    payload = _normalizar_payload(dados_brutos)
+    # sync_id_tentativa so tem sentido na criacao; o validador pode exigir
+    # a chave, entao garantimos um valor sem usa-lo para nada.
+    payload.setdefault('sync_id_tentativa', f'edicao-{numero_rad}')
+
+    try:
+        rad, erros, alteracoes = editar_rad(
+            numero_rad, payload, request.usuario_rad, motivo,
+            ids_ocultar=ids_ocultar,
+            fotos_intervencao=fotos_intervencao, fotos_acao=fotos_acao, pdfs=pdfs,
+        )
+    except RadNaoEncontradoError:
+        return JsonResponse({'erro': 'RAD nao encontrado.'}, status=404)
+    except RadCanceladoError:
+        return JsonResponse({'erro': 'RAD cancelado nao pode ser editado.'}, status=409)
+
+    if erros:
+        return JsonResponse({'erros': erros}, status=422)
+
+    return JsonResponse(
+        {
+            'numero_rad': rad.numero_rad,
+            'numero_os': rad.numero_os,
+            'numero_execucao': rad.numero_execucao,
+            'total_alteracoes': len(alteracoes),
+            'drive_desatualizado': rad.drive_desatualizado,
+            'planilha_desatualizada': rad.planilha_desatualizada,
+        }
+    )

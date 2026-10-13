@@ -1,6 +1,6 @@
 {% extends "interface/base.html" %}
 {% load static %}
-{% block titulo %}Novo RAD — Sistema RAD{% endblock %}
+{% block titulo %}{% if modo_edicao %}Editar RAD {{ numero_rad }}{% else %}Novo RAD{% endif %} — Sistema RAD{% endblock %}
 
 {% block conteudo %}
 <!-- RG-SYNC-018/019: so um RAD em preenchimento por vez. Este modal
@@ -35,11 +35,24 @@
     </nav>
 
     <div class="conteudo-formulario">
+  {% if modo_edicao %}
+  <!-- 13/10/2026: MODO EDICAO (so Administrador) -- mesmo formulario do
+       Novo RAD, carregado com um RAD ja sincronizado. Ver rad_form.js
+       (MODO_EDICAO) e rad/edicao.py. -->
+  <h1 style="font-size:1.3rem;">Editar RAD {{ numero_rad }}</h1>
+  <p class="texto-suave" id="status-rascunho" style="margin-top:-0.5rem; font-size:0.85rem;">Edição feita pelo Administrador. Nada é salvo até você clicar em &ldquo;Salvar alterações&rdquo;.</p>
+  <div class="aviso aviso--atencao" style="margin-bottom:1rem;">
+    O histórico da edição (quem, quando, motivo e o que mudou) fica registrado.
+    Depois de salvar, o Word no Drive e a linha da planilha ficam <strong>desatualizados</strong> até serem reenviados.
+  </div>
+  <button type="button" id="botao-apagar-rascunho" style="display:none;"></button>
+  {% else %}
   <h1 style="font-size:1.3rem;">Novo RAD</h1>
   <p class="texto-suave" id="status-rascunho" style="margin-top:-0.5rem; font-size:0.85rem;"></p>
   <button type="button" class="botao botao--secundaria" id="botao-apagar-rascunho" style="width:auto; min-height:36px; padding:0 0.9rem; margin-bottom:1rem;">
     Apagar rascunho
   </button>
+  {% endif %}
 
   <div id="aviso-formulario"></div>
 
@@ -56,7 +69,7 @@
 
       <div class="campo" data-config-campo="numero_sa">
         <label for="campo-numero-sa">N° SA <span class="obrigatorio" id="marcador-numero_sa">*</span></label>
-        <input type="text" id="campo-numero-sa" inputmode="numeric" maxlength="10" required>
+        <input type="text" id="campo-numero-sa" inputmode="numeric" maxlength="10" data-mensagem-limite="O N° SA aceita no máximo 10 dígitos." required>
       </div>
 
       <div class="campo">
@@ -128,11 +141,11 @@
         <div class="campo-km-poste__linha">
           <div class="campo-km-poste__item">
             <label for="campo-km-poste-inicial" class="campo-km-poste__sublabel">Inicial</label>
-            <input type="text" id="campo-km-poste-inicial" inputmode="numeric" placeholder="XX/XX + XXX" maxlength="11">
+            <input type="text" id="campo-km-poste-inicial" inputmode="numeric" placeholder="XX/XX + XXX" maxlength="11" data-mensagem-limite="O Km/Poste aceita no máximo 7 números (XX/XX + XXX).">
           </div>
           <div class="campo-km-poste__item">
             <label for="campo-km-poste-final" class="campo-km-poste__sublabel">Final</label>
-            <input type="text" id="campo-km-poste-final" inputmode="numeric" placeholder="XX/XX + XXX" maxlength="11">
+            <input type="text" id="campo-km-poste-final" inputmode="numeric" placeholder="XX/XX + XXX" maxlength="11" data-mensagem-limite="O Km/Poste aceita no máximo 7 números (XX/XX + XXX).">
           </div>
         </div>
         <p class="campo__ajuda">Digite os números — não precisa preencher tudo, mas cada caixa precisa de ao menos um.</p>
@@ -254,27 +267,27 @@
 
       <div class="campo">
         <label for="campo-terceiros-encarregados">N° Encarregados <span class="texto-suave">(opcional)</span></label>
-        <input type="text" id="campo-terceiros-encarregados" inputmode="numeric" maxlength="3">
+        <input type="text" id="campo-terceiros-encarregados" inputmode="numeric" maxlength="3" data-mensagem-limite="Este campo aceita no máximo 3 dígitos.">
       </div>
 
       <div class="campo" id="campo-grupo-terceiros-op-maquina">
         <label for="campo-terceiros-op-maquina">N° Op Máquina <span class="texto-suave">(opcional)</span></label>
-        <input type="text" id="campo-terceiros-op-maquina" inputmode="numeric" maxlength="3">
+        <input type="text" id="campo-terceiros-op-maquina" inputmode="numeric" maxlength="3" data-mensagem-limite="Este campo aceita no máximo 3 dígitos.">
       </div>
 
       <div class="campo">
         <label for="campo-terceiros-ajudantes">N° Ajudantes <span class="texto-suave">(opcional)</span></label>
-        <input type="text" id="campo-terceiros-ajudantes" inputmode="numeric" maxlength="3">
+        <input type="text" id="campo-terceiros-ajudantes" inputmode="numeric" maxlength="3" data-mensagem-limite="Este campo aceita no máximo 3 dígitos.">
       </div>
 
       <div class="campo">
         <label for="campo-terceiros-motorista">N° Motorista <span class="texto-suave">(opcional)</span></label>
-        <input type="text" id="campo-terceiros-motorista" inputmode="numeric" maxlength="3">
+        <input type="text" id="campo-terceiros-motorista" inputmode="numeric" maxlength="3" data-mensagem-limite="Este campo aceita no máximo 3 dígitos.">
       </div>
 
       <div class="campo" id="campo-grupo-terceiros-volume">
         <label for="campo-terceiros-volume">Volume <span class="texto-suave">(opcional)</span></label>
-        <input type="text" id="campo-terceiros-volume" inputmode="numeric" maxlength="3">
+        <input type="text" id="campo-terceiros-volume" inputmode="numeric" maxlength="3" data-mensagem-limite="Este campo aceita no máximo 3 dígitos.">
       </div>
     </div>
 
@@ -345,6 +358,18 @@
         </button>
       </div>
     </div>
+
+    {% if modo_edicao %}
+    <div class="cartao" id="cartao-anexos-existentes" style="margin-top:1rem;">
+      <h2 style="font-size:1rem;">Anexos atuais do RAD</h2>
+      <p class="texto-suave" style="font-size:0.82rem; margin-top:-0.4rem;">
+        &ldquo;Remover&rdquo; esconde o arquivo do RAD (ele não é apagado do armazenamento).
+        Para trocar uma foto, remova a antiga e adicione a nova no bloco Anexos abaixo.
+        O RAD precisa continuar com ao menos 1 foto.
+      </p>
+      <div id="lista-anexos-existentes" class="pilha"></div>
+    </div>
+    {% endif %}
 
     <div class="cartao" id="secao-anexos" style="margin-top:1rem;">
       <h2 style="font-size:1rem;">Anexos</h2>
@@ -462,6 +487,16 @@
 
   </form>
 
+  {% if modo_edicao %}
+  <div class="cartao" id="secao-motivo-edicao" style="margin-top:1rem;">
+    <h2 style="font-size:1rem;">Motivo da edição <span class="obrigatorio">*</span></h2>
+    <div class="campo">
+      <label for="campo-motivo-edicao" style="display:none;">Motivo da edição</label>
+      <textarea id="campo-motivo-edicao" maxlength="1000" placeholder="Explique por que este RAD está sendo alterado (fica registrado no histórico)"></textarea>
+    </div>
+  </div>
+  {% endif %}
+
   <div id="lista-erros-sincronizacao"></div>
     </div>
   </div>
@@ -471,19 +506,22 @@
   <div id="aviso-sincronizacao"></div>
   <div id="aviso-exportar-rascunho"></div>
   <div class="grade-botoes-acao-rad">
-    <button type="button" class="botao botao--secundaria" id="botao-copiar-mensagem">
+    <button type="button" class="botao botao--secundaria" id="botao-copiar-mensagem"{% if modo_edicao %} style="display:none;"{% endif %}>
       Copiar
     </button>
-    <button type="button" class="botao botao--secundaria" id="botao-exportar">
+    <button type="button" class="botao botao--secundaria" id="botao-exportar"{% if modo_edicao %} style="display:none;"{% endif %}>
       Exportar
     </button>
+    {% if modo_edicao %}
+    <a class="botao botao--secundaria" href="{% url 'interface:detalhe_rad' numero_rad %}" style="text-decoration:none; display:inline-flex; align-items:center; justify-content:center;">Cancelar</a>
+    {% endif %}
     <!-- 15/09/2026: virou um unico botao -- Sincronizar sempre tenta
          enviar ao Drive em seguida, automaticamente (nao e mais uma
          escolha separada). Se so a parte do Drive falhar, o RAD
          continua sincronizado normalmente -- so fica um aviso na tela
          de detalhe convidando a reenviar manualmente. -->
     <button type="button" class="botao botao--primaria" id="botao-sincronizar-drive" disabled>
-      Sincronizar
+      {% if modo_edicao %}Salvar alterações{% else %}Sincronizar{% endif %}
     </button>
   </div>
   <p class="texto-suave centro" id="texto-status-botao" style="margin: 0.4rem 0 0; font-size: 0.8rem;"></p>
@@ -752,6 +790,21 @@
   /* Asterisco vermelho ao lado de rotulos de campos obrigatorios. */
   .obrigatorio { color: var(--cor-perigo); }
 
+  /* 30/09/2026: aviso de regra logo abaixo do campo, quando o que foi
+     digitado nao segue a regra (ver regras_campos.js). O atributo
+     "hidden" esconde o aviso -- por isso este estilo NAO define
+     display. */
+  .campo__erro {
+    color: var(--cor-perigo);
+    font-size: 0.82rem;
+    font-weight: 600;
+    margin: 0.3rem 0 0;
+  }
+  input[aria-invalid="true"],
+  textarea[aria-invalid="true"] {
+    border-color: var(--cor-perigo);
+  }
+
   /* 05/09/2026: Data da Atividade -- campo de texto com mascara
      (digita so numeros, "/" entra sozinho) + um botao de calendario ao
      lado. O input[type=date] fica por cima do icone, com opacidade 0 --
@@ -920,5 +973,9 @@
 <script src="{% static 'interface/js/regras_horario.js' %}"></script>
 <script src="{% static 'interface/js/validadores_arquivos.js' %}"></script>
 <script src="{% static 'interface/js/exportar_cliente.js' %}"></script>
+<script src="{% static 'interface/js/regras_campos.js' %}"></script>
+{% if modo_edicao %}
+<script>window.RAD_EDICAO = { numero_rad: "{{ numero_rad|escapejs }}" };</script>
+{% endif %}
 <script src="{% static 'interface/js/rad_form.js' %}"></script>
 {% endblock %}

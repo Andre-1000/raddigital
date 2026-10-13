@@ -48,7 +48,7 @@ dados externa consultavel fora do sistema.
 import json
 
 from django.contrib.postgres.aggregates import ArrayAgg
-from django.db.models import Avg, Count, Q
+from django.db.models import Avg, Count, F, Q
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -371,20 +371,36 @@ _SELECT_RELATED_SYNC_BD = (
 )
 
 
+def _filtro_desatualizados_planilha():
+    """
+    RADs que JA foram para a planilha, mas foram EDITADOS depois
+    (13/10/2026) -- a linha la esta velha e precisa ser atualizada.
+    """
+    return Q(
+        data_ultima_sincronizacao_planilha__isnull=False,
+        data_ultima_edicao__isnull=False,
+        data_ultima_edicao__gt=F('data_ultima_sincronizacao_planilha'),
+    )
+
+
 def _contadores_sync_bd():
     """
-    30/09/2026. Os 3 numeros da tela "Sync BD". Inclui RADs CANCELADOS
+    30/09/2026. Os numeros da tela "Sync BD". Inclui RADs CANCELADOS
     tanto no total quanto no que vai pra planilha (decisao do cliente --
     diferente do resto deste arquivo, que so conta Sincronizado).
+
+    13/10/2026: ganhou "desatualizados" (enviados e depois editados).
+    A conta fecha: total = sincronizados (em dia) + desatualizados +
+    nao sincronizados (nunca enviados).
     """
     total = Rad.objects.count()
-    sincronizados = Rad.objects.filter(
-        data_ultima_sincronizacao_planilha__isnull=False
-    ).count()
+    enviados = Rad.objects.filter(data_ultima_sincronizacao_planilha__isnull=False).count()
+    desatualizados = Rad.objects.filter(_filtro_desatualizados_planilha()).count()
     return {
         'total_rad_preenchidos': total,
-        'total_rad_sincronizados': sincronizados,
-        'total_rad_nao_sincronizados': total - sincronizados,
+        'total_rad_sincronizados': enviados - desatualizados,
+        'total_rad_desatualizados': desatualizados,
+        'total_rad_nao_sincronizados': total - enviados,
     }
 
 
@@ -448,7 +464,12 @@ def sync_bd_sincronizar(request):
     timeout de 60s do gunicorn mesmo com um backlog grande -- um
     segundo clique continua de onde parou.
     """
-    from rad.google_sheets import SheetsNaoConfiguradoError, enviar_linhas, montar_linha
+    from rad.google_sheets import (
+        SheetsNaoConfiguradoError,
+        atualizar_linhas,
+        enviar_linhas,
+        montar_linha,
+    )
 
     try:
         corpo = json.loads(request.body or '{}')
@@ -467,49 +488,78 @@ def sync_bd_sincronizar(request):
         # seguranca -- so pode reduzir o lote, nunca aumentar.
         limite = max(1, min(limite, MAXIMO_RADS_POR_CLIQUE_SYNC_BD))
 
-    pendentes = Rad.objects.select_related(*_SELECT_RELATED_SYNC_BD).prefetch_related(
+    base = Rad.objects.select_related(*_SELECT_RELATED_SYNC_BD).prefetch_related(
         *_PREFETCH_SYNC_BD
-    ).filter(
-        data_ultima_sincronizacao_planilha__isnull=True
-    ).order_by('id_rad')[:limite]
+    )
+    # 13/10/2026: primeiro os NUNCA enviados (viram linha nova); com a
+    # folga que sobrar do limite, os EDITADOS depois do envio (a linha
+    # existente e atualizada no lugar -- ver google_sheets.atualizar_linhas).
+    novos = list(
+        base.filter(data_ultima_sincronizacao_planilha__isnull=True).order_by('id_rad')[:limite]
+    )
+    folga = limite - len(novos)
+    desatualizados = (
+        list(base.filter(_filtro_desatualizados_planilha()).order_by('id_rad')[:folga])
+        if folga > 0 else []
+    )
 
-    pendentes = list(pendentes)
-
-    if not pendentes:
+    if not novos and not desatualizados:
         return JsonResponse({'processados': 0, **_contadores_sync_bd()})
 
     total_processado = 0
+    atualizados = 0
     agora = timezone.now()
 
-    for inicio in range(0, len(pendentes), TAMANHO_LOTE_SYNC_BD):
-        lote = pendentes[inicio:inicio + TAMANHO_LOTE_SYNC_BD]
-
-        try:
-            linhas = [montar_linha(rad) for rad in lote]
-            enviar_linhas(linhas)
-        except SheetsNaoConfiguradoError as erro:
-            return JsonResponse(
-                {'erro': str(erro), 'processados': total_processado, **_contadores_sync_bd()},
-                status=503,
-            )
-        except Exception as erro:
-            # Mesmo padrao ja usado em rad/google_drive.py -- resposta
-            # generica pro cliente, erro real no log do Render pra
-            # diagnosticar (falha de rede, cota da API excedida, etc.).
-            print(f'[ERRO] Falha ao enviar lote pra planilha (Sync BD): {erro!r}')
-            return JsonResponse(
-                {
-                    'erro': 'Não foi possível enviar um dos lotes para a planilha. Tente novamente.',
-                    'processados': total_processado,
-                    **_contadores_sync_bd(),
-                },
-                status=502,
-            )
-
-        ids_do_lote = [rad.id_rad for rad in lote]
-        Rad.objects.filter(id_rad__in=ids_do_lote).update(
-            data_ultima_sincronizacao_planilha=agora
+    def _falha(resposta_erro, status):
+        return JsonResponse(
+            {
+                **resposta_erro,
+                'processados': total_processado,
+                'atualizados': atualizados,
+                **_contadores_sync_bd(),
+            },
+            status=status,
         )
-        total_processado += len(lote)
 
-    return JsonResponse({'processados': total_processado, **_contadores_sync_bd()})
+    etapas = (
+        ('novos', novos, False),
+        ('desatualizados', desatualizados, True),
+    )
+    for _nome_etapa, lista, eh_atualizacao in etapas:
+        for inicio in range(0, len(lista), TAMANHO_LOTE_SYNC_BD):
+            lote = lista[inicio:inicio + TAMANHO_LOTE_SYNC_BD]
+
+            try:
+                linhas = [montar_linha(rad) for rad in lote]
+                if eh_atualizacao:
+                    atualizar_linhas([(rad.numero_rad, linha) for rad, linha in zip(lote, linhas)])
+                else:
+                    enviar_linhas(linhas)
+            except SheetsNaoConfiguradoError as erro:
+                return _falha({'erro': str(erro)}, 503)
+            except Exception as erro:
+                # Mesmo padrao ja usado em rad/google_drive.py -- resposta
+                # generica pro cliente, erro real no log do Render pra
+                # diagnosticar (falha de rede, cota da API excedida, etc.).
+                print(f'[ERRO] Falha ao enviar lote pra planilha (Sync BD): {erro!r}')
+                return _falha(
+                    {'erro': 'Não foi possível enviar um dos lotes para a planilha. Tente novamente.'},
+                    502,
+                )
+
+            ids_do_lote = [rad.id_rad for rad in lote]
+            Rad.objects.filter(id_rad__in=ids_do_lote).update(
+                data_ultima_sincronizacao_planilha=agora
+            )
+            if eh_atualizacao:
+                atualizados += len(lote)
+            else:
+                total_processado += len(lote)
+
+    return JsonResponse(
+        {
+            'processados': total_processado,
+            'atualizados': atualizados,
+            **_contadores_sync_bd(),
+        }
+    )

@@ -32,7 +32,12 @@ document.addEventListener('DOMContentLoaded', async function () {
     try {
       const resposta = await RadAuth.requisicaoAutenticada('/configuracoes/campos/');
       if (!resposta.ok) return;
-      campos = (await resposta.json()).campos;
+      // 30/09/2026: so aceita o formato esperado ({campos: [...]}). Antes,
+      // uma resposta em outro formato derrubava a abertura do formulario
+      // INTEIRO (campos.forEach de undefined) -- esta configuracao e so
+      // um refinamento visual, nunca pode impedir o preenchimento.
+      const corpo = await resposta.json();
+      campos = corpo && Array.isArray(corpo.campos) ? corpo.campos : [];
     } catch (erro) {
       return; // offline ou falha de rede -- formulario segue com o padrao fixo do HTML
     }
@@ -68,8 +73,47 @@ document.addEventListener('DOMContentLoaded', async function () {
     return div.innerHTML;
   }
 
-  let rascunho = await RadDB.obterRascunho(sessao.login);
-  const jaExistiaRascunho = rascunho !== null;
+  // 13/10/2026: MODO EDICAO (tela "Editar RAD", so Administrador). O
+  // mesmo formulario e reaproveitado: em vez do rascunho salvo no
+  // dispositivo, carrega o RAD ja sincronizado (GET /rad/<n>/dados-edicao/,
+  // que devolve no mesmo formato do rascunho) e, ao salvar, envia para
+  // /rad/<n>/editar/. O rascunho REAL do dispositivo (IndexedDB) nunca e
+  // lido nem alterado neste modo -- ver salvarRascunhoAgora.
+  // window.RAD_EDICAO e definido por novo_rad.html so na rota de edicao.
+  const MODO_EDICAO = window.RAD_EDICAO || null;
+  if (MODO_EDICAO && !RadAuth.temPerfil('administrador')) {
+    window.location.href = `/consultar/${encodeURIComponent(MODO_EDICAO.numero_rad)}/`;
+    return;
+  }
+  let anexosExistentes = [];
+  const idsAnexosParaOcultar = new Set();
+
+  async function carregarRascunhoParaEdicao() {
+    try {
+      const resposta = await RadAuth.requisicaoAutenticada(
+        `/rad/${encodeURIComponent(MODO_EDICAO.numero_rad)}/dados-edicao/`
+      );
+      const corpo = await resposta.json().catch(function () { return {}; });
+      if (!resposta.ok) throw new Error(corpo.erro || 'Não foi possível carregar o RAD para edição.');
+      anexosExistentes = corpo.anexos || [];
+      return corpo.rascunho;
+    } catch (erro) {
+      avisoFormulario.innerHTML =
+        `<div class="aviso aviso--erro">${escapar(erro.message || 'Não foi possível carregar o RAD para edição.')}</div>`;
+      const formulario = document.getElementById('form-rad');
+      if (formulario) formulario.style.display = 'none';
+      const barraAcao = document.querySelector('.acao-fixa');
+      if (barraAcao) barraAcao.style.display = 'none';
+      return null;
+    }
+  }
+
+  let rascunho = MODO_EDICAO
+    ? await carregarRascunhoParaEdicao()
+    : await RadDB.obterRascunho(sessao.login);
+  // RAD nao carregou (mensagem de erro ja na tela): nao monta o formulario.
+  if (MODO_EDICAO && !rascunho) return;
+  const jaExistiaRascunho = !MODO_EDICAO && rascunho !== null;
   if (!rascunho) {
     rascunho = criarRascunhoVazio();
   } else {
@@ -262,6 +306,13 @@ document.addEventListener('DOMContentLoaded', async function () {
   }
 
   async function salvarRascunhoAgora() {
+    // Modo edicao: nada vai para o IndexedDB (sobrescreveria o rascunho
+    // de um RAD novo que o Administrador tenha em andamento neste
+    // dispositivo). Alteracoes nao salvas se perdem ao sair da tela.
+    if (MODO_EDICAO) {
+      atualizarEstadoBotaoExportar();
+      return;
+    }
     await RadDB.salvarRascunho(sessao.login, rascunho);
     const agora = new Date();
     statusRascunho.textContent = `Salvo neste dispositivo às ${agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
@@ -428,10 +479,14 @@ document.addEventListener('DOMContentLoaded', async function () {
     return resultado;
   }
 
+  // 30/09/2026: texto do aviso quando a mascara descarta algo que a
+  // pessoa digitou (letra, ou digito alem do limite de 7).
+  const AVISO_KM_POSTE = { rotulo: 'O Km/Poste', maximoDigitos: 7, formato: 'XX/XX + XXX' };
+
   function configurarCampoKmPoste(inputEl, chaveRascunho) {
     inputEl.value = rascunho[chaveRascunho] || '';
     inputEl.addEventListener('input', function () {
-      inputEl.value = aplicarMascaraKmPosteNova(inputEl.value);
+      RegrasCampos.mascararComAviso(inputEl, aplicarMascaraKmPosteNova, AVISO_KM_POSTE);
       rascunho[chaveRascunho] = inputEl.value;
       salvarRascunhoAgora();
     });
@@ -528,7 +583,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     salvarRascunhoAgora();
   });
   campoNumeroSa.addEventListener('input', function () {
-    campoNumeroSa.value = campoNumeroSa.value.replace(/\D/g, '').slice(0, 10);
+    campoNumeroSa.value = RegrasCampos.somenteDigitos(campoNumeroSa, { maximo: 10, rotulo: 'O N° SA' });
     rascunho.numero_sa = campoNumeroSa.value;
     salvarRascunhoAgora();
   });
@@ -581,7 +636,23 @@ document.addEventListener('DOMContentLoaded', async function () {
   campoDataAtividadePicker.addEventListener('change', function () {
     rascunho.data_atividade = campoDataAtividadePicker.value;
     campoDataAtividade.value = dataIsoParaBr(campoDataAtividadePicker.value);
+    RegrasCampos.reavaliar(campoDataAtividade);
     salvarRascunhoAgora();
+  });
+
+  // ---- Avisos de regra por campo (30/09/2026) ----------------------------------
+  // Ver interface/static/interface/js/regras_campos.js. A OS e a Data da
+  // Atividade sao instaladas aqui; o Responsavel Atividade, mais abaixo
+  // (junto da lista de sugestoes dele).
+  RegrasCampos.instalarAvisoDeLimite(document.getElementById('form-rad'));
+  RegrasCampos.instalarRegra({
+    campo: campoNumeroOs,
+    verificar: RegrasCampos.verificarOs,
+  });
+  RegrasCampos.instalarRegra({
+    campo: campoDataAtividade,
+    ancora: campoDataAtividade.closest('.campo-data-atividade__linha'),
+    verificar: RegrasCampos.verificarDataAtividade,
   });
 
   await salvarRascunhoAgora();
@@ -1408,12 +1479,13 @@ document.addEventListener('DOMContentLoaded', async function () {
         input.inputMode = 'numeric';
         input.placeholder = 'XX/XX + XXX';
         input.maxLength = 11;
+        input.dataset.mensagemLimite = 'O Km/Poste aceita no máximo 7 números (XX/XX + XXX).';
       }
       input.value = item.dimensao[chave];
       input.disabled = !!item.dimensao[`${chave}_nao_identificado`];
       input.addEventListener('input', function () {
         if (tipo === 'km') {
-          input.value = aplicarMascaraKmPosteNova(input.value);
+          RegrasCampos.mascararComAviso(input, aplicarMascaraKmPosteNova, AVISO_KM_POSTE);
         }
         item.dimensao[chave] = input.value;
         salvarRascunhoAgora();
@@ -1658,7 +1730,7 @@ document.addEventListener('DOMContentLoaded', async function () {
     const elemento = document.getElementById(elementoId);
     elemento.value = rascunho[chaveRascunho] || '';
     elemento.addEventListener('input', function () {
-      elemento.value = elemento.value.replace(/\D/g, '').slice(0, 3);
+      elemento.value = RegrasCampos.somenteDigitos(elemento, { maximo: 3, rotulo: 'Este campo' });
       rascunho[chaveRascunho] = elemento.value;
       salvarRascunhoAgora();
     });
@@ -2029,6 +2101,9 @@ document.addEventListener('DOMContentLoaded', async function () {
           inputEl.value = pessoa.nome;
           rascunho[chaveRascunho] = pessoa.nome;
           resultadosEl.innerHTML = '';
+          // O valor mudou sem evento de digitacao -- reavalia a regra de
+          // tamanho (um nome de colaborador pode passar do limite).
+          RegrasCampos.reavaliar(inputEl);
           salvarRascunhoAgora();
         });
         resultadosEl.appendChild(botao);
@@ -2047,6 +2122,10 @@ document.addEventListener('DOMContentLoaded', async function () {
     document.getElementById('resultados-responsavel-atividade'),
     'responsavel_atividade'
   );
+  RegrasCampos.instalarRegra({
+    campo: document.getElementById('campo-responsavel-atividade'),
+    verificar: RegrasCampos.verificarResponsavel,
+  });
   const campoCcmAberturaNome = document.getElementById('campo-operador-ccm-abertura-nome');
   const campoCcmAberturaHora = document.getElementById('campo-operador-ccm-abertura-hora');
   const campoCcmEntregaNome = document.getElementById('campo-operador-ccm-entrega-nome');
@@ -2091,6 +2170,10 @@ document.addEventListener('DOMContentLoaded', async function () {
   ligarCampoTexto('campo-materiais-utilizados', 'materiais_utilizados');
   ligarCampoTexto('campo-observacoes-gerais', 'observacoes_gerais');
 
+  // Rascunho restaurado com algum valor fora da regra: mostra o aviso ja
+  // ao abrir a tela, em vez de so descobrir ao sincronizar.
+  RegrasCampos.reavaliarTodas();
+
   let sincronizando = false;
 
   // 15/09/2026: virou um unico botao -- Sincronizar sempre tenta
@@ -2109,11 +2192,11 @@ document.addEventListener('DOMContentLoaded', async function () {
       textoStatusBotao.textContent = '';
     } else if (!navigator.onLine) {
       botaoSincronizar.disabled = true;
-      botaoSincronizar.textContent = 'Sincronizar';
+      botaoSincronizar.textContent = MODO_EDICAO ? 'Salvar alterações' : 'Sincronizar';
       textoStatusBotao.textContent = 'Sem conexão';
     } else {
       botaoSincronizar.disabled = false;
-      botaoSincronizar.textContent = 'Sincronizar';
+      botaoSincronizar.textContent = MODO_EDICAO ? 'Salvar alterações' : 'Sincronizar';
       textoStatusBotao.textContent = '';
     }
   }
@@ -2292,7 +2375,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       .join('');
     listaErrosSincronizacao.innerHTML = `
       <div class="aviso aviso--erro">
-        <strong>Não foi possível sincronizar. Corrija os itens abaixo:</strong>
+        <strong>Não foi possível ${MODO_EDICAO ? 'salvar as alterações' : 'sincronizar'}. Corrija os itens abaixo:</strong>
         <ul style="margin: 0.5rem 0 0; padding-left: 1.2rem;">${itens}</ul>
       </div>
     `;
@@ -2308,15 +2391,45 @@ document.addEventListener('DOMContentLoaded', async function () {
   async function executarSincronizacao(tambemSalvarNoDrive) {
     if (sincronizando || !navigator.onLine) return;
 
+    // 30/09/2026: se algum campo visivel esta fora da regra, nao envia.
+    // O servidor recusaria de qualquer jeito (422), e mandar o RAD com
+    // todas as fotos so pra levar um "nao" gasta internet do celular em
+    // campo e processamento do servidor.
+    const violacoes = RegrasCampos.violacoesAtuais();
+    if (violacoes.length > 0) {
+      avisoSincronizacao.innerHTML = '';
+      renderizarErrosSincronizacao(violacoes.map((v) => ({ mensagem: v.mensagem })));
+      if (violacoes[0].campo.focus) violacoes[0].campo.focus();
+      return;
+    }
+
+    // Modo edicao: o motivo e obrigatorio (o servidor tambem exige).
+    let motivoEdicao = '';
+    if (MODO_EDICAO) {
+      const campoMotivo = document.getElementById('campo-motivo-edicao');
+      motivoEdicao = campoMotivo ? campoMotivo.value.trim() : '';
+      if (!motivoEdicao) {
+        avisoSincronizacao.innerHTML = '';
+        renderizarErrosSincronizacao([{ mensagem: 'Informe o motivo da edição.' }]);
+        if (campoMotivo) campoMotivo.focus();
+        return;
+      }
+    }
+
     sincronizando = true;
     atualizarEstadoBotaoSincronizar();
-    botaoSincronizar.textContent = 'Sincronizando…';
+    botaoSincronizar.textContent = MODO_EDICAO ? 'Salvando…' : 'Sincronizando…';
     listaErrosSincronizacao.innerHTML = '';
     avisoSincronizacao.innerHTML = '';
 
     try {
       const formData = new FormData();
-      formData.append('dados', JSON.stringify(montarDadosParaEnvio()));
+      const dadosParaEnvio = montarDadosParaEnvio();
+      if (MODO_EDICAO) {
+        dadosParaEnvio.motivo_edicao = motivoEdicao;
+        dadosParaEnvio.ocultar_anexos = Array.from(idsAnexosParaOcultar);
+      }
+      formData.append('dados', JSON.stringify(dadosParaEnvio));
       rascunho.anexos.fotos_intervencao_verificada.forEach((arquivo) => {
         formData.append('fotos_intervencao_verificada', arquivo);
       });
@@ -2327,13 +2440,31 @@ document.addEventListener('DOMContentLoaded', async function () {
         formData.append('pdf', arquivo);
       });
 
-      const resposta = await RadAuth.requisicaoAutenticada('/rad/sincronizar/', {
+      const urlEnvio = MODO_EDICAO
+        ? `/rad/${encodeURIComponent(MODO_EDICAO.numero_rad)}/editar/`
+        : '/rad/sincronizar/';
+      const resposta = await RadAuth.requisicaoAutenticada(urlEnvio, {
         method: 'POST',
         body: formData,
       });
 
       if (resposta.status === 201 || resposta.status === 200) {
         const corpo = await resposta.json();
+
+        if (MODO_EDICAO) {
+          // Nao reenvia nada ao Drive/planilha aqui: so marca como
+          // desatualizados (reenvio manual -- ver rad/edicao.py).
+          let aviso = 'Alterações salvas!';
+          if (corpo.drive_desatualizado || corpo.planilha_desatualizada) {
+            aviso += ' O Word no Drive e/ou a linha da planilha ficaram desatualizados — reenvie pelo detalhe do RAD e pelo Sync BD.';
+          }
+          avisoSincronizacao.innerHTML = `<div class="aviso aviso--sucesso">${aviso}</div>`;
+          setTimeout(function () {
+            window.location.href = `/consultar/${encodeURIComponent(MODO_EDICAO.numero_rad)}/`;
+          }, 1800);
+          return;
+        }
+
         await RadDB.limparRascunho(sessao.login);
 
         if (!tambemSalvarNoDrive) {
@@ -2397,5 +2528,57 @@ document.addEventListener('DOMContentLoaded', async function () {
   botaoSincronizar.addEventListener('click', function () {
     executarSincronizacao(true);
   });
+
+  // 13/10/2026 (modo edicao): lista as fotos/PDF que o RAD ja tem, com
+  // "Ver" e "Remover". Remover so MARCA a foto (Desfazer disponivel) --
+  // a ocultacao de verdade acontece ao salvar, junto com o motivo. O
+  // arquivo nunca e apagado do armazenamento.
+  function renderizarAnexosExistentes() {
+    const lista = document.getElementById('lista-anexos-existentes');
+    if (!lista) return;
+    lista.innerHTML = '';
+    if (anexosExistentes.length === 0) {
+      lista.innerHTML = '<p class="texto-suave" style="margin:0;">Este RAD não tem anexos.</p>';
+      return;
+    }
+    anexosExistentes.forEach(function (anexo) {
+      const marcado = idsAnexosParaOcultar.has(anexo.id);
+      const item = document.createElement('div');
+      item.className = 'cartao';
+      item.style.padding = '0.6rem 0.8rem';
+      item.style.display = 'flex';
+      item.style.alignItems = 'center';
+      item.style.gap = '0.75rem';
+      item.style.opacity = marcado ? '0.55' : '1';
+      const categoria = anexo.categoria_foto_rotulo || 'PDF';
+      item.innerHTML = `
+        <div style="flex:1; min-width:0;">
+          <div style="word-break:break-all;${marcado ? ' text-decoration:line-through;' : ''}">${escapar(anexo.nome_original)}</div>
+          <div class="texto-suave" style="font-size:0.78rem;">${escapar(categoria)}${marcado ? ' — será removida ao salvar' : ''}</div>
+        </div>
+        <button type="button" class="botao botao--secundaria" data-acao="ver" style="width:auto; min-height:36px; padding:0 0.8rem;">Ver</button>
+        <button type="button" class="botao ${marcado ? 'botao--secundaria' : 'botao--perigo'}" data-acao="alternar" style="width:auto; min-height:36px; padding:0 0.8rem;">${marcado ? 'Desfazer' : 'Remover'}</button>
+      `;
+      item.querySelector('[data-acao="ver"]').addEventListener('click', async function () {
+        try {
+          const resposta = await RadAuth.requisicaoAutenticada(
+            `/consulta/rads/${encodeURIComponent(MODO_EDICAO.numero_rad)}/anexos/${anexo.id}/`
+          );
+          if (!resposta.ok) throw new Error('falha');
+          const url = URL.createObjectURL(await resposta.blob());
+          window.open(url, '_blank');
+        } catch (erro) {
+          avisoFormulario.innerHTML = '<div class="aviso aviso--erro">Não foi possível abrir o arquivo.</div>';
+        }
+      });
+      item.querySelector('[data-acao="alternar"]').addEventListener('click', function () {
+        if (idsAnexosParaOcultar.has(anexo.id)) idsAnexosParaOcultar.delete(anexo.id);
+        else idsAnexosParaOcultar.add(anexo.id);
+        renderizarAnexosExistentes();
+      });
+      lista.appendChild(item);
+    });
+  }
+  if (MODO_EDICAO) renderizarAnexosExistentes();
 
 });

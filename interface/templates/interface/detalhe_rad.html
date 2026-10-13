@@ -145,7 +145,7 @@
          (sem afetar o RAD em si, ja sincronizado normalmente). Aponta
          direto pro botao "Salvar no Drive" abaixo como o conserto. -->
     <div id="aviso-nao-enviado-drive" style="display:none; margin-bottom:0.75rem;">
-      <div class="aviso aviso--atencao">Este RAD ainda não foi enviado ao Google Drive. Use o botão "Salvar no Drive" abaixo.</div>
+      <div class="aviso aviso--atencao" id="texto-aviso-nao-enviado-drive">Este RAD ainda não foi enviado ao Google Drive. Use o botão "Salvar no Drive" abaixo.</div>
     </div>
     <div id="aviso-exportar"></div>
     <div class="pilha">
@@ -153,6 +153,21 @@
       <button type="button" class="botao botao--primaria" id="botao-baixar-docx-oficial">Baixar Word</button>
       <button type="button" class="botao botao--secundaria" id="botao-salvar-drive">Salvar no Drive</button>
       <button type="button" class="botao botao--secundaria" id="botao-baixar-pdf-oficial" style="display:none;">Baixar PDF</button>
+    </div>
+  </div>
+
+  <!-- 13/10/2026: edicao pelo Administrador (rad/edicao.py). O botao
+       so aparece com dados.pode_editar (Administrador e RAD nao
+       cancelado); o historico campo a campo e so dele tambem. -->
+  <div class="cartao" id="cartao-editar" style="margin-top:1rem; display:none;">
+    <h2 class="titulo-secao">Edição</h2>
+    <p class="texto-suave" style="font-size:0.85rem; margin-top:-0.5rem;">
+      Exclusivo do Administrador. Toda edição exige um motivo e fica registrada no histórico.
+    </p>
+    <a class="botao botao--secundaria" id="botao-editar-rad" href="#" style="text-decoration:none;">Editar este RAD</a>
+    <div id="historico-edicoes" style="margin-top:1rem; display:none;">
+      <h3 class="titulo-secao" style="margin-bottom:0.5rem;">Histórico de edições</h3>
+      <div id="lista-historico-edicoes" class="pilha"></div>
     </div>
   </div>
 
@@ -668,6 +683,54 @@
 
     let dadosCarregados = null;
 
+    function formatarValorHistorico(valor) {
+      if (valor === null || valor === undefined || valor === '') return '—';
+      if (Array.isArray(valor)) return valor.length ? valor.join(' · ') : '—';
+      return String(valor);
+    }
+
+    function formatarDataHora(iso) {
+      const data = new Date(iso);
+      return isNaN(data) ? iso : data.toLocaleString('pt-BR');
+    }
+
+    // 13/10/2026: aviso "editado por ..." (todos que veem o RAD),
+    // botao Editar e historico completo (so Administrador).
+    function renderizarEdicao(dados) {
+      if (dados.editado_em) {
+        const aviso = document.createElement('div');
+        aviso.className = 'aviso aviso--atencao';
+        aviso.innerHTML = `<strong>RAD editado</strong> por ${escapar(dados.editado_por || '—')} em ${escapar(formatarDataHora(dados.editado_em))}.`;
+        if (dados.planilha_desatualizada) {
+          aviso.innerHTML += '<br>A linha deste RAD na planilha (Sync BD) está desatualizada.';
+        }
+        avisoDetalhe.appendChild(aviso);
+      }
+
+      if (!dados.pode_editar) return;
+      document.getElementById('cartao-editar').style.display = '';
+      document.getElementById('botao-editar-rad').href =
+        `/consultar/${encodeURIComponent(NUMERO_RAD)}/editar/`;
+
+      const edicoes = dados.edicoes || [];
+      if (edicoes.length === 0) return;
+      document.getElementById('historico-edicoes').style.display = '';
+      const lista = document.getElementById('lista-historico-edicoes');
+      edicoes.forEach(function (edicao) {
+        const item = document.createElement('div');
+        item.className = 'subcartao';
+        const linhas = (edicao.alteracoes || []).map(function (a) {
+          return `<li><strong>${escapar(a.campo)}</strong>: ${escapar(formatarValorHistorico(a.antes))} &rarr; ${escapar(formatarValorHistorico(a.depois))}</li>`;
+        }).join('');
+        item.innerHTML = `
+          <p class="subcartao__titulo">${escapar(formatarDataHora(edicao.data))} — ${escapar(edicao.login_usuario)}</p>
+          <p style="margin:0 0 0.4rem;"><span class="texto-suave">Motivo:</span> ${escapar(edicao.motivo)}</p>
+          <ul style="margin:0; padding-left:1.2rem; font-size:0.85rem;">${linhas}</ul>
+        `;
+        lista.appendChild(item);
+      });
+    }
+
     async function carregarDetalhe() {
       try {
         const resposta = await RadAuth.requisicaoAutenticada(`/consulta/rads/${encodeURIComponent(NUMERO_RAD)}/`);
@@ -708,9 +771,15 @@
           // hora da sincronizacao) nao deu certo -- aponta direto pro
           // botao "Salvar no Drive" logo abaixo como o conserto.
           if (!dados.enviado_drive) {
+            // 13/10/2026: dois motivos diferentes para "nao esta em dia".
+            if (dados.drive_desatualizado) {
+              document.getElementById('texto-aviso-nao-enviado-drive').textContent =
+                'Este RAD foi editado depois do último envio ao Google Drive — o Word lá está desatualizado. Use "Salvar no Drive" para substituir o arquivo.';
+            }
             document.getElementById('aviso-nao-enviado-drive').style.display = '';
           }
         }
+        renderizarEdicao(dados);
         if (dados.pode_cancelar) {
           document.getElementById('cartao-cancelar').style.display = '';
         }
@@ -800,7 +869,10 @@
           return;
         }
 
-        avisoExportar.innerHTML = '<div class="aviso aviso--sucesso">Salvo no Google Drive.</div>';
+        const extras = corpo.copias_extras
+          ? ` Atenção: existem mais ${corpo.copias_extras} cópia(s) com o mesmo nome na pasta — apague as sobras direto no Drive (apenas a mais antiga foi atualizada).`
+          : '';
+        avisoExportar.innerHTML = `<div class="aviso aviso--sucesso">Salvo no Google Drive.${extras}</div>`;
         document.getElementById('aviso-nao-enviado-drive').style.display = 'none';
         window.open(corpo.link, '_blank');
       } catch (erro) {

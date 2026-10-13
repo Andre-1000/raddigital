@@ -85,6 +85,19 @@ def tela_novo_rad(request):
     return render(request, 'interface/novo_rad.html')
 
 
+def tela_editar_rad(request, numero_rad):
+    """
+    Tela "Editar RAD" (13/10/2026) -- o mesmo formulario do Novo RAD em
+    modo edicao (rad_form.js::MODO_EDICAO). So serve o shell HTML; o
+    guard real esta nos endpoints rad/<n>/dados-edicao/ e rad/<n>/editar/
+    (@requer_perfil(ADMINISTRADOR)), e o JS da tela devolve quem nao e
+    Administrador para a Consulta.
+    """
+    return render(
+        request, 'interface/novo_rad.html', {'modo_edicao': True, 'numero_rad': numero_rad}
+    )
+
+
 def tela_redefinir_senha(request):
     """
     Pagina PUBLICA (sem autenticacao, 30/07/2026) -- destino do link de
