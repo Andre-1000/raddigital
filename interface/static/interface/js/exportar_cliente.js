@@ -112,7 +112,10 @@ const ExportarCliente = (function () {
       ['km_poste_final', 'Km/Poste Final', ouNA(rascunho.km_poste_final)],
       [
         'hora_prog_inicio', 'Horário programado',
-        `${ouNA(rascunho.hora_prog_inicio)} a ${ouNA(rascunho.hora_prog_termino)}`,
+        // Falha: sem horario programado (campos vazios) -> N/A inteiro.
+        rascunho.hora_prog_inicio || rascunho.hora_prog_termino
+          ? `${ouNA(rascunho.hora_prog_inicio)} a ${ouNA(rascunho.hora_prog_termino)}`
+          : NAO_APLICAVEL,
       ],
       ['hora_real_inicio', 'Início', ouNA(rascunho.hora_real_inicio)],
       ['hora_real_termino', 'Término', ouNA(rascunho.hora_real_termino)],
@@ -250,8 +253,12 @@ const ExportarCliente = (function () {
     return (anexos.fotos_intervencao_verificada || []).length + (anexos.fotos_acao_realizada || []).length;
   }
 
-  function camposObrigatoriosFaltando(rascunho) {
+  // Falha nao tem horario programado: nao e exigido (ehFalha = true).
+  const CHAVES_SO_FORA_DE_FALHA = ['hora_prog_inicio', 'hora_prog_termino'];
+
+  function camposObrigatoriosFaltando(rascunho, ehFalha) {
     const faltando = CAMPOS_OBRIGATORIOS_ROTULOS.filter(function ([chave]) {
+      if (ehFalha && CHAVES_SO_FORA_DE_FALHA.includes(chave)) return false;
       const valor = rascunho[chave];
       if (Array.isArray(valor)) return valor.length === 0;
       return !valor;
@@ -264,7 +271,7 @@ const ExportarCliente = (function () {
     return faltando;
   }
 
-  function camposObrigatoriosPreenchidos(rascunho) {
+  function camposObrigatoriosPreenchidos(rascunho, ehFalha) {
     return !!(
       rascunho.numero_os &&
       rascunho.numero_sa &&
@@ -277,8 +284,7 @@ const ExportarCliente = (function () {
       rascunho.linhas && rascunho.linhas.length > 0 &&
       rascunho.vias && rascunho.vias.length > 0 &&
       rascunho.id_tipo_manutencao &&
-      rascunho.hora_prog_inicio &&
-      rascunho.hora_prog_termino &&
+      (ehFalha || (rascunho.hora_prog_inicio && rascunho.hora_prog_termino)) &&
       rascunho.hora_real_inicio &&
       rascunho.hora_real_termino &&
       rascunho.servicos && rascunho.servicos.length > 0 &&

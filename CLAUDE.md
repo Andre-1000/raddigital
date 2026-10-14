@@ -129,6 +129,14 @@ sem combinar com o André:
 - A tela de edição é o mesmo `novo_rad.html` + `rad_form.js` em modo edição
   (`window.RAD_EDICAO`); nesse modo nada é lido/gravado no IndexedDB.
 
+## Tipo "Falha" não tem horário programado (14/10/2026)
+- Tipo de Manutenção = Falha: Horário Programado de Início/Término (e datas) ficam **ocultos/desabilitados** na tela e são guardados **NULL** no banco (migration `0028_horarios_programados_opcionais`). `duracao_programada_min` e `data_hora_prog_*` também NULL.
+- Horários reais continuam obrigatórios; duração real continua calculada; atraso continua desligado para Falha.
+- Backend: `regras_horario.processar_horarios` (Falha → prog = None), `regras_negocio._preparar_horarios`/`montar_dados_rad`, VLD-011 e `_CONDICAO_VISIBILIDADE_CAMPO_CONFIG` (config "obrigatório" não trava Falha).
+- Qualquer código novo que leia `hora_prog_*`/`duracao_programada_min` DEVE tratar `None` (exportações usam "N/A").
+- Frontend: `rad_form.js::atualizarHorariosProgramadosPorTipo` (usa atributo `hidden`, não `style.display`, para não colidir com Configurações); `ExportarCliente.camposObrigatorios*(rascunho, ehFalha)`.
+- Testes: `rad/test_falha_sem_horario_programado.py`, `interface/js_tests/teste_falha_horarios.js`.
+
 ## Convenções de código
 
 - Comentários e docstrings em português, sem acentos em identificadores de código

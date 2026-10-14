@@ -754,3 +754,27 @@ class TestTelaEditarRad:
             f'Teste do modo edicao falhou:\n{resultado.stdout}\n{resultado.stderr}'
         )
         assert 'TODOS OS TESTES PASSARAM' in resultado.stdout
+
+    def test_falha_esconde_horarios_programados_com_dom_real(self, tmp_path):
+        """14/10/2026: Tipo = Falha -> sem horario programado (jsdom)."""
+        import subprocess
+        from pathlib import Path
+
+        from django.template.loader import render_to_string
+
+        html = render_to_string(
+            'interface/novo_rad.html', {'modo_edicao': True, 'numero_rad': 'R00001'}
+        )
+        caminho_html = tmp_path / 'falha_renderizado.html'
+        caminho_html.write_text(html)
+
+        script = Path(__file__).resolve().parent / 'js_tests' / 'teste_falha_horarios.js'
+        resultado = subprocess.run(
+            ['node', str(script), str(caminho_html)],
+            capture_output=True, text=True, timeout=60,
+            cwd=str(Path(__file__).resolve().parent / 'js_tests'),
+        )
+        assert resultado.returncode == 0, (
+            f'Teste Falha/horarios falhou:\n{resultado.stdout}\n{resultado.stderr}'
+        )
+        assert 'TODOS OS TESTES PASSARAM' in resultado.stdout

@@ -319,8 +319,17 @@ document.addEventListener('DOMContentLoaded', async function () {
     atualizarEstadoBotaoExportar();
   }
 
+  // Pode ser chamada antes do catalogo de tipos carregar -> false.
+  function ehFalhaSeguro() {
+    try {
+      return tipoManutencaoEhFalha();
+    } catch (erro) {
+      return false;
+    }
+  }
+
   function atualizarEstadoBotaoExportar() {
-    const habilitado = ExportarCliente.camposObrigatoriosPreenchidos(rascunho);
+    const habilitado = ExportarCliente.camposObrigatoriosPreenchidos(rascunho, ehFalhaSeguro());
     const botaoExportar = document.getElementById('botao-exportar');
     const botaoCopiar = document.getElementById('botao-copiar-mensagem');
     [botaoExportar, botaoCopiar].forEach(function (botao) {
@@ -541,6 +550,8 @@ document.addEventListener('DOMContentLoaded', async function () {
   campoTipoManutencao.addEventListener('change', function () {
     rascunho.id_tipo_manutencao = campoTipoManutencao.value ? Number(campoTipoManutencao.value) : null;
     atualizarVisibilidadeNumeroFalha();
+    atualizarHorariosProgramadosPorTipo();
+    recalcularHorarios();
     atualizarComentariosFotos();
     salvarRascunhoAgora();
   });
@@ -715,6 +726,39 @@ document.addEventListener('DOMContentLoaded', async function () {
     return nomeDoTipoSelecionado() === 'Falha';
   }
 
+  // Falha nao tem programacao: Horario Programado de Inicio/Termino (e a
+  // duracao programada) ficam ocultos e desabilitados, e os valores sao
+  // LIMPOS no rascunho -- o servidor guarda esses campos vazios (NULL).
+  // So os horarios reais e a duracao real continuam. Usa o atributo
+  // `hidden` (nao style.display) para nao colidir com o que a tela de
+  // Configuracoes ja faz via data-config-campo.
+  function atualizarHorariosProgramadosPorTipo() {
+    const ehFalha = tipoManutencaoEhFalha();
+    ['hora_prog_inicio', 'hora_prog_termino'].forEach(function (chave) {
+      const container = document.querySelector(`[data-config-campo="${chave}"]`);
+      if (container) container.hidden = ehFalha;
+    });
+    const blocoDuracao = document.getElementById('bloco-duracao-programada');
+    if (blocoDuracao) blocoDuracao.hidden = ehFalha;
+    [campoHpInicio, campoDataHpInicio, campoHpTermino, campoDataHpTermino].forEach(function (el) {
+      el.disabled = ehFalha;
+      el.required = !ehFalha && (el === campoHpInicio || el === campoHpTermino);
+    });
+    if (ehFalha) {
+      rascunho.hora_prog_inicio = '';
+      rascunho.hora_prog_termino = '';
+      rascunho.data_hp_inicio = '';
+      rascunho.data_hp_termino = '';
+      campoHpInicio.value = '';
+      campoHpTermino.value = '';
+      campoDataHpInicio.value = '';
+      campoDataHpTermino.value = '';
+    } else {
+      if (!campoDataHpInicio.value) campoDataHpInicio.value = rascunho.data_preenchimento;
+      if (!campoDataHpTermino.value) campoDataHpTermino.value = rascunho.data_preenchimento;
+    }
+  }
+
   function recalcularHorarios() {
     if (rascunho.hora_prog_inicio && rascunho.hora_prog_termino && !dataHpTerminoEditadaManualmente) {
       const novaData = RegrasHorario.ajustarDataPorViradaDeMeiaNoite(
@@ -778,6 +822,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       grupoDescTermino.style.display = 'none';
     }
   }
+  atualizarHorariosProgramadosPorTipo();
   recalcularHorarios();
 
   function aoMudarHora(campoInputEl, chaveRascunho) {
@@ -2209,14 +2254,14 @@ document.addEventListener('DOMContentLoaded', async function () {
   const avisoExportarRascunho = document.getElementById('aviso-exportar-rascunho');
 
   function avisarCamposFaltando() {
-    const faltando = ExportarCliente.camposObrigatoriosFaltando(rascunho);
+    const faltando = ExportarCliente.camposObrigatoriosFaltando(rascunho, ehFalhaSeguro());
     avisoExportarRascunho.innerHTML =
       '<div class="aviso aviso--erro">Preencha os campos obrigatórios antes de continuar: ' +
       faltando.join(', ') + '.</div>';
   }
 
   document.getElementById('botao-exportar').addEventListener('click', function () {
-    if (!ExportarCliente.camposObrigatoriosPreenchidos(rascunho)) {
+    if (!ExportarCliente.camposObrigatoriosPreenchidos(rascunho, ehFalhaSeguro())) {
       avisarCamposFaltando();
       return;
     }
@@ -2249,7 +2294,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   }
 
   document.getElementById('botao-copiar-mensagem').addEventListener('click', async function () {
-    if (!ExportarCliente.camposObrigatoriosPreenchidos(rascunho)) {
+    if (!ExportarCliente.camposObrigatoriosPreenchidos(rascunho, ehFalhaSeguro())) {
       avisarCamposFaltando();
       return;
     }
