@@ -82,35 +82,49 @@ def processar_horarios(
     automaticamente considerando a virada de meia-noite.
 
     RG-HOR-006/007/019: quando o Tipo de Manutencao e "Falha", os
-    controles de atraso permanecem desligados (ocultos na interface).
+    controles de atraso permanecem desligados (ocultos na interface) e
+    os horarios programados sao descartados (retornam None); so a
+    duracao real e calculada. hora_prog_* podem ser None nesse caso.
 
     Retorna um dict pronto para popular os campos correspondentes do
     modelo Rad.
     """
-    data_hp_inicio = data_hp_inicio or data_preenchimento
     data_hr_inicio = data_hr_inicio or data_preenchimento
-
-    data_hp_termino = data_hp_termino or ajustar_data_por_virada_de_meia_noite(
-        data_hp_inicio, hora_prog_inicio, hora_prog_termino
-    )
     data_hr_termino = data_hr_termino or ajustar_data_por_virada_de_meia_noite(
         data_hr_inicio, hora_real_inicio, hora_real_termino
     )
-
-    dt_prog_inicio = montar_datetime(data_hp_inicio, hora_prog_inicio)
-    dt_prog_termino = montar_datetime(data_hp_termino, hora_prog_termino)
     dt_real_inicio = montar_datetime(data_hr_inicio, hora_real_inicio)
     dt_real_termino = montar_datetime(data_hr_termino, hora_real_termino)
-
-    duracao_programada_min = calcular_duracao_minutos(dt_prog_inicio, dt_prog_termino)
     duracao_real_min = calcular_duracao_minutos(dt_real_inicio, dt_real_termino)
 
     if tipo_manutencao_e_falha:
-        atraso_inicio = False
-        atraso_termino = False
-    else:
-        atraso_inicio = calcular_atraso_inicio(dt_prog_inicio, dt_real_inicio)
-        atraso_termino = calcular_atraso_termino(dt_prog_termino, dt_real_termino)
+        # Falha nao tem programacao: tudo que e "programado" fica vazio
+        # (NULL). Apenas a duracao real e calculada; sem atrasos.
+        return {
+            'data_hp_inicio': None,
+            'data_hp_termino': None,
+            'data_hr_inicio': data_hr_inicio,
+            'data_hr_termino': data_hr_termino,
+            'data_hora_prog_inicio': None,
+            'data_hora_prog_termino': None,
+            'data_hora_real_inicio': dt_real_inicio,
+            'data_hora_real_termino': dt_real_termino,
+            'duracao_programada_min': None,
+            'duracao_real_min': duracao_real_min,
+            'atraso_inicio': False,
+            'atraso_termino': False,
+        }
+
+    data_hp_inicio = data_hp_inicio or data_preenchimento
+    data_hp_termino = data_hp_termino or ajustar_data_por_virada_de_meia_noite(
+        data_hp_inicio, hora_prog_inicio, hora_prog_termino
+    )
+    dt_prog_inicio = montar_datetime(data_hp_inicio, hora_prog_inicio)
+    dt_prog_termino = montar_datetime(data_hp_termino, hora_prog_termino)
+    duracao_programada_min = calcular_duracao_minutos(dt_prog_inicio, dt_prog_termino)
+
+    atraso_inicio = calcular_atraso_inicio(dt_prog_inicio, dt_real_inicio)
+    atraso_termino = calcular_atraso_termino(dt_prog_termino, dt_real_termino)
 
     return {
         'data_hp_inicio': data_hp_inicio,

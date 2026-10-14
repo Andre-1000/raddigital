@@ -213,6 +213,10 @@ def _validar_horarios_obrigatorios(payload, erros):
         'hora_real_inicio': 'Horario Real de Inicio',
         'hora_real_termino': 'Horario Real de Termino',
     }
+    if payload.get('_tipo_manutencao_e_falha'):
+        # Falha nao tem horario programado: so os reais sao exigidos.
+        del campos_horario['hora_prog_inicio']
+        del campos_horario['hora_prog_termino']
     for campo, rotulo in campos_horario.items():
         if not payload.get(campo):
             erros.append(_erro('VLD-011', campo, f'Informe um {rotulo.lower()} valido.'))
@@ -732,6 +736,9 @@ def _motivo_atraso_e_outros(payload, campo_motivo):
 # visiveis (ex.: Km/Poste, Materiais Utilizados) nao precisam de
 # entrada -- ausencia no mapa = sempre relevante, como antes.
 _CONDICAO_VISIBILIDADE_CAMPO_CONFIG = {
+    # Horarios programados ficam ocultos (e NULL) quando Tipo = Falha.
+    'hora_prog_inicio': lambda payload: not payload.get('_tipo_manutencao_e_falha'),
+    'hora_prog_termino': lambda payload: not payload.get('_tipo_manutencao_e_falha'),
     'numero_falha': lambda payload: bool(payload.get('_tipo_manutencao_e_falha')),
     'outros_servico_desc': _servico_outros_selecionado,
     'id_motivo_atraso_inicio': lambda payload: bool(payload.get('atraso_inicio')),

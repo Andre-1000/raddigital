@@ -170,13 +170,24 @@ def _preparar_horarios(payload):
     a validacao (VLD-011) e quem sinaliza o problema ao usuario, esta
     funcao nao deve levantar excecao por dado ausente.
     """
+    tipo_manutencao = None
+    if payload.get('id_tipo_manutencao'):
+        tipo_manutencao = CatTipoManutencao.objects.filter(
+            id=payload['id_tipo_manutencao']
+        ).first()
+    tipo_e_falha = bool(tipo_manutencao and tipo_manutencao.nome == 'Falha')
+
     campos_obrigatorios = [
         payload.get('data_preenchimento'),
-        payload.get('hora_prog_inicio'),
-        payload.get('hora_prog_termino'),
         payload.get('hora_real_inicio'),
         payload.get('hora_real_termino'),
     ]
+    if not tipo_e_falha:
+        # Falha nao tem horario programado (fica NULL).
+        campos_obrigatorios += [
+            payload.get('hora_prog_inicio'),
+            payload.get('hora_prog_termino'),
+        ]
     if not all(campos_obrigatorios):
         return {
             'data_hora_prog_inicio': None,
@@ -187,22 +198,15 @@ def _preparar_horarios(payload):
             'atraso_termino': False,
         }
 
-    tipo_manutencao = None
-    if payload.get('id_tipo_manutencao'):
-        tipo_manutencao = CatTipoManutencao.objects.filter(
-            id=payload['id_tipo_manutencao']
-        ).first()
-    tipo_e_falha = bool(tipo_manutencao and tipo_manutencao.nome == 'Falha')
-
     resultado = processar_horarios(
         data_preenchimento=payload['data_preenchimento'],
-        hora_prog_inicio=parse_hora(payload['hora_prog_inicio']),
-        hora_prog_termino=parse_hora(payload['hora_prog_termino']),
+        hora_prog_inicio=None if tipo_e_falha else parse_hora(payload['hora_prog_inicio']),
+        hora_prog_termino=None if tipo_e_falha else parse_hora(payload['hora_prog_termino']),
         hora_real_inicio=parse_hora(payload['hora_real_inicio']),
         hora_real_termino=parse_hora(payload['hora_real_termino']),
         tipo_manutencao_e_falha=tipo_e_falha,
-        data_hp_inicio=payload.get('data_hp_inicio'),
-        data_hp_termino=payload.get('data_hp_termino'),
+        data_hp_inicio=None if tipo_e_falha else payload.get('data_hp_inicio'),
+        data_hp_termino=None if tipo_e_falha else payload.get('data_hp_termino'),
         data_hr_inicio=payload.get('data_hr_inicio'),
         data_hr_termino=payload.get('data_hr_termino'),
     )
@@ -217,7 +221,9 @@ def _preparar_horarios(payload):
         'data_hora_real_inicio',
         'data_hora_real_termino',
     ):
-        resultado[campo] = tornar_aware(resultado[campo])
+        resultado[campo] = (
+            tornar_aware(resultado[campo]) if resultado[campo] is not None else None
+        )
 
     return resultado
 
@@ -484,8 +490,15 @@ def montar_dados_rad(payload, horarios, tipo_manutencao):
         'operador': payload.get('operador') or None,
         'tipo_manutencao': tipo_manutencao,
         'numero_falha': payload.get('numero_falha') or None,
-        'hora_prog_inicio': parse_hora(payload['hora_prog_inicio']),
-        'hora_prog_termino': parse_hora(payload['hora_prog_termino']),
+        # Falha: sem horario programado (NULL).
+        'hora_prog_inicio': (
+            None if tipo_manutencao.nome == 'Falha'
+            else parse_hora(payload['hora_prog_inicio'])
+        ),
+        'hora_prog_termino': (
+            None if tipo_manutencao.nome == 'Falha'
+            else parse_hora(payload['hora_prog_termino'])
+        ),
         'hora_real_inicio': parse_hora(payload['hora_real_inicio']),
         'hora_real_termino': parse_hora(payload['hora_real_termino']),
         # RG-HOR-016/017/018: motivo/descricao so persistem quando o

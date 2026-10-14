@@ -117,10 +117,12 @@ class Rad(models.Model):
     )
 
     # --- Horarios (EFD-012 a EFD-017) -----------------------------------
-    hora_prog_inicio = models.TimeField()
-    data_hp_inicio = models.DateField()
-    hora_prog_termino = models.TimeField()
-    data_hp_termino = models.DateField()
+    # Horarios programados ficam NULL quando tipo_manutencao = Falha
+    # (nao existe programacao numa falha); os reais sao sempre obrigatorios.
+    hora_prog_inicio = models.TimeField(null=True, blank=True)
+    data_hp_inicio = models.DateField(null=True, blank=True)
+    hora_prog_termino = models.TimeField(null=True, blank=True)
+    data_hp_termino = models.DateField(null=True, blank=True)
     hora_real_inicio = models.TimeField()
     data_hr_inicio = models.DateField()
     hora_real_termino = models.TimeField()
@@ -128,12 +130,12 @@ class Rad(models.Model):
 
     # DateTime completos, calculados a partir dos pares data+hora acima
     # (RG-HOR-024/025). Usados em todos os calculos de duracao.
-    data_hora_prog_inicio = models.DateTimeField()
-    data_hora_prog_termino = models.DateTimeField()
+    data_hora_prog_inicio = models.DateTimeField(null=True, blank=True)
+    data_hora_prog_termino = models.DateTimeField(null=True, blank=True)
     data_hora_real_inicio = models.DateTimeField()
     data_hora_real_termino = models.DateTimeField()
 
-    duracao_programada_min = models.IntegerField()
+    duracao_programada_min = models.IntegerField(null=True, blank=True)
     duracao_real_min = models.IntegerField()
 
     # --- Atrasos (EFD-018, EFD-019) --------------------------------------

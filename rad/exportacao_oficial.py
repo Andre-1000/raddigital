@@ -312,7 +312,11 @@ def gerar_docx_oficial_bytes(rad):
         '{{SOLICITANTE_SA}}': na(rad.solicitante_sa),
         '{{OPERADOR_CCM}}': _operador_ccm_abertura_texto(rad),
         '{{RESPONSAVEL_RAD}}': nome_de_quem_preencheu(rad),
-        '{{H_PROGRAMADO}}': f'{rad.hora_prog_inicio.strftime("%H:%M")} às {rad.hora_prog_termino.strftime("%H:%M")}',
+        '{{H_PROGRAMADO}}': (
+            f'{rad.hora_prog_inicio.strftime("%H:%M")} às {rad.hora_prog_termino.strftime("%H:%M")}'
+            if rad.hora_prog_inicio and rad.hora_prog_termino
+            else 'N/A'  # Falha: sem horario programado
+        ),
         '{{H_EXECUTADO}}': f'{rad.hora_real_inicio.strftime("%H:%M")} às {rad.hora_real_termino.strftime("%H:%M")}',
         '{{DESCRICAO_TECNICA}}': na(rad.descricao_tecnica_atividade),
         '{{CONCLUSAO}}': (

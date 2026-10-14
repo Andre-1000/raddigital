@@ -115,7 +115,11 @@ def _campos_do_relatorio(rad):
         (
             'hora_prog_inicio',
             'Horário programado',
-            f'{rad.hora_prog_inicio:%H:%M} a {rad.hora_prog_termino:%H:%M}',
+            (
+                f'{rad.hora_prog_inicio:%H:%M} a {rad.hora_prog_termino:%H:%M}'
+                if rad.hora_prog_inicio and rad.hora_prog_termino
+                else 'N/A'
+            ),
         ),
         ('hora_real_inicio', 'Início', f'{rad.hora_real_inicio:%H:%M}'),
         ('hora_real_termino', 'Término', f'{rad.hora_real_termino:%H:%M}'),
