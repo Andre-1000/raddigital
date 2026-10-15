@@ -125,14 +125,26 @@ class CatServico(models.Model):
     preenchimento do RAD, para separar os servicos em blocos
     expansiveis (Geral, Infra, Corretiva, Mecanizada). Nao afeta
     nenhuma regra de negocio -- so a organizacao visual da lista.
+
+    14/10/2026: nova area 'insp_ronda' (rotulo "Inspeção e Ronda"),
+    com os servicos "Inspeção" e "Reparo". Os antigos "Inspeção" e
+    "Reparo" do Geral foram renomeados para "Inspeção (Geral)" e
+    "Reparo (Geral)" e DESATIVADOS (migration 0013) -- os RADs antigos
+    continuam apontando para eles, sem mudar de grupo. Os blocos
+    passam a aparecer em ordem alfabetica do rotulo (AREA_CHOICES ja
+    esta nessa ordem; o front ordena pelo rotulo tambem).
     """
 
+    # Ordem alfabetica do rotulo (14/10/2026) -- mesma ordem em que os
+    # blocos aparecem na tela. A chave tem no maximo 10 caracteres
+    # (max_length do campo 'area').
     AREA_CHOICES = [
+        ('amv', 'AMV'),
+        ('corretiva', 'Corretiva'),
         ('geral', 'Geral'),
         ('infra', 'Infra'),
-        ('corretiva', 'Corretiva'),
+        ('insp_ronda', 'Inspeção e Ronda'),
         ('mecanizada', 'Mecanizada'),
-        ('amv', 'AMV'),
     ]
 
     nome = models.CharField(max_length=100, unique=True)
@@ -163,7 +175,7 @@ class CatServico(models.Model):
         max_length=10,
         choices=AREA_CHOICES,
         default='geral',
-        help_text='Agrupamento visual na tela de preenchimento (Geral, Infra, Corretiva, Mecanizada ou AMV).',
+        help_text='Agrupamento visual na tela de preenchimento (AMV, Corretiva, Geral, Infra, Inspeção e Ronda ou Mecanizada).',
     )
     ativo = models.BooleanField(default=True)
 

@@ -86,6 +86,11 @@ document.addEventListener('DOMContentLoaded', async function () {
     return;
   }
   let anexosExistentes = [];
+  // 14/10/2026: servicos DESATIVADOS no catalogo que este RAD ainda usa
+  // (ex.: "Inspeção (Geral)"). O catalogo offline so traz os ativos;
+  // sem isto, o servico ficaria marcado mas invisivel na edicao e o
+  // Administrador nao conseguiria desmarca-lo.
+  let servicosDesativadosDoRad = [];
   const idsAnexosParaOcultar = new Set();
 
   async function carregarRascunhoParaEdicao() {
@@ -96,6 +101,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       const corpo = await resposta.json().catch(function () { return {}; });
       if (!resposta.ok) throw new Error(corpo.erro || 'Não foi possível carregar o RAD para edição.');
       anexosExistentes = corpo.anexos || [];
+      servicosDesativadosDoRad = corpo.servicos_desativados || [];
       return corpo.rascunho;
     } catch (erro) {
       avisoFormulario.innerHTML =
@@ -891,7 +897,13 @@ document.addEventListener('DOMContentLoaded', async function () {
     semOutros.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     return [...semOutros, ...outros];
   }
-  const servicos = ordenarComOutrosPorUltimo(servicosCarregados);
+  const servicos = ordenarComOutrosPorUltimo(
+    servicosCarregados.concat(
+      servicosDesativadosDoRad
+        .filter((d) => !servicosCarregados.some((s) => s.id === d.id))
+        .map((d) => Object.assign({}, d, { desativado: true }))
+    )
+  );
 
   const listaServicosEl = document.getElementById('lista-servicos');
   const grupoOutrosServico = document.getElementById('campo-grupo-outros-servico');
@@ -928,13 +940,18 @@ document.addEventListener('DOMContentLoaded', async function () {
   }
 
   const ROTULOS_GRUPO_SERVICO = {
+    amv: 'AMV',
+    corretiva: 'Corretiva',
     geral: 'Geral',
     infra: 'Infra',
-    corretiva: 'Corretiva',
+    insp_ronda: 'Inspeção e Ronda',
     mecanizada: 'Mecanizada',
-    amv: 'AMV',
   };
-  const ORDEM_GRUPOS_SERVICO = ['geral', 'infra', 'corretiva', 'mecanizada', 'amv'];
+  // 14/10/2026: blocos em ordem alfabetica do ROTULO (nao da chave) --
+  // um bloco novo so precisa entrar em ROTULOS_GRUPO_SERVICO.
+  const ORDEM_GRUPOS_SERVICO = Object.keys(ROTULOS_GRUPO_SERVICO).sort(function (a, b) {
+    return ROTULOS_GRUPO_SERVICO[a].localeCompare(ROTULOS_GRUPO_SERVICO[b], 'pt-BR');
+  });
 
   function criarLinhaCheckboxServico(servico, valoresSelecionados, aoMudar) {
     const linha = document.createElement('label');
@@ -956,7 +973,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
 
     const textoWrapper = document.createElement('span');
-    textoWrapper.textContent = servico.nome;
+    // 14/10/2026: servico desativado so aparece na edicao de um RAD que
+    // ja o tinha -- sinaliza para o Administrador poder desmarcar.
+    textoWrapper.textContent = servico.desativado ? `${servico.nome} (desativado)` : servico.nome;
     linha.appendChild(checkbox);
     linha.appendChild(textoWrapper);
     return linha;

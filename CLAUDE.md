@@ -59,8 +59,8 @@ IndexedDB (offline-first, sem framework front-end).
 
 ## Estado das migrations (conferir antes de criar a próxima)
 
-- `catalogos`: até `0011_inspecoes_e_renomeacao.py`
-- `rad`: até `0014_multiplos_blocos_amv.py`
+- `catalogos`: até `0013_inspecao_e_ronda.py`
+- `rad`: até `0028_horarios_programados_opcionais.py`
 - `configuracoes`: até `0006_limite_fotos.py`
 
 ## Regras críticas — nunca violar
@@ -137,6 +137,19 @@ sem combinar com o André:
 - Frontend: `rad_form.js::atualizarHorariosProgramadosPorTipo` (usa atributo `hidden`, não `style.display`, para não colidir com Configurações); `ExportarCliente.camposObrigatorios*(rascunho, ehFalha)`.
 - Testes: `rad/test_falha_sem_horario_programado.py`, `interface/js_tests/teste_falha_horarios.js`.
 
+## Bloco "Inspeção e Ronda" em Serviços Executados (14/10/2026)
+- Nova área `insp_ronda` (rótulo "Inspeção e Ronda") com os serviços "Inspeção" e
+  "Reparo" (simples, sem bloco extra, limite de fotos padrão).
+- Os antigos "Inspeção" e "Reparo" do Geral foram **renomeados** para "Inspeção (Geral)"
+  e "Reparo (Geral)" e **desativados** (migration `catalogos/0013_inspecao_e_ronda`).
+  Os ~112 RADs antigos continuam apontando para eles (histórico intacto no Geral);
+  André vai reclassificar caso a caso os que forem de ronda.
+- Edição de RAD: `GET /rad/<n>/dados-edicao/` devolve `servicos_desativados` (serviços
+  inativos que o RAD usa) e `rad_form.js` os mostra com "(desativado)" para o
+  Administrador poder desmarcar/trocar. Antes disso, um serviço desativado ficava
+  marcado e invisível na edição.
+- Testes: `rad/test_inspecao_e_ronda.py`, `interface/js_tests/teste_inspecao_ronda.js`.
+
 ## Convenções de código
 
 - Comentários e docstrings em português, sem acentos em identificadores de código
@@ -154,10 +167,15 @@ sem combinar com o André:
 - Todo campo do formulário que pode ser tornado obrigatório/opcional ou
   habilitado/desabilitado pelo Administrador passa pelo mapa em
   `_MAPA_CHAVE_CONFIG_PARA_CAMPO_PAYLOAD` (`rad/validadores.py`).
-- Serviços do catálogo (`CatServico`) têm campo `area` (`geral`/`infra`/`corretiva`/
-  `mecanizada`/`amv`) usado só pra agrupamento visual em blocos expansíveis na tela
-  de preenchimento — não afeta regra de negócio, exceto Infra, que também controla
-  limite de fotos (ver `configuracoes.models.LimiteFotos`).
+- Serviços do catálogo (`CatServico`) têm campo `area` (`amv`/`corretiva`/`geral`/
+  `infra`/`insp_ronda`/`mecanizada`, máx. 10 caracteres) usado só pra agrupamento
+  visual em blocos expansíveis na tela de preenchimento — não afeta regra de negócio,
+  exceto Infra, que também controla limite de fotos (ver
+  `configuracoes.models.LimiteFotos`). Os blocos aparecem em **ordem alfabética do
+  rótulo** (desde 14/10/2026) — `AREA_CHOICES` já está nessa ordem e o JS ordena pelo
+  rótulo; área nova precisa entrar em `AREA_CHOICES`, `ROTULOS_GRUPO_SERVICO`
+  (`rad_form.js`), `ROTULO_AREA`/`ROTULO_AREA_GRAFICO` (`dashboard.js`) e no
+  `<select>`/`ROTULO_AREA` de `consulta.html`.
 - Renomear um serviço existente (ex.: "Recolhimento de Lixo" → "Recolhimento de
   Descartes") deve ser uma migration `RunPython` que faz `update(nome=...)` na MESMA
   linha — nunca desativar uma e criar outra, isso quebraria a FK de RADs antigos.

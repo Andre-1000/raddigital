@@ -41,10 +41,14 @@ document.addEventListener('DOMContentLoaded', async function () {
   // painel de Canaleta por criticidade (03/09/2026).
   // ---------------------------------------------------------------
   const ROTULO_AREA = {
-    geral: 'Geral', infra: 'Infra', corretiva: 'Corretiva',
-    mecanizada: 'Mecanizada', amv: 'AMV', outros: 'Outros',
+    amv: 'AMV', corretiva: 'Corretiva', geral: 'Geral', infra: 'Infra',
+    insp_ronda: 'Inspeção e Ronda', mecanizada: 'Mecanizada', outros: 'Outros',
   };
-  const ORDEM_AREAS = ['geral', 'infra', 'corretiva', 'mecanizada', 'amv', 'outros'];
+  // 14/10/2026: areas em ordem alfabetica do rotulo; "Outros" sempre por ultimo.
+  const ORDEM_AREAS = Object.keys(ROTULO_AREA)
+    .filter((a) => a !== 'outros')
+    .sort((a, b) => ROTULO_AREA[a].localeCompare(ROTULO_AREA[b], 'pt-BR'))
+    .concat(['outros']);
 
   let locais = [];
   let servicosPorArea = {};
@@ -367,7 +371,8 @@ document.addEventListener('DOMContentLoaded', async function () {
   }
 
   const ROTULO_AREA_GRAFICO = {
-    geral: 'Geral', infra: 'Infra', corretiva: 'Corretiva', mecanizada: 'Mecanizada', amv: 'AMV',
+    amv: 'AMV', corretiva: 'Corretiva', geral: 'Geral', infra: 'Infra',
+    insp_ronda: 'Inspeção e Ronda', mecanizada: 'Mecanizada',
   };
 
   function renderizarTabelaMotivos(motivos) {

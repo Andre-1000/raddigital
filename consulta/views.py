@@ -30,6 +30,7 @@ from comum.datas import parse_data, parse_datetime_aware
 from usuarios.decorators import requer_perfil, requer_token
 from usuarios.models import UsuarioPerfil
 
+from catalogos.models import CatServico
 from rad.models import Rad
 
 RADS_POR_PAGINA = 15  # PRM-032
@@ -405,7 +406,9 @@ def nome_de_quem_preencheu(rad):
     return rad.usuario.login
 
 
-_ORDEM_AREAS_SERVICO = ['geral', 'infra', 'corretiva', 'mecanizada', 'amv']
+# 14/10/2026: ordem alfabetica do rotulo, igual a tela de preenchimento
+# (AREA_CHOICES ja esta nessa ordem) -- area nova entra sozinha.
+_ORDEM_AREAS_SERVICO = [codigo for codigo, _rotulo in CatServico.AREA_CHOICES]
 
 
 def _servicos_por_area(rad):
@@ -414,8 +417,8 @@ def _servicos_por_area(rad):
     Infra, Corretiva, Mecanizada, AMV) -- cada area vira uma LINHA
     propria no detalhe do RAD (rotulo = nome da area, valor = os
     servicos daquela area), em vez de repetir o nome da area ao lado
-    de cada servico entre parenteses no mesmo campo. Ordem fixa (nao
-    alfabetica), mesma ORDEM_GRUPOS_SERVICO usada em rad_form.js --
+    de cada servico entre parenteses no mesmo campo. Ordem alfabetica
+    do rotulo (14/10/2026), mesma ORDEM_GRUPOS_SERVICO de rad_form.js --
     so entram areas que o RAD realmente tem algum servico.
     """
     nomes_por_area = {}

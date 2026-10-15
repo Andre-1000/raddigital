@@ -268,6 +268,22 @@ def dados_edicao(request, numero_rad):
             'numero_execucao': rad.numero_execucao,
             'rascunho': montar_rascunho(rad),
             'anexos': _anexos_para_edicao(rad),
+            # 14/10/2026: servicos desativados que o RAD ainda usa (o
+            # catalogo do formulario so traz os ativos) -- mesmos campos
+            # do catalogo, para a tela mostrar o checkbox e deixar o
+            # Administrador desmarcar/trocar.
+            'servicos_desativados': [
+                {
+                    'id': s.id, 'nome': s.nome, 'descricao': s.descricao,
+                    'requer_amv': s.requer_amv, 'requer_descricao': s.requer_descricao,
+                    'requer_terceiros': s.requer_terceiros,
+                    'terceiros_tem_op_maquina': s.terceiros_tem_op_maquina,
+                    'terceiros_tem_volume': s.terceiros_tem_volume,
+                    'requer_canaleta': s.requer_canaleta, 'area': s.area,
+                }
+                for s in (rs.servico for rs in rad.servicos.all())
+                if not s.ativo
+            ],
         }
     )
 

@@ -9,7 +9,8 @@
 -- requer_canaleta (30/07/2026): TRUE somente para Inspeção de
 --   Canaleta -- abre o bloco "Anomalias" no formulario
 -- area (30/07/2026): agrupamento visual em blocos expansíveis na tela
---   de preenchimento — Geral, Infra, Corretiva, Mecanizada.
+--   de preenchimento — AMV, Corretiva, Geral, Infra, Inspeção e Ronda
+--   (insp_ronda, 14/10/2026), Mecanizada.
 --
 -- Mudanças de negócio 22/07/2026: "Limpeza" e "Controle de Vegetação"
 -- foram DESATIVADOS (ativo=FALSE).
@@ -28,6 +29,13 @@
 -- deploy seguinte): "Socaria em via corrida" e "Socaria em AMV" vao
 -- para o grupo MECANIZADA (foram lançadas por engano em Corretiva no
 -- primeiro deploy) -- substituem "Socadora", que foi DESATIVADA.
+-- Mudança de negócio 14/10/2026: novo bloco "Inspeção e Ronda" (area
+-- 'insp_ronda') com os serviços "Inspeção" e "Reparo". Os antigos
+-- "Inspeção" e "Reparo" do Geral foram RENOMEADOS (migration catalogos
+-- 0013) para "Inspeção (Geral)" e "Reparo (Geral)" e DESATIVADOS --
+-- os RADs antigos continuam apontando para eles. Este seed roda DEPOIS
+-- do migrate (start.sh), então as linhas abaixo apenas confirmam o
+-- estado que a migration criou.
 -- Nenhum serviço é removido de verdade do banco — RadServico tem FK
 -- PROTECT contra CatServico e RADs antigos podem referenciá-los.
 --
@@ -39,12 +47,14 @@
 -- ============================================================
 
 INSERT INTO cat_servicos (nome, descricao, requer_amv, requer_descricao, requer_terceiros, terceiros_tem_op_maquina, terceiros_tem_volume, requer_canaleta, area, ativo) VALUES
-  ('Inspeção', 'Verificação visual, dimensional ou geométrica da via permanente, podendo ser realizada a pé ou com veículo. Inclui registro de anomalias, medição de desgaste, avaliação de condições dos componentes e monitoramento geral do estado da via.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'geral', TRUE),
+  ('Inspeção', 'Verificação visual, dimensional ou geométrica da via permanente, podendo ser realizada a pé ou com veículo. Inclui registro de anomalias, medição de desgaste, avaliação de condições dos componentes e monitoramento geral do estado da via.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'insp_ronda', TRUE),
+  ('Inspeção (Geral)', 'Verificação visual, dimensional ou geométrica da via permanente, podendo ser realizada a pé ou com veículo. Inclui registro de anomalias, medição de desgaste, avaliação de condições dos componentes e monitoramento geral do estado da via.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'geral', FALSE),
   ('Ajuste', 'Regulagem, reaperto e calibração de elementos da via permanente e de AMVs. Inclui aperto de fixações, ajuste de mecanismos de chave, regulagem de folgas e calibração de dispositivos.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'geral', FALSE),
   ('Limpeza', 'Limpeza e desobstrução de componentes da via permanente. Inclui remoção de detritos, limpeza de canaletas, desobstrução de drenos, limpeza de mecanismos de AMV e remoção de resíduos que comprometam a operação.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'geral', FALSE),
   ('Lubrificação', 'Aplicação de lubrificantes em juntas de trilho, elementos de fixação e partes móveis da via permanente. Executada conforme plano de manutenção ou necessidade identificada em inspeção.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'geral', FALSE),
   ('Substituição', 'Troca parcial ou total de componentes da via permanente em estado degradado. Inclui substituição de trilhos, dormentes, fixações e placas de apoio.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'geral', TRUE),
-  ('Reparo', 'Recuperação e conserto de elementos estruturais danificados, sem substituição completa. Inclui correção de defeitos localizados, reparo de fixações e restauração de componentes com dano parcial.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'geral', TRUE),
+  ('Reparo', 'Recuperação e conserto de elementos estruturais danificados, sem substituição completa. Inclui correção de defeitos localizados, reparo de fixações e restauração de componentes com dano parcial.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'insp_ronda', TRUE),
+  ('Reparo (Geral)', 'Recuperação e conserto de elementos estruturais danificados, sem substituição completa. Inclui correção de defeitos localizados, reparo de fixações e restauração de componentes com dano parcial.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'geral', FALSE),
   ('Soldagem', 'Execução de soldas em trilhos e elementos estruturais da via. Inclui soldagem aluminotérmica, elétrica, reparo de soldas defeituosas e uniões de trilhos.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'geral', TRUE),
   ('Esmerilhamento', 'Retificação da superfície de rolamento dos trilhos. Inclui remoção de ondulações, rebarbas e defeitos superficiais, acabamento de soldas e correção de irregularidades que afetam o conforto de marcha.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'geral', FALSE),
   ('Alinhamento', 'Alinhamento e nivelamento geométrico da via permanente. Inclui correção de desvios horizontais e verticais e restabelecimento dos parâmetros geométricos dentro das tolerâncias operacionais.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'geral', TRUE),
@@ -83,5 +93,6 @@ ON CONFLICT (nome) DO UPDATE SET
   area = EXCLUDED.area,
   ativo = EXCLUDED.ativo;
 
--- Total: 33 registros (7 inativos: Ajuste, Limpeza, Lubrificação,
--- Esmerilhamento, Socaria, Controle de Vegetação, Socadora)
+-- Total: 35 registros (9 inativos: Ajuste, Limpeza, Lubrificação,
+-- Esmerilhamento, Socaria, Controle de Vegetação, Socadora,
+-- Inspeção (Geral), Reparo (Geral))

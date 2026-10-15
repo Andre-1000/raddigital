@@ -141,11 +141,12 @@
         <label for="filtro-servico-area">Serviço executado — Área</label>
         <select id="filtro-servico-area">
           <option value="">Todas</option>
+          <option value="amv">AMV</option>
+          <option value="corretiva">Corretiva</option>
           <option value="geral">Geral</option>
           <option value="infra">Infra</option>
-          <option value="corretiva">Corretiva</option>
+          <option value="insp_ronda">Inspeção e Ronda</option>
           <option value="mecanizada">Mecanizada</option>
-          <option value="amv">AMV</option>
         </select>
       </div>
       <div class="campo" id="campo-subcategoria-servico" style="display:none;">
@@ -275,8 +276,8 @@
     // Preenchido uma vez ao carregar os catálogos; consultado sempre
     // que a pessoa troca a Área escolhida.
     const ROTULO_AREA = {
-      geral: 'Geral', infra: 'Infra', corretiva: 'Corretiva',
-      mecanizada: 'Mecanizada', amv: 'AMV',
+      amv: 'AMV', corretiva: 'Corretiva', geral: 'Geral', infra: 'Infra',
+      insp_ronda: 'Inspeção e Ronda', mecanizada: 'Mecanizada',
     };
     let servicosPorArea = {};
 
