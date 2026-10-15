@@ -13,12 +13,31 @@ texto, separados por '; ' -- nao ha como representar uma relacao
 1-para-N numa planilha onde cada RAD e uma linha so. Quem precisar do
 detalhe individual (ex.: por MCH ou por colaborador) deve usar a tela
 de Consulta ou a API, nao o Excel.
+
+15/10/2026 (BI-RAD): a coluna "Serviços" passa a trazer a AREA de cada
+servico junto do nome, no formato "Área > Serviço" (ex.:
+"Geral > Soldagem; Infra > Roçada/Poda"). Antes ia so o nome e a area
+(bloco de Servicos Executados do formulario) se perdia -- o BI nao
+conseguia analisar por area sem uma tabela de-para mantida a mao.
+O par area+servico viaja junto no mesmo item, entao quem dividir por
+'; ' e depois por ' > ' nunca descasa um do outro. A area e a ATUAL do
+catalogo (CatServico.area), nao a da epoca do RAD. Vale para os tres
+consumidores desta funcao: planilha do Google (rad/google_sheets.py),
+Excel do Dashboard e Excel da Consulta. Sem migration.
 """
 import io
 
 from django.utils import timezone as django_timezone
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
+
+from catalogos.models import CatServico
+
+# Codigo da area -> rotulo exibido na tela (ex.: 'insp_ronda' ->
+# 'Inspeção e Ronda'). Lido de AREA_CHOICES para nunca ficar
+# desatualizado quando uma area nova for criada.
+_ROTULO_AREA = dict(CatServico.AREA_CHOICES)
+SEPARADOR_AREA = ' > '
 
 COLUNAS = [
     ('numero_rad', 'Número RAD'),
@@ -156,6 +175,25 @@ def _campos_canaleta(rad):
     }
 
 
+def _rotulo_area(codigo):
+    """
+    Rotulo legivel da area. Codigo desconhecido (area criada no banco
+    sem estar em AREA_CHOICES) aparece como o proprio codigo, e area
+    vazia como 'Sem área' -- nunca quebra a exportacao.
+    """
+    if not codigo:
+        return 'Sem área'
+    return _ROTULO_AREA.get(codigo, codigo)
+
+
+def _servicos_com_area(rad):
+    """'Área > Serviço' de cada servico do RAD, separados por '; '."""
+    return '; '.join(
+        f'{_rotulo_area(area)}{SEPARADOR_AREA}{nome}'
+        for area, nome in rad.servicos.values_list('servico__area', 'servico__nome')
+    )
+
+
 def _linha_para_rad(rad):
     return {
         'numero_rad': rad.numero_rad,
@@ -184,7 +222,8 @@ def _linha_para_rad(rad):
         'linhas': '; '.join(str(v) for v in rad.linhas.values_list('linha_id', flat=True)),
         'vias': '; '.join(rad.vias.values_list('via__nome', flat=True)),
         'equipes': '; '.join(rad.equipes.values_list('equipe_id', flat=True)),
-        'servicos': '; '.join(rad.servicos.values_list('servico__nome', flat=True)),
+        # 15/10/2026: "Área > Serviço" (ver docstring do modulo).
+        'servicos': _servicos_com_area(rad),
         # 04/09/2026: um bloco AMV pode ter mch=None (via "MCH não
         # cadastrada") -- nesse caso mostra o texto livre digitado no
         # lugar da identificação real, prefixado para ficar claro que
