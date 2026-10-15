@@ -36,6 +36,9 @@
 -- os RADs antigos continuam apontando para eles. Este seed roda DEPOIS
 -- do migrate (start.sh), então as linhas abaixo apenas confirmam o
 -- estado que a migration criou.
+-- Mudança de negócio 15/10/2026: adicionado ao bloco Inspeção e Ronda
+-- o serviço "Pedido de Interdição" -- serviço simples, sem bloco
+-- especial associado.
 -- Nenhum serviço é removido de verdade do banco — RadServico tem FK
 -- PROTECT contra CatServico e RADs antigos podem referenciá-los.
 --
@@ -54,6 +57,7 @@ INSERT INTO cat_servicos (nome, descricao, requer_amv, requer_descricao, requer_
   ('Lubrificação', 'Aplicação de lubrificantes em juntas de trilho, elementos de fixação e partes móveis da via permanente. Executada conforme plano de manutenção ou necessidade identificada em inspeção.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'geral', FALSE),
   ('Substituição', 'Troca parcial ou total de componentes da via permanente em estado degradado. Inclui substituição de trilhos, dormentes, fixações e placas de apoio.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'geral', TRUE),
   ('Reparo', 'Recuperação e conserto de elementos estruturais danificados, sem substituição completa. Inclui correção de defeitos localizados, reparo de fixações e restauração de componentes com dano parcial.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'insp_ronda', TRUE),
+  ('Pedido de Interdição', 'Solicitação de interdição da via ao CCO para execução de serviço.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'insp_ronda', TRUE),
   ('Reparo (Geral)', 'Recuperação e conserto de elementos estruturais danificados, sem substituição completa. Inclui correção de defeitos localizados, reparo de fixações e restauração de componentes com dano parcial.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'geral', FALSE),
   ('Soldagem', 'Execução de soldas em trilhos e elementos estruturais da via. Inclui soldagem aluminotérmica, elétrica, reparo de soldas defeituosas e uniões de trilhos.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'geral', TRUE),
   ('Esmerilhamento', 'Retificação da superfície de rolamento dos trilhos. Inclui remoção de ondulações, rebarbas e defeitos superficiais, acabamento de soldas e correção de irregularidades que afetam o conforto de marcha.', FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, 'geral', FALSE),
@@ -93,6 +97,6 @@ ON CONFLICT (nome) DO UPDATE SET
   area = EXCLUDED.area,
   ativo = EXCLUDED.ativo;
 
--- Total: 35 registros (9 inativos: Ajuste, Limpeza, Lubrificação,
+-- Total: 36 registros (9 inativos: Ajuste, Limpeza, Lubrificação,
 -- Esmerilhamento, Socaria, Controle de Vegetação, Socadora,
 -- Inspeção (Geral), Reparo (Geral))

@@ -139,7 +139,8 @@ sem combinar com o André:
 
 ## Bloco "Inspeção e Ronda" em Serviços Executados (14/10/2026)
 - Nova área `insp_ronda` (rótulo "Inspeção e Ronda") com os serviços "Inspeção" e
-  "Reparo" (simples, sem bloco extra, limite de fotos padrão).
+  "Reparo" (simples, sem bloco extra, limite de fotos padrão). Em 15/10/2026 entrou
+  também "Pedido de Interdição" (simples, só pelo seed — sem migration).
 - Os antigos "Inspeção" e "Reparo" do Geral foram **renomeados** para "Inspeção (Geral)"
   e "Reparo (Geral)" e **desativados** (migration `catalogos/0013_inspecao_e_ronda`).
   Os ~112 RADs antigos continuam apontando para eles (histórico intacto no Geral);
