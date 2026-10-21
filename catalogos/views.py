@@ -74,4 +74,14 @@ def listar_todos(request):
             LimiteFotos.objects.values('categoria', 'area', 'limite')
         ),
     }
+    # 15/10/2026: ?incluir_servicos_desativados=1 -- usado SO pela tela
+    # de Consulta, para o filtro "Subcategoria" listar tambem servicos
+    # desativados (ex.: "Inspeção (Geral)") e achar RADs antigos que os
+    # usam. Chave separada de 'servicos' de proposito: o formulario de
+    # preenchimento le 'servicos' e guarda offline -- servico
+    # desativado nunca pode aparecer la para um RAD novo.
+    if request.GET.get('incluir_servicos_desativados') == '1':
+        dados['servicos_desativados'] = list(
+            CatServico.objects.filter(ativo=False).values('id', 'nome', 'area')
+        )
     return JsonResponse(dados)

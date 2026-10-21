@@ -150,6 +150,12 @@ sem combinar com o André:
   Administrador poder desmarcar/trocar. Antes disso, um serviço desativado ficava
   marcado e invisível na edição.
 - Testes: `rad/test_inspecao_e_ronda.py`, `interface/js_tests/teste_inspecao_ronda.js`.
+- Consulta (15/10/2026): o filtro "Serviço executado → Subcategoria" lista também os
+  serviços **desativados**, com "(desativado)", no fim de cada área — para achar os RADs
+  antigos. Vem de `GET /catalogos/todos/?incluir_servicos_desativados=1`, na chave
+  separada `servicos_desativados`; a chave `servicos` continua só com ativos porque o
+  formulário a guarda offline. Testes: `consulta/test_filtro_servico_desativado.py`,
+  `interface/js_tests/teste_consulta_servico_desativado.js`.
 
 ## Convenções de código
 

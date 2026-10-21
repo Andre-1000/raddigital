@@ -223,7 +223,7 @@
 
     async function carregarCatalogos() {
       try {
-        const resposta = await RadAuth.requisicaoAutenticada('/catalogos/todos/');
+        const resposta = await RadAuth.requisicaoAutenticada('/catalogos/todos/?incluir_servicos_desativados=1');
         if (!resposta.ok) return;
         const catalogos = await resposta.json();
 
@@ -264,7 +264,13 @@
           (l) => l.nome
         );
 
-        popularServicosPorArea(catalogos.servicos);
+        // 15/10/2026: desativados entram no filtro (com "(desativado)")
+        // para achar RADs antigos -- ex.: "Inspeção (Geral)".
+        popularServicosPorArea(
+          catalogos.servicos.concat(
+            (catalogos.servicos_desativados || []).map((s) => Object.assign({}, s, { desativado: true }))
+          )
+        );
       } catch (erro) {
         // Falha ao carregar catalogos nao deve travar a tela de consulta;
         // os filtros por texto continuam funcionando normalmente.
@@ -288,6 +294,13 @@
         if (!servicosPorArea[servico.area]) servicosPorArea[servico.area] = [];
         servicosPorArea[servico.area].push(servico);
       });
+      // Ativos primeiro (ordem alfabetica), desativados no fim de cada area.
+      Object.keys(servicosPorArea).forEach(function (area) {
+        servicosPorArea[area].sort(function (a, b) {
+          if (Boolean(a.desativado) !== Boolean(b.desativado)) return a.desativado ? 1 : -1;
+          return a.nome.localeCompare(b.nome, 'pt-BR');
+        });
+      });
     }
 
     function atualizarSubcategoria() {
@@ -304,7 +317,7 @@
       const servicosDaArea = servicosPorArea[areaEscolhida] || [];
       listaSubcategoria.innerHTML = servicosDaArea.map(function (servico) {
         return `<label>
-          <input type="checkbox" class="checkbox-subcategoria-servico" value="${servico.id}"> ${servico.nome}
+          <input type="checkbox" class="checkbox-subcategoria-servico" value="${Number(servico.id)}"> ${escapar(servico.nome)}${servico.desativado ? ' <em>(desativado)</em>' : ''}
         </label>`;
       }).join('');
       campoSubcategoria.style.display = '';

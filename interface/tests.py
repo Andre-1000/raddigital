@@ -802,3 +802,24 @@ class TestTelaEditarRad:
             f'Teste Inspeção e Ronda falhou:\n{resultado.stdout}\n{resultado.stderr}'
         )
         assert 'TODOS OS TESTES PASSARAM' in resultado.stdout
+
+    def test_consulta_filtra_servico_desativado_com_dom_real(self, tmp_path):
+        """15/10/2026: Subcategoria da Consulta lista servicos desativados (jsdom)."""
+        import subprocess
+        from pathlib import Path
+
+        from django.template.loader import render_to_string
+
+        caminho_html = tmp_path / 'consulta_renderizada.html'
+        caminho_html.write_text(render_to_string('interface/consulta.html'))
+
+        script = Path(__file__).resolve().parent / 'js_tests' / 'teste_consulta_servico_desativado.js'
+        resultado = subprocess.run(
+            ['node', str(script), str(caminho_html)],
+            capture_output=True, text=True, timeout=60,
+            cwd=str(Path(__file__).resolve().parent / 'js_tests'),
+        )
+        assert resultado.returncode == 0, (
+            f'Teste filtro de servico desativado falhou:\n{resultado.stdout}\n{resultado.stderr}'
+        )
+        assert 'TODOS OS TESTES PASSARAM' in resultado.stdout
