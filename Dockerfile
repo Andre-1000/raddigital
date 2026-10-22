@@ -6,7 +6,7 @@
 # (ainda pendente, ver README) so muda ONDE esta imagem roda, nao
 # como ela e construida.
 
-FROM python:3.12-slim AS base
+FROM python:3.14-slim AS base
 
 # psycopg2-binary evita precisar de libpq-dev, mas o build ainda
 # precisa de um compilador para outras dependencias nativas (Pillow).
