@@ -27,6 +27,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   // as duas fontes de visibilidade sem testar caso a caso teria mais
   // risco de quebrar alguma coisa do que valor. Para esses, a
   // configuracao continua valendo so no servidor, como ja era.
+  let camposDesabilitadosConfig = [];
   async function aplicarConfiguracoesDeCampo() {
     let campos;
     try {
@@ -38,6 +39,9 @@ document.addEventListener('DOMContentLoaded', async function () {
       // um refinamento visual, nunca pode impedir o preenchimento.
       const corpo = await resposta.json();
       campos = corpo && Array.isArray(corpo.campos) ? corpo.campos : [];
+      // 26/10/2026: guardado para a mensagem "Copiar" omitir os mesmos
+      // campos que o servidor omite (ver catalogosParaExportar).
+      camposDesabilitadosConfig = campos.filter((c) => !c.habilitado).map((c) => c.chave);
     } catch (erro) {
       return; // offline ou falha de rede -- formulario segue com o padrao fixo do HTML
     }
@@ -2298,6 +2302,7 @@ document.addEventListener('DOMContentLoaded', async function () {
       mch: mchs,
       motivos_atraso: motivosAtraso,
       colaboradores_cadastro: colaboradoresCadastro,
+      campos_desabilitados: camposDesabilitadosConfig,
     };
   }
 

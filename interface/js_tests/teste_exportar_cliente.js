@@ -98,7 +98,9 @@ async function principal() {
   );
 
   const mensagem = ExportarCliente.gerarMensagemCopiar(rascunho, catalogos);
-  assert(mensagem.startsWith('RAD - (Relatório de Atividade Diária)'), 'mensagem comeca com o cabecalho esperado');
+  // 26/10/2026: formato por grupos (WhatsApp) -- ver rad/test_mensagem_whatsapp.py
+  assert(mensagem.startsWith('*RAD – Relatório de Atividade Diária*\n\n📋 *IDENTIFICAÇÃO*'), 'mensagem comeca com o cabecalho esperado');
+  assert(!mensagem.includes('___'), 'mensagem sem linhas de sublinhado');
   assert(mensagem.includes('OS: 4321'), 'mensagem contem a OS');
   assert(mensagem.includes('Responsável Atividade: Carlos Souza'), 'mensagem contem responsavel_atividade');
 

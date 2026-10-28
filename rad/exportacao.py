@@ -147,23 +147,171 @@ def _campos_do_relatorio(rad):
     ]
 
 
+# ---------------------------------------------------------------------
+# Mensagem "Copiar" para o WhatsApp (formato por grupos, 26/10/2026)
+# ---------------------------------------------------------------------
+# Decisoes do Andre (26/10/2026) -- valem SO para a mensagem; PDF e
+# Word continuam usando _campos_do_relatorio, sem mudanca:
+#   - sem linhas "___" entre campos: separa por GRUPOS (titulo em negrito
+#     com emoji + linha em branco entre grupos);
+#   - campo que se aplica mas ficou vazio: rotulo SEM valor ("Falha:");
+#   - campo que nao se aplica (ex.: N° Falha quando o tipo nao e Falha,
+#     Terceiros quando nenhum servico pede): NAO aparece;
+#   - pares na mesma linha, explicitos: "09:30 (início) // 15:30 (término)";
+#   - "Atividade" saiu (era a mesma lista de "Serviços realizados");
+#   - entraram Tipo de Manutenção, Tipo de Veículo e Operador.
+# Mesmo formato em interface/static/interface/js/exportar_cliente.js
+# (mensagem copiada no celular, offline) -- mudar os dois juntos.
+
+TITULO_MENSAGEM = '*RAD – Relatório de Atividade Diária*'
+
+
+def _vazio_se_nada(valor):
+    if valor is None:
+        return ''
+    return str(valor).strip()
+
+
+def _par(primeiro, segundo, rotulo_1, rotulo_2):
+    """"A (rotulo_1) // B (rotulo_2)" -- vazio se os dois estiverem vazios."""
+    primeiro, segundo = _vazio_se_nada(primeiro), _vazio_se_nada(segundo)
+    if not primeiro and not segundo:
+        return ''
+    return f'{primeiro or "—"} ({rotulo_1}) // {segundo or "—"} ({rotulo_2})'
+
+
+def _hora(valor):
+    return f'{valor:%H:%M}' if valor else ''
+
+
+def _ccm(nome, hora):
+    nome = _vazio_se_nada(nome)
+    if not nome:
+        return ''
+    return f'{nome} ({hora:%H:%M})' if hora else nome
+
+
+def _grupos_da_mensagem(rad):
+    """
+    Lista de grupos: (titulo, itens). Cada item e (chave_config, rotulo,
+    valor) -- rotulo None = bloco de texto livre, sem rotulo. Itens que
+    nao se aplicam a este RAD simplesmente nao entram na lista.
+    """
+    e_falha = bool(rad.tipo_manutencao and rad.tipo_manutencao.nome == 'Falha')
+    servicos = [rs.servico for rs in rad.servicos.all()]
+    tem_outros = any(s.nome == 'Outros' for s in servicos)
+    pede = lambda flag: any(getattr(s, flag) for s in servicos)  # noqa: E731
+
+    identificacao = [
+        ('tipo_manutencao', 'Tipo de Manutenção', rad.tipo_manutencao.nome if rad.tipo_manutencao else ''),
+        ('numero_os', 'OS', rad.numero_os),
+        ('numero_sa', 'N° SA', rad.numero_sa),
+        ('solicitante_sa', 'Solicitante SA', rad.solicitante_sa),
+    ]
+    if e_falha:
+        identificacao.append(('numero_falha', 'N° Falha', rad.numero_falha))
+
+    datas = [
+        ('data_atividade', 'Data da Atividade', rad.data_atividade.strftime('%d/%m/%Y') if rad.data_atividade else ''),
+        ('data_preenchimento', 'Data de Preenchimento', rad.data_preenchimento.strftime('%d/%m/%Y')),
+    ]
+    if not e_falha:
+        datas.append(('hora_prog_inicio', 'Programado', _par(
+            _hora(rad.hora_prog_inicio), _hora(rad.hora_prog_termino), 'início', 'término')))
+    datas.append(('hora_real_inicio', 'Realizado', _par(
+        _hora(rad.hora_real_inicio), _hora(rad.hora_real_termino), 'início', 'término')))
+    # O formulario so pede motivo para atraso no TERMINO (o atraso no
+    # inicio ainda e calculado, mas nao tem campo de motivo na tela) --
+    # entao "se aplica" = atraso no termino, ou RAD antigo que tenha
+    # motivo de inicio gravado.
+    if rad.atraso_termino or rad.motivo_atraso_inicio_id:
+        datas.append(('motivo_atraso_inicio', 'Motivo dos atrasos', _motivo_atrasos_texto(rad)
+                      if (rad.motivo_atraso_inicio_id or rad.motivo_atraso_termino_id) else ''))
+
+    if rad.km_poste_inicial or rad.km_poste_final:
+        km = _par(rad.km_poste_inicial, rad.km_poste_final, 'inicial', 'final')
+    else:
+        km = _vazio_se_nada(rad.km_poste)  # RAD antigo: campo unico
+    localizacao = [
+        ('local_inicial', 'Local', _par(rad.local_inicial.sigla, rad.local_final.sigla, 'inicial', 'final')),
+        ('linhas', 'Linha', ', '.join(rad.linhas.values_list('linha__nome', flat=True))),
+        ('vias', 'Via', ', '.join(rad.vias.values_list('via__nome', flat=True))),
+        ('km_poste', 'Km/Poste', km),
+    ]
+
+    execucao = [
+        ('equipes', 'Equipes Envolvidas', ', '.join(rad.equipes.values_list('equipe__nome', flat=True))),
+        ('servicos', 'Serviços realizados', ', '.join(s.nome for s in servicos)),
+    ]
+    if tem_outros:
+        execucao.append(('outros_servico_desc', 'Descrição de Outros', rad.outros_servico_desc))
+    if pede('requer_terceiros'):
+        execucao.append(('terceiros', 'N° Encarregados (Terceiros)', rad.terceiros_num_encarregados))
+    if pede('terceiros_tem_op_maquina'):
+        execucao.append(('terceiros', 'N° Op Máquina (Terceiros)', rad.terceiros_num_op_maquina))
+    if pede('requer_terceiros'):
+        execucao.append(('terceiros', 'N° Ajudantes (Terceiros)', rad.terceiros_num_ajudantes))
+        execucao.append(('terceiros', 'N° Motorista (Terceiros)', rad.terceiros_num_motorista))
+    if pede('terceiros_tem_volume'):
+        execucao.append(('terceiros', 'Volume (Terceiros)', rad.terceiros_volume))
+    execucao += [
+        ('materiais_utilizados', 'Equipamentos utilizados', rad.materiais_utilizados),
+        ('tipo_veiculo', 'Tipo de Veículo', rad.tipo_veiculo),
+        ('operador', 'Operador', rad.operador),
+    ]
+
+    responsaveis = [
+        ('colaboradores', 'Responsável', ', '.join(rad.colaboradores.values_list('nome', flat=True))),
+        ('responsavel_atividade', 'Responsável Atividade', rad.responsavel_atividade),
+        ('operador_ccm_abertura', 'Op CCM - Abertura',
+         _ccm(rad.operador_ccm_abertura_nome, rad.operador_ccm_abertura_hora)),
+        ('operador_ccm_entrega', 'Op CCM - Entrega',
+         _ccm(rad.operador_ccm_entrega_nome, rad.operador_ccm_entrega_hora)),
+    ]
+
+    return [
+        ('📋 *IDENTIFICAÇÃO*', identificacao),
+        ('📅 *DATAS E HORÁRIOS*', datas),
+        ('📍 *LOCALIZAÇÃO*', localizacao),
+        ('🛠️ *EXECUÇÃO*', execucao),
+        ('👷 *RESPONSÁVEIS*', responsaveis),
+        ('📝 *DESCRIÇÃO TÉCNICA*', [('descricao_tecnica_atividade', None, rad.descricao_tecnica_atividade)]),
+        ('💬 *OBSERVAÇÃO GERAL*', [('observacoes_gerais', None, rad.observacoes_gerais)]),
+    ]
+
+
+def montar_mensagem_por_grupos(grupos, desabilitados):
+    """
+    Monta o texto a partir dos grupos. Campo desabilitado pelo
+    Administrador some; grupo que ficou sem nenhum campo some inteiro.
+    Separado de _grupos_da_mensagem para ser testavel sem banco.
+    """
+    blocos = [TITULO_MENSAGEM]
+    for titulo, itens in grupos:
+        linhas = []
+        for chave, rotulo, valor in itens:
+            if chave in desabilitados:
+                continue
+            valor = _vazio_se_nada(valor)
+            if rotulo is None:
+                linhas.append(valor)  # texto livre: mantem as quebras de linha
+            else:
+                # Campo com rotulo: quebra de linha viraria uma linha "solta"
+                # que parece outro campo -- junta com virgula.
+                valor = ', '.join(parte.strip() for parte in valor.splitlines() if parte.strip())
+                linhas.append(f'{rotulo}: {valor}'.rstrip())
+        if linhas:
+            blocos.append('\n'.join([titulo] + linhas))
+    return '\n\n'.join(blocos)
+
+
 def gerar_mensagem_copiar(rad):
     """
-    RG-EXP-013: mensagem estruturada para a área de transferência.
-
-    27/08/2026: formatada para colar direto no WhatsApp -- rótulos em
-    negrito (*texto*, um asterisco só -- é o formato real do WhatsApp;
-    dois asteriscos "**" não vira negrito lá, aparece literal) e cada
-    campo separado por uma linha de sublinhados, para ficar fácil de
-    escanear numa conversa.
+    RG-EXP-013: mensagem para a area de transferencia, pronta para colar
+    no WhatsApp. Formato por grupos (26/10/2026) -- ver o bloco de
+    comentario acima de TITULO_MENSAGEM.
     """
-    desabilitados = campos_desabilitados()
-    campos = _campos_do_relatorio(rad)
-    linhas = [
-        f'*{rotulo}:* {valor}' for chave, rotulo, valor in campos if chave not in desabilitados
-    ]
-    corpo = '\n___________\n'.join(linhas)
-    return f'*RAD - (Relatório de Atividade Diária)*\n___________\n{corpo}'
+    return montar_mensagem_por_grupos(_grupos_da_mensagem(rad), campos_desabilitados())
 
 
 def gerar_pdf_bytes(rad):

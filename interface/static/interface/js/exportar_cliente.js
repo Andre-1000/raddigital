@@ -160,14 +160,146 @@ const ExportarCliente = (function () {
     return `${dia}/${mes}/${ano}`;
   }
 
+  // -------------------------------------------------------------------
+  // Mensagem "Copiar" para o WhatsApp -- formato por grupos (26/10/2026).
+  // MESMO formato de rad/exportacao.py::gerar_mensagem_copiar (servidor);
+  // mudar os dois juntos. Regras (decisao do Andre):
+  //   - sem "___": grupos com titulo em negrito + emoji, linha em branco
+  //     entre grupos;
+  //   - campo que se aplica mas esta vazio: rotulo sem valor ("Falha:");
+  //   - campo que nao se aplica (N° Falha fora de Falha, Programado em
+  //     Falha, Terceiros sem servico que peca, etc.): nao aparece;
+  //   - pares: "09:30 (início) // 15:30 (término)";
+  //   - "Atividade" saiu (repetia "Serviços realizados").
+  // PDF e Word offline continuam usando montarCampos, sem mudanca.
+  // -------------------------------------------------------------------
+  const TITULO_MENSAGEM = '*RAD – Relatório de Atividade Diária*';
+
+  function vazioSeNada(valor) {
+    if (valor === null || valor === undefined) return '';
+    return String(valor).trim();
+  }
+
+  function par(primeiro, segundo, rotulo1, rotulo2) {
+    const a = vazioSeNada(primeiro);
+    const b = vazioSeNada(segundo);
+    if (!a && !b) return '';
+    return `${a || '—'} (${rotulo1}) // ${b || '—'} (${rotulo2})`;
+  }
+
+  function gruposDaMensagem(rascunho, catalogos) {
+    const nomeTipo = nomePorCodigo(catalogos.tipos_manutencao || [], 'id', rascunho.id_tipo_manutencao) || '';
+    const ehFalha = nomeTipo === 'Falha';
+    const servicosSel = (catalogos.servicos || []).filter((s) => (rascunho.servicos || []).includes(s.id));
+    const nomesServicos = (rascunho.servicos || []).map((id) => nomePorCodigo(catalogos.servicos || [], 'id', id) || id);
+    const temOutros = servicosSel.some((s) => s.nome === 'Outros');
+    const pede = (flag) => servicosSel.some((s) => s[flag]);
+    const nomes = (lista, catalogo, campo) =>
+      (lista || []).map((codigo) => nomePorCodigo(catalogo || [], campo, codigo) || codigo).join(', ');
+    const dataBr = (iso) => (iso ? formatarDataBr(iso) : '');
+    const ccm = (nome, hora) => {
+      const n = vazioSeNada(nome);
+      if (!n) return '';
+      return hora ? `${n} (${hora})` : n;
+    };
+
+    const identificacao = [
+      ['tipo_manutencao', 'Tipo de Manutenção', nomeTipo],
+      ['numero_os', 'OS', rascunho.numero_os],
+      ['numero_sa', 'N° SA', rascunho.numero_sa],
+      ['solicitante_sa', 'Solicitante SA', rascunho.solicitante_sa],
+    ];
+    if (ehFalha) identificacao.push(['numero_falha', 'N° Falha', rascunho.numero_falha]);
+
+    const datas = [
+      ['data_atividade', 'Data da Atividade', dataBr(rascunho.data_atividade)],
+      ['data_preenchimento', 'Data de Preenchimento', dataBr(rascunho.data_preenchimento)],
+    ];
+    if (!ehFalha) {
+      datas.push(['hora_prog_inicio', 'Programado', par(rascunho.hora_prog_inicio, rascunho.hora_prog_termino, 'início', 'término')]);
+    }
+    datas.push(['hora_real_inicio', 'Realizado', par(rascunho.hora_real_inicio, rascunho.hora_real_termino, 'início', 'término')]);
+    // No rascunho o atraso e calculado na tela (nao ha flag guardada) e o
+    // motivo e limpo quando nao ha atraso -- entao motivo preenchido =
+    // houve atraso. (No servidor a regra usa Rad.atraso_inicio/termino.)
+    if (rascunho.id_motivo_atraso_inicio || rascunho.id_motivo_atraso_termino) {
+      const partes = [];
+      if (rascunho.id_motivo_atraso_inicio) {
+        let m = nomePorCodigo(catalogos.motivos_atraso || [], 'id', rascunho.id_motivo_atraso_inicio) || '';
+        if (rascunho.desc_motivo_atraso_inicio) m += `: ${rascunho.desc_motivo_atraso_inicio}`;
+        partes.push(`Início — ${m}`);
+      }
+      if (rascunho.id_motivo_atraso_termino) {
+        let m = nomePorCodigo(catalogos.motivos_atraso || [], 'id', rascunho.id_motivo_atraso_termino) || '';
+        if (rascunho.desc_motivo_atraso_termino) m += `: ${rascunho.desc_motivo_atraso_termino}`;
+        partes.push(`Término — ${m}`);
+      }
+      datas.push(['motivo_atraso_inicio', 'Motivo dos atrasos', partes.join('; ')]);
+    }
+
+    const localizacao = [
+      ['local_inicial', 'Local', par(rascunho.id_local_inicial, rascunho.id_local_final, 'inicial', 'final')],
+      ['linhas', 'Linha', nomes(rascunho.linhas, catalogos.linhas, 'codigo')],
+      ['vias', 'Via', nomes(rascunho.vias, catalogos.vias, 'id')],
+      ['km_poste', 'Km/Poste', par(rascunho.km_poste_inicial, rascunho.km_poste_final, 'inicial', 'final')],
+    ];
+
+    const execucao = [
+      ['equipes', 'Equipes Envolvidas', nomes(rascunho.equipes, catalogos.equipes, 'codigo')],
+      ['servicos', 'Serviços realizados', nomesServicos.join(', ')],
+    ];
+    if (temOutros) execucao.push(['outros_servico_desc', 'Descrição de Outros', rascunho.outros_servico_desc]);
+    if (pede('requer_terceiros')) execucao.push(['terceiros', 'N° Encarregados (Terceiros)', rascunho.terceiros_num_encarregados]);
+    if (pede('terceiros_tem_op_maquina')) execucao.push(['terceiros', 'N° Op Máquina (Terceiros)', rascunho.terceiros_num_op_maquina]);
+    if (pede('requer_terceiros')) {
+      execucao.push(['terceiros', 'N° Ajudantes (Terceiros)', rascunho.terceiros_num_ajudantes]);
+      execucao.push(['terceiros', 'N° Motorista (Terceiros)', rascunho.terceiros_num_motorista]);
+    }
+    if (pede('terceiros_tem_volume')) execucao.push(['terceiros', 'Volume (Terceiros)', rascunho.terceiros_volume]);
+    execucao.push(
+      ['materiais_utilizados', 'Equipamentos utilizados', rascunho.materiais_utilizados],
+      ['tipo_veiculo', 'Tipo de Veículo', rascunho.tipo_veiculo],
+      ['operador', 'Operador', rascunho.operador]
+    );
+
+    const responsaveis = [
+      ['colaboradores', 'Responsável', (rascunho.colaboradores || []).map((p) => p.nome).join(', ')],
+      ['responsavel_atividade', 'Responsável Atividade', rascunho.responsavel_atividade],
+      ['operador_ccm_abertura', 'Op CCM - Abertura', ccm(rascunho.operador_ccm_abertura_nome, rascunho.operador_ccm_abertura_hora)],
+      ['operador_ccm_entrega', 'Op CCM - Entrega', ccm(rascunho.operador_ccm_entrega_nome, rascunho.operador_ccm_entrega_hora)],
+    ];
+
+    return [
+      ['📋 *IDENTIFICAÇÃO*', identificacao],
+      ['📅 *DATAS E HORÁRIOS*', datas],
+      ['📍 *LOCALIZAÇÃO*', localizacao],
+      ['🛠️ *EXECUÇÃO*', execucao],
+      ['👷 *RESPONSÁVEIS*', responsaveis],
+      ['📝 *DESCRIÇÃO TÉCNICA*', [['descricao_tecnica_atividade', null, rascunho.descricao_tecnica_atividade]]],
+      ['💬 *OBSERVAÇÃO GERAL*', [['observacoes_gerais', null, rascunho.observacoes_gerais]]],
+    ];
+  }
+
   function gerarMensagemCopiar(rascunho, catalogos) {
-    // 27/08/2026: mesmo formato do backend (rad/exportacao.py::gerar_mensagem_copiar)
-    // -- rótulos em negrito real do WhatsApp (*texto*, um asterisco
-    // só) e cada campo separado por uma linha de sublinhados.
-    const campos = montarCampos(rascunho, catalogos);
-    const linhas = campos.map(([_chave, rotulo, valor]) => `*${rotulo}:* ${valor}`);
-    const corpo = linhas.join('\n___________\n');
-    return `*RAD - (Relatório de Atividade Diária)*\n___________\n${corpo}`;
+    // Campos desabilitados pelo Administrador (rad_form.js passa a lista
+    // em catalogos.campos_desabilitados) somem, igual ao servidor.
+    const desabilitados = new Set((catalogos && catalogos.campos_desabilitados) || []);
+    const blocos = [TITULO_MENSAGEM];
+    gruposDaMensagem(rascunho, catalogos).forEach(function ([titulo, itens]) {
+      const linhas = [];
+      itens.forEach(function ([chave, rotulo, valor]) {
+        if (desabilitados.has(chave)) return;
+        let texto = vazioSeNada(valor);
+        if (rotulo !== null) {
+          // Campo com rotulo: quebra de linha viraria uma linha "solta" que
+          // parece outro campo -- junta com virgula (texto livre mantem).
+          texto = texto.split(/\r?\n/).map((p) => p.trim()).filter(Boolean).join(', ');
+        }
+        linhas.push(rotulo === null ? texto : `${rotulo}: ${texto}`.trimEnd());
+      });
+      if (linhas.length) blocos.push([titulo, ...linhas].join('\n'));
+    });
+    return blocos.join('\n\n');
   }
 
   function gerarPdfBlob(rascunho, catalogos) {

@@ -60,45 +60,9 @@ def rad_completo(db):
     return rad
 
 
-@pytest.mark.django_db
-class TestGerarMensagemCopiar:
-    def test_mensagem_contem_todos_os_campos_originais_da_efd(self, rad_completo):
-        mensagem = gerar_mensagem_copiar(rad_completo)
-        assert 'RAD - (Relatório de Atividade Diária)' in mensagem
-        assert 'Atividade: Inspeção' in mensagem
-        assert 'Local: BFU/BFU' in mensagem
-        assert 'Linha: Coral' in mensagem
-        assert 'Via: Via 1' in mensagem
-        assert 'Equipamentos utilizados: Parafusos, graxa' in mensagem
-        assert 'Responsável: Fulano de Tal' in mensagem
-        assert 'Observação Geral: Tudo certo.' in mensagem
-
-    def test_mensagem_contem_campos_novos_da_mudanca_17_07(self, rad_completo):
-        mensagem = gerar_mensagem_copiar(rad_completo)
-        assert 'OS:' in mensagem
-        assert 'N° SA: 9999999999' in mensagem
-        assert 'Equipes Envolvidas:' in mensagem
-        assert 'VP' in mensagem
-        assert 'SINAL' in mensagem
-        assert 'Responsável Atividade: Carlos Souza' in mensagem
-        assert 'Operador CCM: Op. 42' in mensagem
-        assert 'Descrição Técnica da Atividade: Trilho com desgaste de 4,5mm — substituído.' in mensagem
-
-    def test_campos_vazios_viram_na(self, rad_completo):
-        rad_completo.km_poste = None
-        rad_completo.operador_ccm = None
-        rad_completo.save()
-        mensagem = gerar_mensagem_copiar(rad_completo)
-        assert 'Km/Poste: N/A' in mensagem
-        assert 'Operador CCM: N/A' in mensagem
-
-    def test_campo_desabilitado_nao_aparece_na_mensagem(self, rad_completo):
-        CampoFormulario.objects.filter(chave='operador_ccm').update(habilitado=False)
-        try:
-            mensagem = gerar_mensagem_copiar(rad_completo)
-            assert 'Operador CCM' not in mensagem
-        finally:
-            CampoFormulario.objects.filter(chave='operador_ccm').update(habilitado=True)
+# 26/10/2026: os testes da mensagem "Copiar" (TestGerarMensagemCopiar)
+# sairam daqui -- o formato mudou para grupos (WhatsApp) e eles passaram
+# para rad/test_mensagem_whatsapp.py. PDF e Word continuam abaixo.
 
 
 @pytest.mark.django_db

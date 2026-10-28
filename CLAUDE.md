@@ -157,6 +157,24 @@ sem combinar com o André:
   formulário a guarda offline. Testes: `consulta/test_filtro_servico_desativado.py`,
   `interface/js_tests/teste_consulta_servico_desativado.js`.
 
+## Mensagem "Copiar" (WhatsApp) por grupos (26/10/2026)
+- Vale **só para a mensagem**; PDF e Word continuam usando `_campos_do_relatorio`/`montarCampos`
+  sem mudança (o Word oficial tem `{{ATIVIDADE}}` = resumo da descrição técnica, outra coisa).
+- Grupos com título em negrito + emoji (Identificação, Datas e Horários, Localização,
+  Execução, Responsáveis, Descrição Técnica, Observação Geral), linha em branco entre eles,
+  sem as linhas `___`.
+- Campo que se aplica mas está vazio → rótulo sem valor (`Solicitante SA:`), nunca "N/A".
+  Campo que não se aplica → não aparece: N° Falha só em Falha; Programado só fora de Falha;
+  Motivo dos atrasos só com atraso no término (o formulário não pede motivo de início);
+  Descrição de Outros só com "Outros"; Terceiros só se o serviço pede. Campo desabilitado
+  pelo Administrador some (o celular recebe a lista em `catalogos.campos_desabilitados`).
+- Pares explícitos: `09:30 (início) // 15:30 (término)`, `SGU (inicial) // PTR (final)`.
+- "Atividade" saiu (repetia "Serviços realizados"); entraram Tipo de Manutenção, Tipo de
+  Veículo e Operador. Campo com rótulo junta quebras de linha com vírgula; texto livre mantém.
+- Dois geradores que DEVEM ficar iguais: `rad/exportacao.py::gerar_mensagem_copiar`
+  (Consulta) e `exportar_cliente.js::gerarMensagemCopiar` (celular/offline). O teste
+  `rad/test_mensagem_whatsapp.py::TestServidorIgualCelular` compara os dois textos.
+
 ## Convenções de código
 
 - Comentários e docstrings em português, sem acentos em identificadores de código
