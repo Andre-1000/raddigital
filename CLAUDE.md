@@ -205,6 +205,15 @@ sem combinar com o André:
   Descartes") deve ser uma migration `RunPython` que faz `update(nome=...)` na MESMA
   linha — nunca desativar uma e criar outra, isso quebraria a FK de RADs antigos.
 
+## Fotos no Word oficial (28/10/2026)
+- Bug real (R00459, erro 500 ao baixar o Word): foto JPEG com EXIF defeituoso abre no Pillow
+  (passa na sincronização), mas o python-docx lê o EXIF sozinho e quebra
+  (`UnexpectedEndOfFileError`). Correção em `rad/exportacao_oficial.py::_normalizar_foto_para_word`:
+  o Pillow regrava cada foto como JPEG limpo, sem EXIF, já girada (`exif_transpose`) e
+  reduzida a `LADO_MAXIMO_FOTO_PX` (1600). Foto ilegível vira aviso em texto na célula;
+  nunca derruba o Word inteiro. Vale também para "Salvar no Drive" (mesmo gerador).
+- Testes: `rad/test_word_foto_exif.py`.
+
 ## Gaps conhecidos no Word oficial (`rad/templates_export/rda_oficial_template.docx`)
 
 Não são bugs, são funcionalidades que existem no sistema mas ainda não têm token/

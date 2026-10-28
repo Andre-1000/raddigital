@@ -56,7 +56,7 @@ import os
 from django.conf import settings
 from docx import Document
 from docx.shared import Cm
-from PIL import Image
+from PIL import Image, ImageOps
 
 CAMINHO_TEMPLATE = os.path.join(
     settings.BASE_DIR, 'rad', 'templates_export', 'rda_oficial_template.docx'
@@ -389,21 +389,61 @@ def gerar_docx_oficial_bytes(rad):
     return buffer_saida.getvalue()
 
 
+# Lado maior da foto dentro do Word. A foto aparece com 7 cm de largura
+# -- 1600 px ja e mais que suficiente para impressao, e evita guardar
+# a foto original da camera (4000+ px) inteira dentro do .docx.
+LADO_MAXIMO_FOTO_PX = 1600
+
+
+def _normalizar_foto_para_word(conteudo):
+    """
+    28/10/2026 (bug real, RAD R00459 -- erro 500 ao baixar o Word):
+    algumas cameras de celular gravam o EXIF (metadados da foto) com
+    defeito. O Pillow abre essas fotos sem problema (por isso passaram
+    na validacao da sincronizacao), mas o leitor de imagens do
+    python-docx le o EXIF por conta propria e quebra
+    (UnexpectedEndOfFileError), derrubando a exportacao inteira.
+
+    Solucao: o Pillow decodifica a foto e regrava um JPEG NOVO, limpo,
+    SEM o EXIF -- o python-docx so ve um arquivo simples. De brinde:
+      - aplica a rotacao do EXIF antes de descarta-lo (exif_transpose),
+        entao foto tirada "de pe" nao aparece deitada no Word;
+      - reduz para no maximo LADO_MAXIMO_FOTO_PX -- .docx bem menor e
+        menos memoria (draft() faz o JPEG ser decodificado ja reduzido).
+    Retorna um BytesIO pronto para add_picture, ou None se a foto nao
+    puder ser lida.
+    """
+    try:
+        imagem = Image.open(io.BytesIO(conteudo))
+        imagem.draft('RGB', (LADO_MAXIMO_FOTO_PX, LADO_MAXIMO_FOTO_PX))
+        try:
+            imagem = ImageOps.exif_transpose(imagem)
+        except Exception:
+            pass  # EXIF ilegivel: segue sem girar, a foto ainda entra
+        imagem = imagem.convert('RGB')
+        imagem.thumbnail((LADO_MAXIMO_FOTO_PX, LADO_MAXIMO_FOTO_PX))
+        saida = io.BytesIO()
+        imagem.save(saida, format='JPEG', quality=85)
+        saida.seek(0)
+        return saida
+    except Exception:
+        return None
+
+
 def _inserir_foto_temp(celula, arquivo_django):
     """
-    python-docx precisa de um caminho de arquivo ou objeto tipo-arquivo
-    seekable; grava em um buffer de memoria para nao depender do tipo
-    exato de storage configurado (local em dev, outro em producao).
+    Insere UMA foto na celula do molde. Nunca derruba a exportacao por
+    causa de uma foto: se ela nao puder ser lida/inserida, a celula
+    recebe um aviso em texto e o Word sai com as outras fotos.
     """
-    conteudo = arquivo_django.read()
-    buffer_imagem = io.BytesIO(conteudo)
-    try:
-        imagem = Image.open(buffer_imagem)
-        imagem.verify()
-    except Exception:
-        return  # arquivo corrompido -- nao trava a exportacao inteira por causa de 1 foto
-    buffer_imagem.seek(0)
-    _inserir_foto_na_celula(celula, buffer_imagem)
+    buffer_imagem = _normalizar_foto_para_word(arquivo_django.read())
+    if buffer_imagem is not None:
+        try:
+            _inserir_foto_na_celula(celula, buffer_imagem)
+            return
+        except Exception:
+            pass
+    _limpar_texto_celula(celula, 'Foto não pôde ser inserida (arquivo com defeito).')
 
 
 class PdfNaoDisponivelError(Exception):
