@@ -108,16 +108,31 @@ def _validar_os(payload, erros):
         )
 
 
+# 29/10/2026: Tipos de Manutencao em que o N° SA e OBRIGATORIO. Em
+# Falha a SA (e o Solicitante SA) fica inativa -- gravada vazia, ver
+# regras_negocio.montar_dados_rad. Em qualquer outro tipo (Corretiva,
+# e o que mais existir no catalogo) a SA e opcional.
+TIPOS_MANUTENCAO_QUE_EXIGEM_SA = frozenset({'Preventiva', 'Preditiva'})
+
+
 def _validar_numero_sa(payload, erros):
     """
-    VLD-028: N. SA e obrigatorio, numerico, ate 10 caracteres.
-    Campo novo e independente da OS -- mesmo padrao de validacao usado
-    para o registro_empresa do cadastro de colaboradores (numerico,
-    limite de caracteres), mas com sua propria regra e codigo.
+    VLD-028: N. SA numerico, ate 10 caracteres.
+
+    29/10/2026: a obrigatoriedade depende do Tipo de Manutencao (flags
+    calculadas por quem chama, como '_tipo_manutencao_e_falha'):
+      - Falha: SA nao se aplica -- nada e validado (o valor e descartado
+        ao salvar);
+      - Preventiva/Preditiva ('_tipo_manutencao_exige_sa'): obrigatoria;
+      - demais (ex.: Corretiva): opcional -- se vier, o formato vale.
+    Regra fixa: o Administrador nao altera isso em Configuracoes.
     """
+    if payload.get('_tipo_manutencao_e_falha'):
+        return
     numero_sa = payload.get('numero_sa')
     if not numero_sa:
-        erros.append(_erro('VLD-028', 'numero_sa', 'Informe o N. SA.'))
+        if payload.get('_tipo_manutencao_exige_sa'):
+            erros.append(_erro('VLD-028', 'numero_sa', 'Informe o N. SA.'))
         return
     numero_sa = str(numero_sa)
     if not numero_sa.isdigit():
@@ -665,8 +680,10 @@ def _remover_erros_de_campos_desabilitados(erros):
 # complexa (agregada ou aninhada) e nao sao cobertos por este
 # mecanismo generico de toggle obrigatorio/opcional.
 _MAPA_CHAVE_CONFIG_PARA_CAMPO_PAYLOAD = {
-    'numero_os': 'numero_os',
-    'numero_sa': 'numero_sa',
+    # 29/10/2026: 'numero_os' e 'numero_sa' sairam deste mapa -- regra
+    # FIXA (configuracoes.servicos.CAMPOS_REGRA_FIXA). OS opcional
+    # gerava erro 500 (o banco exige OS); a SA depende do Tipo de
+    # Manutencao (_validar_numero_sa).
     'data_preenchimento': 'data_preenchimento',
     'local_inicial': 'id_local_inicial',
     'local_final': 'id_local_final',

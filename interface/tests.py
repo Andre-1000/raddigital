@@ -823,3 +823,27 @@ class TestTelaEditarRad:
             f'Teste filtro de servico desativado falhou:\n{resultado.stdout}\n{resultado.stderr}'
         )
         assert 'TODOS OS TESTES PASSARAM' in resultado.stdout
+
+    def test_os_sa_regra_fixa_com_dom_real(self, tmp_path):
+        """29/10/2026: ordem dos blocos e SA conforme o Tipo de Manutencao (jsdom)."""
+        import subprocess
+        from pathlib import Path
+
+        from django.template.loader import render_to_string
+
+        html = render_to_string(
+            'interface/novo_rad.html', {'modo_edicao': True, 'numero_rad': 'R00001'}
+        )
+        caminho_html = tmp_path / 'os_sa_renderizado.html'
+        caminho_html.write_text(html)
+
+        script = Path(__file__).resolve().parent / 'js_tests' / 'teste_os_sa_regra_fixa.js'
+        resultado = subprocess.run(
+            ['node', str(script), str(caminho_html)],
+            capture_output=True, text=True, timeout=60,
+            cwd=str(Path(__file__).resolve().parent / 'js_tests'),
+        )
+        assert resultado.returncode == 0, (
+            f'Teste OS/SA falhou:\n{resultado.stdout}\n{resultado.stderr}'
+        )
+        assert 'TODOS OS TESTES PASSARAM' in resultado.stdout

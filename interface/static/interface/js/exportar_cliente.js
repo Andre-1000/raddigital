@@ -206,9 +206,13 @@ const ExportarCliente = (function () {
     const identificacao = [
       ['tipo_manutencao', 'Tipo de Manutenção', nomeTipo],
       ['numero_os', 'OS', rascunho.numero_os],
-      ['numero_sa', 'N° SA', rascunho.numero_sa],
-      ['solicitante_sa', 'Solicitante SA', rascunho.solicitante_sa],
     ];
+    if (!ehFalha) { // 29/10/2026: SA e Solicitante SA ficam inativos em Falha
+      identificacao.push(
+        ['numero_sa', 'N° SA', rascunho.numero_sa],
+        ['solicitante_sa', 'Solicitante SA', rascunho.solicitante_sa]
+      );
+    }
     if (ehFalha) identificacao.push(['numero_falha', 'N° Falha', rascunho.numero_falha]);
 
     const datas = [
@@ -388,9 +392,13 @@ const ExportarCliente = (function () {
   // Falha nao tem horario programado: nao e exigido (ehFalha = true).
   const CHAVES_SO_FORA_DE_FALHA = ['hora_prog_inicio', 'hora_prog_termino'];
 
-  function camposObrigatoriosFaltando(rascunho, ehFalha) {
+  // 29/10/2026: N° SA obrigatoria so em Preventiva/Preditiva (exigeSa),
+  // mesma regra do servidor (rad/validadores.py::_validar_numero_sa).
+  // Sem o 3o parametro, mantem o comportamento antigo (exige fora de Falha).
+  function camposObrigatoriosFaltando(rascunho, ehFalha, exigeSa = !ehFalha) {
     const faltando = CAMPOS_OBRIGATORIOS_ROTULOS.filter(function ([chave]) {
       if (ehFalha && CHAVES_SO_FORA_DE_FALHA.includes(chave)) return false;
+      if (chave === 'numero_sa' && !exigeSa) return false;
       const valor = rascunho[chave];
       if (Array.isArray(valor)) return valor.length === 0;
       return !valor;
@@ -403,10 +411,10 @@ const ExportarCliente = (function () {
     return faltando;
   }
 
-  function camposObrigatoriosPreenchidos(rascunho, ehFalha) {
+  function camposObrigatoriosPreenchidos(rascunho, ehFalha, exigeSa = !ehFalha) {
     return !!(
       rascunho.numero_os &&
-      rascunho.numero_sa &&
+      (!exigeSa || rascunho.numero_sa) &&
       rascunho.data_preenchimento &&
       rascunho.data_atividade &&
       rascunho.id_local_inicial &&

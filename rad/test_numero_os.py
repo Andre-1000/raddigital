@@ -198,9 +198,11 @@ class TestValidacaoDaOs:
 
 @pytest.mark.django_db
 class TestCampoOpcionalNaoApagaValidacaoDeFormato:
-    def test_os_opcional_e_em_branco_nao_gera_erro_de_os(self, catalogo):
+    def test_os_opcional_em_config_e_em_branco_continua_com_erro(self, catalogo):
+        # 29/10/2026: OS virou regra FIXA -- "opcional" em Configuracoes nao
+        # vale mais (deixava o RAD passar sem OS e o banco dava erro 500).
         _tornar_os_opcional()
-        assert _codigos_do_campo(_validar(_payload(catalogo, numero_os=None)), 'numero_os') == []
+        assert _codigos_do_campo(_validar(_payload(catalogo, numero_os=None)), 'numero_os') == ['VLD-001']
 
     def test_os_opcional_mas_preenchida_grande_demais_continua_com_erro(self, catalogo):
         _tornar_os_opcional()

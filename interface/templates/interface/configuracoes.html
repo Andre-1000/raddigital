@@ -76,7 +76,10 @@
         </div>
       </div>
 
-      <div class="linha-campo__botoes" style="margin-top:0.9rem;">
+      <!-- 29/10/2026: OS e N° SA tem regra fixa do sistema -- sem botoes. -->
+      <p class="aviso aviso--atencao" id="aviso-regra-fixa" style="display:none; margin-top:0.9rem;"></p>
+
+      <div class="linha-campo__botoes" id="botoes-campo" style="margin-top:0.9rem;">
         <button type="button" class="botao botao--secundaria" id="botao-alternar-habilitado"></button>
         <button type="button" class="botao botao--secundaria" id="botao-alternar-obrigatorio"></button>
       </div>
@@ -198,6 +201,18 @@
       botaoAlternarObrigatorio.textContent = campo.obrigatorio ? 'Tornar opcional' : 'Tornar obrigatório';
       botaoAlternarObrigatorio.disabled = !campo.habilitado;
       botaoAlternarObrigatorio.style.opacity = campo.habilitado ? '1' : '0.6';
+
+      // 29/10/2026: regra fixa (OS e N° SA) -- nao pode ser alterada aqui.
+      const avisoRegraFixa = document.getElementById('aviso-regra-fixa');
+      document.getElementById('botoes-campo').style.display = campo.regra_fixa ? 'none' : '';
+      avisoRegraFixa.style.display = campo.regra_fixa ? '' : 'none';
+      avisoRegraFixa.textContent = !campo.regra_fixa ? '' : (campo.chave === 'numero_sa'
+        ? 'Regra fixa do sistema: N° SA é obrigatória em Preventiva e Preditiva, opcional em Corretiva e não se aplica em Falha.'
+        : 'Regra fixa do sistema: a OS é obrigatória em todo RAD.');
+      if (campo.chave === 'numero_sa') {
+        seloObrigatorioAtual.textContent = 'Conforme o tipo';
+        seloObrigatorioAtual.className = 'selo selo-opcional';
+      }
     }
 
     campoSelecionar.addEventListener('change', function () {

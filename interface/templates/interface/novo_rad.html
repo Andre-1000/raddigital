@@ -23,9 +23,9 @@
     <nav class="nav-lateral-formulario" aria-label="Atalhos do formulário">
       <a href="{% url 'interface:inicio' %}" class="nav-lateral-formulario__home">← Home</a>
       <p class="nav-lateral-formulario__titulo">Seções</p>
+      <a href="#secao-controle-operacional">Controle Operacional</a>
       <a href="#secao-identificacao">Identificação</a>
       <a href="#secao-localizacao">Localização</a>
-      <a href="#secao-controle-operacional">Controle Operacional</a>
       <a href="#secao-horarios">Horários</a>
       <a href="#secao-servicos">Serviços Executados</a>
       <a href="#secao-colaboradores">Colaboradores</a>
@@ -58,7 +58,30 @@
 
   <form id="form-rad" novalidate>
 
-    <div class="cartao" id="secao-identificacao">
+    <!-- 29/10/2026: Controle Operacional vem ANTES de Identificacao -- o Tipo
+         de Manutencao decide como fica a SA (obrigatoria em Preventiva/
+         Preditiva, opcional em Corretiva, inativa em Falha), entao o
+         tecnico escolhe o tipo antes de chegar na SA. -->
+    <div class="cartao" id="secao-controle-operacional">
+      <h2 style="font-size:1rem; display:flex; align-items:center; gap:0.4rem;">
+        Controle Operacional
+        <button type="button" id="botao-ajuda-tipo-manutencao" class="selo selo--online" style="border:none; cursor:pointer;" aria-label="O que significa cada tipo de manutenção?">?</button>
+      </h2>
+
+      <div class="campo" data-config-campo="tipo_manutencao">
+        <label for="campo-tipo-manutencao">Tipo de Manutenção <span class="obrigatorio" id="marcador-tipo_manutencao">*</span></label>
+        <select id="campo-tipo-manutencao" required>
+          <option value="">Selecione…</option>
+        </select>
+      </div>
+
+      <div class="campo" id="campo-grupo-numero-falha" style="display:none;">
+        <label for="campo-numero-falha">N° Falha</label>
+        <input type="number" id="campo-numero-falha" inputmode="numeric" min="1" max="9999999">
+      </div>
+    </div>
+
+    <div class="cartao" id="secao-identificacao" style="margin-top:1rem;">
       <h2 style="font-size:1rem;">Identificação</h2>
 
       <div class="grade-campos grade-campos--compacta">
@@ -70,10 +93,11 @@
       <div class="campo" data-config-campo="numero_sa">
         <label for="campo-numero-sa">N° SA <span class="obrigatorio" id="marcador-numero_sa">*</span></label>
         <input type="text" id="campo-numero-sa" inputmode="numeric" maxlength="10" data-mensagem-limite="O N° SA aceita no máximo 10 dígitos." required>
+        <p class="campo__ajuda" id="ajuda-numero-sa" hidden>Não se aplica quando o Tipo de Manutenção é Falha.</p>
       </div>
 
-      <div class="campo">
-        <label for="campo-solicitante-sa">Solicitante SA <span class="texto-suave">(opcional)</span></label>
+      <div class="campo" id="campo-grupo-solicitante-sa">
+        <label for="campo-solicitante-sa">Solicitante SA <span class="texto-suave" id="marcador-solicitante_sa">(opcional)</span></label>
         <input type="text" id="campo-solicitante-sa">
       </div>
 
@@ -149,25 +173,6 @@
           </div>
         </div>
         <p class="campo__ajuda">Digite os números — não precisa preencher tudo, mas cada caixa precisa de ao menos um.</p>
-      </div>
-    </div>
-
-    <div class="cartao" id="secao-controle-operacional" style="margin-top:1rem;">
-      <h2 style="font-size:1rem; display:flex; align-items:center; gap:0.4rem;">
-        Controle Operacional
-        <button type="button" id="botao-ajuda-tipo-manutencao" class="selo selo--online" style="border:none; cursor:pointer;" aria-label="O que significa cada tipo de manutenção?">?</button>
-      </h2>
-
-      <div class="campo" data-config-campo="tipo_manutencao">
-        <label for="campo-tipo-manutencao">Tipo de Manutenção <span class="obrigatorio" id="marcador-tipo_manutencao">*</span></label>
-        <select id="campo-tipo-manutencao" required>
-          <option value="">Selecione…</option>
-        </select>
-      </div>
-
-      <div class="campo" id="campo-grupo-numero-falha" style="display:none;">
-        <label for="campo-numero-falha">N° Falha</label>
-        <input type="number" id="campo-numero-falha" inputmode="numeric" min="1" max="9999999">
       </div>
     </div>
 

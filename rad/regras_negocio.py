@@ -33,7 +33,7 @@ from .models import (
 from comum.datas import parse_hora, tornar_aware
 
 from .regras_horario import processar_horarios
-from .validadores import validar_payload_sincronizacao
+from .validadores import TIPOS_MANUTENCAO_QUE_EXIGEM_SA, validar_payload_sincronizacao
 from .validadores_arquivos import validar_anexos
 
 # Namespace para os locks consultivos desta funcionalidade, para nao
@@ -452,6 +452,10 @@ def _limites_de_foto_do_payload(payload):
     )
 
 
+def _e_falha(tipo_manutencao):
+    return bool(tipo_manutencao and tipo_manutencao.nome == 'Falha')
+
+
 def montar_dados_rad(payload, horarios, tipo_manutencao):
     """
     Converte o payload (ja validado) nos campos de valor unico do Rad.
@@ -478,8 +482,12 @@ def montar_dados_rad(payload, horarios, tipo_manutencao):
 
     dados_rad = {
         'numero_os': payload['numero_os'],
-        'numero_sa': str(payload['numero_sa']),
-        'solicitante_sa': payload.get('solicitante_sa') or None,
+        # 29/10/2026: em Falha a SA e o Solicitante SA ficam inativos --
+        # gravados vazios mesmo que o cliente (ex.: app antigo em cache)
+        # mande algum valor. Nos outros tipos, SA vazia = '' (a coluna
+        # nao aceita NULL; Corretiva permite SA em branco).
+        'numero_sa': '' if _e_falha(tipo_manutencao) else str(payload.get('numero_sa') or ''),
+        'solicitante_sa': None if _e_falha(tipo_manutencao) else (payload.get('solicitante_sa') or None),
         'data_preenchimento': payload['data_preenchimento'],
         'data_atividade': payload.get('data_atividade'),
         'local_inicial': local_inicial,
@@ -598,6 +606,10 @@ def processar_sincronizacao(payload, usuario, fotos_intervencao=None, fotos_acao
         **horarios,
         '_tipo_manutencao_e_falha': bool(
             tipo_manutencao and tipo_manutencao.nome == 'Falha'
+        ),
+        # 29/10/2026: SA obrigatoria so em Preventiva/Preditiva (VLD-028).
+        '_tipo_manutencao_exige_sa': bool(
+            tipo_manutencao and tipo_manutencao.nome in TIPOS_MANUTENCAO_QUE_EXIGEM_SA
         ),
         # 30/07/2026: usado por VLD-033 -- comentarios de foto
         # (desc_foto_1..4) viram obrigatorios quando o Tipo de

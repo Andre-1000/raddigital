@@ -338,8 +338,19 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
   }
 
+  // 29/10/2026: N° SA obrigatoria so em Preventiva/Preditiva (mesma
+  // regra do servidor, rad/validadores.py::TIPOS_MANUTENCAO_QUE_EXIGEM_SA).
+  const TIPOS_QUE_EXIGEM_SA = ['Preventiva', 'Preditiva'];
+  function exigeSaSeguro() {
+    try {
+      return TIPOS_QUE_EXIGEM_SA.includes(nomeDoTipoSelecionado());
+    } catch (erro) {
+      return true;
+    }
+  }
+
   function atualizarEstadoBotaoExportar() {
-    const habilitado = ExportarCliente.camposObrigatoriosPreenchidos(rascunho, ehFalhaSeguro());
+    const habilitado = ExportarCliente.camposObrigatoriosPreenchidos(rascunho, ehFalhaSeguro(), exigeSaSeguro());
     const botaoExportar = document.getElementById('botao-exportar');
     const botaoCopiar = document.getElementById('botao-copiar-mensagem');
     [botaoExportar, botaoCopiar].forEach(function (botao) {
@@ -560,6 +571,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   campoTipoManutencao.addEventListener('change', function () {
     rascunho.id_tipo_manutencao = campoTipoManutencao.value ? Number(campoTipoManutencao.value) : null;
     atualizarVisibilidadeNumeroFalha();
+    atualizarSaPorTipo();
     atualizarHorariosProgramadosPorTipo();
     recalcularHorarios();
     atualizarComentariosFotos();
@@ -612,6 +624,36 @@ document.addEventListener('DOMContentLoaded', async function () {
     rascunho.solicitante_sa = campoSolicitanteSa.value;
     salvarRascunhoAgora();
   });
+
+  // 29/10/2026: N° SA e Solicitante SA conforme o Tipo de Manutencao:
+  //   - Falha: os dois ficam INATIVOS (desabilitados) e LIMPOS -- o
+  //     servidor grava vazio;
+  //   - Preventiva/Preditiva: SA obrigatoria (*);
+  //   - demais (Corretiva...): SA opcional.
+  // Regra fixa -- o Administrador nao altera em Configuracoes.
+  const marcadorNumeroSa = document.getElementById('marcador-numero_sa');
+  const ajudaNumeroSa = document.getElementById('ajuda-numero-sa');
+  function atualizarSaPorTipo() {
+    const nomeTipo = nomeDoTipoSelecionado();
+    const ehFalha = nomeTipo === 'Falha';
+    const exigeSa = TIPOS_QUE_EXIGEM_SA.includes(nomeTipo);
+    campoNumeroSa.disabled = ehFalha;
+    campoSolicitanteSa.disabled = ehFalha;
+    campoNumeroSa.required = exigeSa;
+    ajudaNumeroSa.hidden = !ehFalha;
+    if (ehFalha) {
+      marcadorNumeroSa.textContent = '';
+      marcadorNumeroSa.className = '';
+      rascunho.numero_sa = '';
+      rascunho.solicitante_sa = '';
+      campoNumeroSa.value = '';
+      campoSolicitanteSa.value = '';
+    } else {
+      marcadorNumeroSa.textContent = exigeSa ? '*' : '(opcional)';
+      marcadorNumeroSa.className = exigeSa ? 'obrigatorio' : 'texto-suave';
+    }
+  }
+  atualizarSaPorTipo();
 
   // 05/09/2026: Data da Atividade -- campo de texto com mascara
   // DD/MM/AAAA (digita so numeros) + um calendario ao lado (input
@@ -2277,14 +2319,14 @@ document.addEventListener('DOMContentLoaded', async function () {
   const avisoExportarRascunho = document.getElementById('aviso-exportar-rascunho');
 
   function avisarCamposFaltando() {
-    const faltando = ExportarCliente.camposObrigatoriosFaltando(rascunho, ehFalhaSeguro());
+    const faltando = ExportarCliente.camposObrigatoriosFaltando(rascunho, ehFalhaSeguro(), exigeSaSeguro());
     avisoExportarRascunho.innerHTML =
       '<div class="aviso aviso--erro">Preencha os campos obrigatórios antes de continuar: ' +
       faltando.join(', ') + '.</div>';
   }
 
   document.getElementById('botao-exportar').addEventListener('click', function () {
-    if (!ExportarCliente.camposObrigatoriosPreenchidos(rascunho, ehFalhaSeguro())) {
+    if (!ExportarCliente.camposObrigatoriosPreenchidos(rascunho, ehFalhaSeguro(), exigeSaSeguro())) {
       avisarCamposFaltando();
       return;
     }
@@ -2318,7 +2360,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   }
 
   document.getElementById('botao-copiar-mensagem').addEventListener('click', async function () {
-    if (!ExportarCliente.camposObrigatoriosPreenchidos(rascunho, ehFalhaSeguro())) {
+    if (!ExportarCliente.camposObrigatoriosPreenchidos(rascunho, ehFalhaSeguro(), exigeSaSeguro())) {
       avisarCamposFaltando();
       return;
     }

@@ -205,9 +205,12 @@ def _grupos_da_mensagem(rad):
     identificacao = [
         ('tipo_manutencao', 'Tipo de Manutenção', rad.tipo_manutencao.nome if rad.tipo_manutencao else ''),
         ('numero_os', 'OS', rad.numero_os),
-        ('numero_sa', 'N° SA', rad.numero_sa),
-        ('solicitante_sa', 'Solicitante SA', rad.solicitante_sa),
     ]
+    if not e_falha:  # 29/10/2026: SA e Solicitante SA ficam inativos em Falha
+        identificacao += [
+            ('numero_sa', 'N° SA', rad.numero_sa),
+            ('solicitante_sa', 'Solicitante SA', rad.solicitante_sa),
+        ]
     if e_falha:
         identificacao.append(('numero_falha', 'N° Falha', rad.numero_falha))
 

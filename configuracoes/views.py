@@ -10,14 +10,20 @@ from usuarios.decorators import requer_perfil, requer_token
 from usuarios.models import UsuarioPerfil
 
 from .models import CampoFormulario, LimiteFotos
+from .servicos import CAMPOS_REGRA_FIXA
 
 
 def _serializar(campo):
+    regra_fixa = campo.chave in CAMPOS_REGRA_FIXA
     return {
         'chave': campo.chave,
         'rotulo': campo.rotulo,
-        'habilitado': campo.habilitado,
-        'obrigatorio': campo.obrigatorio,
+        # Regra fixa (29/10/2026): sempre habilitado e obrigatorio para o
+        # cliente, independente do que estiver gravado -- a SA ainda tem a
+        # regra por Tipo de Manutencao aplicada no formulario.
+        'habilitado': True if regra_fixa else campo.habilitado,
+        'obrigatorio': True if regra_fixa else campo.obrigatorio,
+        'regra_fixa': regra_fixa,
         'atualizado_em': campo.atualizado_em.isoformat(),
     }
 
@@ -84,6 +90,12 @@ def _alterar_estado(request, chave, campos):
         campo = CampoFormulario.objects.get(chave=chave)
     except CampoFormulario.DoesNotExist:
         return JsonResponse({'erro': 'Campo nao encontrado.'}, status=404)
+
+    if chave in CAMPOS_REGRA_FIXA:
+        return JsonResponse(
+            {'erro': 'Este campo tem regra fixa do sistema e não pode ser alterado.'},
+            status=409,
+        )
 
     for atributo, valor in campos.items():
         setattr(campo, atributo, valor)

@@ -175,6 +175,24 @@ sem combinar com o André:
   (Consulta) e `exportar_cliente.js::gerarMensagemCopiar` (celular/offline). O teste
   `rad/test_mensagem_whatsapp.py::TestServidorIgualCelular` compara os dois textos.
 
+## OS e N° SA com regra fixa (29/10/2026)
+- Bug real: OS marcada como opcional em Configurações deixava o RAD passar sem OS e o banco
+  recusava (coluna NOT NULL; o Nº de execução vem da OS) → erro 500 na sincronização.
+- **OS obrigatória em todo RAD.** **N° SA conforme o Tipo de Manutenção:** obrigatória em
+  Preventiva/Preditiva (`TIPOS_MANUTENCAO_QUE_EXIGEM_SA` em `rad/validadores.py`), opcional
+  nos demais (Corretiva…), **inativa em Falha** — SA e Solicitante SA desabilitados e limpos
+  na tela, gravados vazios no servidor (`regras_negocio.montar_dados_rad`), mesmo que o
+  cliente mande valor. Flag `_tipo_manutencao_exige_sa` no payload de validação (sincronizar
+  e editar).
+- Regra fixa: `configuracoes.servicos.CAMPOS_REGRA_FIXA` = {numero_os, numero_sa}. Saíram de
+  `_MAPA_CHAVE_CONFIG_PARA_CAMPO_PAYLOAD`; `campos_desabilitados()` os ignora; a API de
+  Configurações devolve `regra_fixa: true` (sempre habilitado/obrigatório) e recusa
+  alterá-los (409); a tela mostra o aviso no lugar dos botões.
+- Tela: bloco **Controle Operacional vem antes de Identificação** (o tipo decide a SA).
+  `rad_form.js::atualizarSaPorTipo`; `ExportarCliente.camposObrigatorios*(rascunho, ehFalha, exigeSa)`.
+- Exportações: Word `{{SA}}` vazio → "N/A"; mensagem WhatsApp não mostra SA/Solicitante em Falha.
+- Testes: `rad/test_os_sa_regra_fixa.py`, `interface/js_tests/teste_os_sa_regra_fixa.js`.
+
 ## Convenções de código
 
 - Comentários e docstrings em português, sem acentos em identificadores de código
@@ -192,6 +210,7 @@ sem combinar com o André:
 - Todo campo do formulário que pode ser tornado obrigatório/opcional ou
   habilitado/desabilitado pelo Administrador passa pelo mapa em
   `_MAPA_CHAVE_CONFIG_PARA_CAMPO_PAYLOAD` (`rad/validadores.py`).
+  Exceção: campos de regra fixa (`CAMPOS_REGRA_FIXA` — hoje OS e N° SA) não entram no mapa.
 - Serviços do catálogo (`CatServico`) têm campo `area` (`amv`/`corretiva`/`geral`/
   `infra`/`insp_ronda`/`mecanizada`, máx. 10 caracteres) usado só pra agrupamento
   visual em blocos expansíveis na tela de preenchimento — não afeta regra de negócio,

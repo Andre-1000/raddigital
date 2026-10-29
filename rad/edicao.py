@@ -35,7 +35,7 @@ from .regras_negocio import (
     montar_dados_rad,
     proxima_execucao_da_os,
 )
-from .validadores import validar_payload_sincronizacao
+from .validadores import TIPOS_MANUTENCAO_QUE_EXIGEM_SA, validar_payload_sincronizacao
 from .validadores_arquivos import _erro, _validar_foto_individual, _validar_pdf_individual
 
 
@@ -419,6 +419,9 @@ def editar_rad(
         **payload,
         **horarios,
         '_tipo_manutencao_e_falha': bool(tipo_manutencao and tipo_manutencao.nome == 'Falha'),
+        '_tipo_manutencao_exige_sa': bool(
+            tipo_manutencao and tipo_manutencao.nome in TIPOS_MANUTENCAO_QUE_EXIGEM_SA
+        ),
         '_tipo_manutencao_e_vpm001': bool(tipo_manutencao and tipo_manutencao.nome == 'VPM001'),
     }
     erros += validar_payload_sincronizacao(payload_validacao, hoje=timezone.localdate())

@@ -308,7 +308,7 @@ def gerar_docx_oficial_bytes(rad):
         # nullable, ver rad/models.py) -- cai em 'N/A' nesse caso, em
         # vez de quebrar a exportacao.
         '{{DATA}}': rad.data_atividade.strftime('%d/%m/%Y') if rad.data_atividade else 'N/A',
-        '{{SA}}': rad.numero_sa,
+        '{{SA}}': na(rad.numero_sa),  # 29/10/2026: Falha grava SA vazia
         '{{SOLICITANTE_SA}}': na(rad.solicitante_sa),
         '{{OPERADOR_CCM}}': _operador_ccm_abertura_texto(rad),
         '{{RESPONSAVEL_RAD}}': nome_de_quem_preencheu(rad),

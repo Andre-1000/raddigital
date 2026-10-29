@@ -112,8 +112,15 @@ class TestValidacoesBasicas:
         assert 'VLD-001' not in _codigos(validar_payload_sincronizacao(payload, hoje=HOJE))
 
     def test_vld_028_numero_sa_vazio(self, servico_inspecao):
-        payload = _payload_valido_base(servicos=[servico_inspecao.id], numero_sa=None)
+        # 29/10/2026: SA vazia so e erro quando o tipo exige (Preventiva/Preditiva).
+        payload = _payload_valido_base(
+            servicos=[servico_inspecao.id], numero_sa=None, _tipo_manutencao_exige_sa=True
+        )
         assert 'VLD-028' in _codigos(validar_payload_sincronizacao(payload, hoje=HOJE))
+
+    def test_vld_028_numero_sa_vazio_em_tipo_que_nao_exige(self, servico_inspecao):
+        payload = _payload_valido_base(servicos=[servico_inspecao.id], numero_sa=None)
+        assert 'VLD-028' not in _codigos(validar_payload_sincronizacao(payload, hoje=HOJE))
 
     def test_vld_028_numero_sa_nao_numerico(self, servico_inspecao):
         payload = _payload_valido_base(servicos=[servico_inspecao.id], numero_sa='ABC123')
