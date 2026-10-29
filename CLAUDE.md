@@ -214,6 +214,13 @@ sem combinar com o André:
   nunca derruba o Word inteiro. Vale também para "Salvar no Drive" (mesmo gerador).
 - Testes: `rad/test_word_foto_exif.py`.
 
+## Logs (28/10/2026)
+- `LOGGING` em `config/settings.py`: todo erro 500 escreve o traceback completo na saída
+  do processo (Render → Logs), formato `[data] ERROR django.request: ...`. Antes não havia
+  configuração e, com `DEBUG=False`, o Django escondia o erro (só aparecia "... 500 145").
+- Nível geral pela variável de ambiente opcional `LOG_LEVEL` (padrão `WARNING`).
+- Teste: `config/test_logging.py` (roda um processo com `DEBUG=False`, como em produção).
+
 ## Gaps conhecidos no Word oficial (`rad/templates_export/rda_oficial_template.docx`)
 
 Não são bugs, são funcionalidades que existem no sistema mas ainda não têm token/

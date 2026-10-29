@@ -309,3 +309,59 @@ if not DEBUG:
         ),
         'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
     }
+
+
+# ---------------------------------------------------------------------
+# LOGGING (28/10/2026)
+# ---------------------------------------------------------------------
+# Antes nao havia configuracao nenhuma: com DEBUG=False o Django NAO
+# escreve o erro no console -- um erro 500 aparecia nos Logs do Render
+# so como uma linha de acesso ("... 500 145"), sem o motivo. Foi o que
+# aconteceu com o Word do R00459: a causa so foi achada rodando um
+# diagnostico manual pelo Shell.
+#
+# Agora todo erro 500 escreve o TRACEBACK completo (arquivo, linha e
+# tipo do erro) na saida padrao -- o Render mostra isso em Logs, junto
+# da linha de acesso. Nao grava corpo de requisicao nem senha/token:
+# o Django so registra o caminho da URL e o erro.
+#
+# LOG_LEVEL (variavel de ambiente, opcional): WARNING por padrao. Use
+# INFO ou DEBUG so temporariamente, para investigar algo -- gera muito
+# mais texto nos Logs.
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'WARNING').upper()
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'simples': {
+            'format': '[{asctime}] {levelname} {name}: {message}',
+            'style': '{',
+            'datefmt': '%d/%m/%Y %H:%M:%S',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'simples',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': LOG_LEVEL,
+    },
+    'loggers': {
+        # Erros 500 (excecao nao tratada numa view): sempre com traceback.
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        # Erros do proprio Django fora de uma requisicao (ex.: banco).
+        'django': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+    },
+}
