@@ -847,3 +847,27 @@ class TestTelaEditarRad:
             f'Teste OS/SA falhou:\n{resultado.stdout}\n{resultado.stderr}'
         )
         assert 'TODOS OS TESTES PASSARAM' in resultado.stdout
+
+    def test_amv_corretiva_e_operador_cco_ccm_com_dom_real(self, tmp_path):
+        """30/10/2026: limite de blocos AMV por servico e escolha CCO/CCM (jsdom)."""
+        import subprocess
+        from pathlib import Path
+
+        from django.template.loader import render_to_string
+
+        html = render_to_string(
+            'interface/novo_rad.html', {'modo_edicao': True, 'numero_rad': 'R00001'}
+        )
+        caminho_html = tmp_path / 'amv_cco_renderizado.html'
+        caminho_html.write_text(html)
+
+        script = Path(__file__).resolve().parent / 'js_tests' / 'teste_amv_corretiva_cco_ccm.js'
+        resultado = subprocess.run(
+            ['node', str(script), str(caminho_html)],
+            capture_output=True, text=True, timeout=60,
+            cwd=str(Path(__file__).resolve().parent / 'js_tests'),
+        )
+        assert resultado.returncode == 0, (
+            f'Teste AMV Corretiva / CCO-CCM falhou:\n{resultado.stdout}\n{resultado.stderr}'
+        )
+        assert 'TODOS OS TESTES PASSARAM' in resultado.stdout

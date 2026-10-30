@@ -39,6 +39,12 @@
 -- Mudança de negócio 15/10/2026: adicionado ao bloco Inspeção e Ronda
 -- o serviço "Pedido de Interdição" -- serviço simples, sem bloco
 -- especial associado.
+-- Mudança de negócio 30/10/2026: adicionado ao grupo Corretiva o serviço
+-- "Manutenção Corretiva em AMV" -- abre o Bloco AMV (mesmas regras de
+-- "Manutenção em AMV"), mas com no máximo 3 blocos (1 inicial + 2 pelo
+-- botão "Adicionar MCH"), via coluna limite_blocos_amv (migration
+-- catalogos 0014). Fica num INSERT próprio, no fim deste arquivo, para
+-- não precisar repetir a coluna nova em todas as linhas acima.
 -- Nenhum serviço é removido de verdade do banco — RadServico tem FK
 -- PROTECT contra CatServico e RADs antigos podem referenciá-los.
 --
@@ -100,3 +106,20 @@ ON CONFLICT (nome) DO UPDATE SET
 -- Total: 36 registros (9 inativos: Ajuste, Limpeza, Lubrificação,
 -- Esmerilhamento, Socaria, Controle de Vegetação, Socadora,
 -- Inspeção (Geral), Reparo (Geral))
+
+-- 30/10/2026: servico com limite de blocos AMV proprio (ver cabecalho).
+INSERT INTO cat_servicos (nome, descricao, requer_amv, requer_descricao, requer_terceiros, terceiros_tem_op_maquina, terceiros_tem_volume, requer_canaleta, area, limite_blocos_amv, ativo) VALUES
+  ('Manutenção Corretiva em AMV', 'Manutenção corretiva em Aparelhos de Mudança de Via (AMV). Ao selecionar este serviço, o sistema exibe o bloco AMV, com a possibilidade de adicionar até 3 blocos (1 inicial + 2 pelo botão "Adicionar MCH"), uma MCH por bloco: Identificação MCH, Modelo, Via, UR, Local, Linha, Tipo de Defeito e Ações.', TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, 'corretiva', 3, TRUE)
+ON CONFLICT (nome) DO UPDATE SET
+  descricao = EXCLUDED.descricao,
+  requer_amv = EXCLUDED.requer_amv,
+  requer_descricao = EXCLUDED.requer_descricao,
+  requer_terceiros = EXCLUDED.requer_terceiros,
+  terceiros_tem_op_maquina = EXCLUDED.terceiros_tem_op_maquina,
+  terceiros_tem_volume = EXCLUDED.terceiros_tem_volume,
+  requer_canaleta = EXCLUDED.requer_canaleta,
+  area = EXCLUDED.area,
+  limite_blocos_amv = EXCLUDED.limite_blocos_amv,
+  ativo = EXCLUDED.ativo;
+
+-- Total geral: 37 registros (36 acima + este).

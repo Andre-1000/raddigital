@@ -171,6 +171,15 @@ class CatServico(models.Model):
     terceiros_tem_volume = models.BooleanField(
         default=False, help_text='So relevante quando requer_terceiros=True.'
     )
+    # 30/10/2026: quantos blocos AMV (1 por MCH) este servico permite no
+    # RAD. Vazio = padrao do sistema (rad.validadores.LIMITE_BLOCOS_AMV,
+    # 16). "Manutenção Corretiva em AMV" usa 3 (1 inicial + 2 pelo botao).
+    # Com mais de um servico de AMV marcado, vale o MAIOR limite.
+    limite_blocos_amv = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        help_text='So para servicos com requer_amv. Vazio = padrao (16).',
+    )
     area = models.CharField(
         max_length=10,
         choices=AREA_CHOICES,

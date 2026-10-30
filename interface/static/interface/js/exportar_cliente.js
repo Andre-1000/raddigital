@@ -22,6 +22,15 @@ const ExportarCliente = (function () {
     return valores && valores.length ? valores.join(', ') : NAO_APLICAVEL;
   }
 
+  // 30/10/2026: acrescenta CCO/CCM ao texto do operador -- "Fulano (08:00)
+  // – CCO"; so o centro, sem nome: "CCO". Mesmo formato do servidor
+  // (rad/exportacao.py::_com_centro).
+  function comCentro(texto, centro) {
+    if (!centro) return texto;
+    if (!texto || texto === NAO_APLICAVEL) return centro;
+    return `${texto} – ${centro}`;
+  }
+
   function nomePorCodigo(catalogo, campoCodigo, codigo) {
     const item = catalogo.find((c) => String(c[campoCodigo]) === String(codigo));
     return item ? item.nome : null;
@@ -87,8 +96,8 @@ const ExportarCliente = (function () {
     // 30/07/2026: Operador CCM agora e dois pares Nome+Hora
     // (Abertura/Entrega). Sem nome, o par inteiro cai em N/A -- a hora
     // sozinha (mesmo com o default 00:00) nao tem sentido sem nome.
-    function textoOperadorCcm(nome, hora) {
-      return nome ? `${nome} (${ouNA(hora)})` : NAO_APLICAVEL;
+    function textoOperadorCcm(nome, hora, centro) {
+      return comCentro(nome ? `${nome} (${ouNA(hora)})` : NAO_APLICAVEL, centro);
     }
 
     return [
@@ -142,12 +151,12 @@ const ExportarCliente = (function () {
       ['tipo_veiculo', 'Tipo de Veículo', ouNA(rascunho.tipo_veiculo)],
       ['operador', 'Operador', ouNA(rascunho.operador)],
       [
-        'operador_ccm_abertura', 'Op CCM - Abertura',
-        textoOperadorCcm(rascunho.operador_ccm_abertura_nome, rascunho.operador_ccm_abertura_hora),
+        'operador_ccm_abertura', 'Operador CCO/CCM - Abertura',
+        textoOperadorCcm(rascunho.operador_ccm_abertura_nome, rascunho.operador_ccm_abertura_hora, rascunho.operador_ccm_abertura_centro),
       ],
       [
-        'operador_ccm_entrega', 'Op CCM - Entrega',
-        textoOperadorCcm(rascunho.operador_ccm_entrega_nome, rascunho.operador_ccm_entrega_hora),
+        'operador_ccm_entrega', 'Operador CCO/CCM - Entrega',
+        textoOperadorCcm(rascunho.operador_ccm_entrega_nome, rascunho.operador_ccm_entrega_hora, rascunho.operador_ccm_entrega_centro),
       ],
       ['descricao_tecnica_atividade', 'Descrição Técnica da Atividade', ouNA(rascunho.descricao_tecnica_atividade)],
       ['observacoes_gerais', 'Observação Geral', ouNA(rascunho.observacoes_gerais)],
@@ -269,8 +278,8 @@ const ExportarCliente = (function () {
     const responsaveis = [
       ['colaboradores', 'Responsável', (rascunho.colaboradores || []).map((p) => p.nome).join(', ')],
       ['responsavel_atividade', 'Responsável Atividade', rascunho.responsavel_atividade],
-      ['operador_ccm_abertura', 'Op CCM - Abertura', ccm(rascunho.operador_ccm_abertura_nome, rascunho.operador_ccm_abertura_hora)],
-      ['operador_ccm_entrega', 'Op CCM - Entrega', ccm(rascunho.operador_ccm_entrega_nome, rascunho.operador_ccm_entrega_hora)],
+      ['operador_ccm_abertura', 'Operador CCO/CCM - Abertura', comCentro(ccm(rascunho.operador_ccm_abertura_nome, rascunho.operador_ccm_abertura_hora), rascunho.operador_ccm_abertura_centro)],
+      ['operador_ccm_entrega', 'Operador CCO/CCM - Entrega', comCentro(ccm(rascunho.operador_ccm_entrega_nome, rascunho.operador_ccm_entrega_hora), rascunho.operador_ccm_entrega_centro)],
     ];
 
     return [

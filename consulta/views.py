@@ -933,6 +933,8 @@ def detalhe_rad(request, numero_rad):
                     rad.operador_ccm_abertura_hora.isoformat()
                     if rad.operador_ccm_abertura_hora else None
                 ),
+                'operador_ccm_abertura_centro': rad.operador_ccm_abertura_centro,
+                'operador_ccm_entrega_centro': rad.operador_ccm_entrega_centro,
                 'operador_ccm_entrega_nome': rad.operador_ccm_entrega_nome,
                 'operador_ccm_entrega_hora': (
                     rad.operador_ccm_entrega_hora.isoformat()

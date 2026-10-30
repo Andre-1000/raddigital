@@ -59,8 +59,8 @@ IndexedDB (offline-first, sem framework front-end).
 
 ## Estado das migrations (conferir antes de criar a próxima)
 
-- `catalogos`: até `0013_inspecao_e_ronda.py`
-- `rad`: até `0028_horarios_programados_opcionais.py`
+- `catalogos`: até `0014_limite_blocos_amv.py`
+- `rad`: até `0029_operador_cco_ccm.py`
 - `configuracoes`: até `0006_limite_fotos.py`
 
 ## Regras críticas — nunca violar
@@ -193,6 +193,21 @@ sem combinar com o André:
 - Exportações: Word `{{SA}}` vazio → "N/A"; mensagem WhatsApp não mostra SA/Solicitante em Falha.
 - Testes: `rad/test_os_sa_regra_fixa.py`, `interface/js_tests/teste_os_sa_regra_fixa.js`.
 
+## Manutenção Corretiva em AMV e Operador CCO/CCM (30/10/2026)
+- Serviço novo **"Manutenção Corretiva em AMV"** no bloco Corretiva (só pelo seed, num
+  INSERT próprio no fim de `seed_cat_servicos.sql`): abre o Bloco AMV com as mesmas regras
+  de "Manutenção em AMV", mas no máximo **3 blocos** (1 + 2 pelo botão). Campo
+  `CatServico.limite_blocos_amv` (migration `catalogos/0014`; vazio = 16). Com os dois
+  serviços marcados vale o **maior** limite. `rad/validadores.py::limite_blocos_amv` e
+  `rad_form.js::limiteBlocosAmv`. Acima do limite a tela avisa e não apaga nada.
+- **Operador CCO/CCM** (antes "Op CCM"): Abertura e Entrega ganham a escolha CCO ou CCM
+  (`Rad.operador_ccm_abertura_centro`/`_entrega_centro`, migration `rad/0029`, opcional).
+  Dois "flegues" exclusivos ("Opção 1 - CCO" / "Opção 2 - CCM"); a Entrega copia a Abertura
+  até ser mexida. Textos: "Fulano (08:00) – CCO" (mensagem, PDF/Word simples, Word oficial
+  na Abertura). A migration renomeia os rótulos em Configurações. Planilha/Excel não têm
+  colunas de operador (nem antes) — nada a mudar no cabeçalho.
+- Testes: `rad/test_amv_corretiva_e_cco_ccm.py`, `interface/js_tests/teste_amv_corretiva_cco_ccm.js`.
+
 ## Convenções de código
 
 - Comentários e docstrings em português, sem acentos em identificadores de código
@@ -253,12 +268,12 @@ já foi resolvido antes de reexplicar do zero:
 ## Funcionalidades grandes já implementadas (pra não redescobrir do zero)
 
 - **Múltiplos blocos AMV por RAD**: até 16 (1 inicial + 15 via botão "Adicionar
-  MCH"), cada um com MCH/Tipo de Defeito/Ações próprios. `RadAmv` é FK normal pro
+  MCH"; "Manutenção Corretiva em AMV" = até 3), cada um com MCH/Tipo de Defeito/Ações próprios. `RadAmv` é FK normal pro
   Rad (não mais `OneToOneField`); `RadAmvDefeito`/`RadAmvAcao` apontam pro **bloco**
   (`RadAmv`), não mais direto pro RAD.
-- **Operador CCM**: 4 campos (`operador_ccm_abertura_nome/hora`,
-  `operador_ccm_entrega_nome/hora`). Nome da Abertura auto-preenche a Entrega,
-  editável depois (para de sincronizar assim que editado manualmente).
+- **Operador CCO/CCM** (era "Operador CCM"): 6 campos (`operador_ccm_abertura_nome/hora/centro`,
+  `operador_ccm_entrega_nome/hora/centro`). Nome e centro da Abertura auto-preenchem a
+  Entrega, editável depois (para de sincronizar assim que editado manualmente).
 - **Limite de fotos configurável por área** (`configuracoes.models.LimiteFotos`,
   tela Configurações → "Limites de Fotos"): padrão 2+2 (4 total), Infra 5+5 (10
   total). Client relê o limite certo ao marcar/desmarcar serviço Infra.

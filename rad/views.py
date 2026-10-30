@@ -280,6 +280,7 @@ def dados_edicao(request, numero_rad):
                     'terceiros_tem_op_maquina': s.terceiros_tem_op_maquina,
                     'terceiros_tem_volume': s.terceiros_tem_volume,
                     'requer_canaleta': s.requer_canaleta, 'area': s.area,
+                    'limite_blocos_amv': s.limite_blocos_amv,
                 }
                 for s in (rs.servico for rs in rad.servicos.all())
                 if not s.ativo

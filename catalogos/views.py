@@ -53,7 +53,7 @@ def listar_todos(request):
             CatServico.objects.filter(ativo=True).values(
                 'id', 'nome', 'descricao', 'requer_amv', 'requer_descricao',
                 'requer_terceiros', 'terceiros_tem_op_maquina', 'terceiros_tem_volume',
-                'requer_canaleta', 'area',
+                'requer_canaleta', 'area', 'limite_blocos_amv',
             )
         ),
         'motivos_atraso': list(

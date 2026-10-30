@@ -355,6 +355,9 @@ def _validar_responsavel_atividade(payload, erros):
         )
 
 
+CENTROS_OPERADOR_VALIDOS = ('CCO', 'CCM')
+
+
 def _validar_operador_ccm(payload, erros):
     """
     VLD-030 (30/07/2026, revisado): Operador CCM agora e dois pares
@@ -363,14 +366,19 @@ def _validar_operador_ccm(payload, erros):
     nao podem passar de 50 caracteres cada.
     """
     for campo, rotulo in (
-        ('operador_ccm_abertura_nome', 'Op CCM - Abertura'),
-        ('operador_ccm_entrega_nome', 'Op CCM - Entrega'),
+        ('operador_ccm_abertura_nome', 'Operador CCO/CCM - Abertura'),
+        ('operador_ccm_entrega_nome', 'Operador CCO/CCM - Entrega'),
     ):
         valor = payload.get(campo)
         if valor and len(str(valor)) > 50:
             erros.append(
                 _erro('VLD-030', campo, f'O {rotulo} deve ter no máximo 50 caracteres.')
             )
+    # 30/10/2026: CCO ou CCM (opcional). Qualquer outro valor e recusado.
+    for campo in ('operador_ccm_abertura_centro', 'operador_ccm_entrega_centro'):
+        valor = payload.get(campo)
+        if valor and valor not in CENTROS_OPERADOR_VALIDOS:
+            erros.append(_erro('VLD-030', campo, 'Escolha CCO ou CCM.'))
 
 
 def _validar_descricoes_foto_vpm001(payload, erros):
@@ -472,6 +480,17 @@ def _validar_colaboradores_sem_registro_duplicado(payload, erros):
 LIMITE_BLOCOS_AMV = 16  # 1 bloco inicial + 15 adicionais (regra de negocio 30/07/2026)
 
 
+def limite_blocos_amv(servicos_amv):
+    """
+    30/10/2026: o limite de blocos AMV depende do servico -- cada
+    CatServico pode ter limite_blocos_amv proprio (ex.: "Manutenção
+    Corretiva em AMV" = 3); vazio = LIMITE_BLOCOS_AMV. Com mais de um
+    servico de AMV marcado vale o MAIOR (nao trava quem ja preenchia
+    16 blocos em "Manutenção em AMV"). Mesma regra em rad_form.js.
+    """
+    return max((s.limite_blocos_amv or LIMITE_BLOCOS_AMV) for s in servicos_amv)
+
+
 def _validar_bloco_amv(payload, erros):
     """
     VLD-020/VLD-021/VLD-022, revisado 30/07/2026: exigidos somente
@@ -488,11 +507,10 @@ def _validar_bloco_amv(payload, erros):
     misturam no mesmo bloco -- ver rad/models.py::RadAmv.
     """
     servicos_ids = payload.get('servicos') or []
-    amv_selecionado = CatServico.objects.filter(
-        id__in=servicos_ids, requer_amv=True
-    ).exists()
-    if not amv_selecionado:
+    servicos_amv = list(CatServico.objects.filter(id__in=servicos_ids, requer_amv=True))
+    if not servicos_amv:
         return
+    limite = limite_blocos_amv(servicos_amv)
 
     blocos = payload.get('amv_blocos') or []
     if not blocos:
@@ -501,11 +519,11 @@ def _validar_bloco_amv(payload, erros):
         )
         return
 
-    if len(blocos) > LIMITE_BLOCOS_AMV:
+    if len(blocos) > limite:
         erros.append(
             _erro(
                 'VLD-020', 'amv_blocos',
-                f'No máximo {LIMITE_BLOCOS_AMV} blocos AMV por RAD.',
+                f'No máximo {limite} blocos AMV por RAD para o(s) serviço(s) selecionado(s).',
             )
         )
 

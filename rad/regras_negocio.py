@@ -547,6 +547,9 @@ def montar_dados_rad(payload, horarios, tipo_manutencao):
         'operador_ccm_abertura_hora': parse_hora(payload.get('operador_ccm_abertura_hora')),
         'operador_ccm_entrega_nome': payload.get('operador_ccm_entrega_nome') or None,
         'operador_ccm_entrega_hora': parse_hora(payload.get('operador_ccm_entrega_hora')),
+        # 30/10/2026: CCO ou CCM, opcional (vazio = nao informado).
+        'operador_ccm_abertura_centro': payload.get('operador_ccm_abertura_centro') or None,
+        'operador_ccm_entrega_centro': payload.get('operador_ccm_entrega_centro') or None,
         'descricao_tecnica_atividade': payload.get('descricao_tecnica_atividade') or None,
         **{k: v for k, v in horarios.items() if k not in ('atraso_inicio', 'atraso_termino')},
     }

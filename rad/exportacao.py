@@ -67,7 +67,19 @@ def _responsaveis_texto(rad):
     return _lista_ou_na(rad.colaboradores.values_list('nome', flat=True))
 
 
-def _operador_ccm_texto(nome, hora):
+def _com_centro(texto, centro):
+    """
+    30/10/2026: acrescenta CCO/CCM ao texto do operador -- "Fulano (08:00)
+    – CCO". So o centro, sem nome: "CCO". Nenhum dos dois: o proprio texto.
+    """
+    if not centro:
+        return texto
+    if not texto or texto == NAO_APLICAVEL:
+        return centro
+    return f'{texto} – {centro}'
+
+
+def _operador_ccm_texto(nome, hora, centro=None):
     """
     30/07/2026: formata um par Nome+Hora do Operador CCM (Abertura ou
     Entrega) como "NOME (HH:MM)". Se nao houver nome, cai em N/A --
@@ -75,10 +87,10 @@ def _operador_ccm_texto(nome, hora):
     sentido sem um nome associado.
     """
     if not nome or not str(nome).strip():
-        return NAO_APLICAVEL
+        return _com_centro(NAO_APLICAVEL, centro)
     if hora:
-        return f'{nome} ({hora:%H:%M})'
-    return str(nome)
+        return _com_centro(f'{nome} ({hora:%H:%M})', centro)
+    return _com_centro(str(nome), centro)
 
 
 def _campos_do_relatorio(rad):
@@ -130,13 +142,19 @@ def _campos_do_relatorio(rad):
         ('responsavel_atividade', 'Responsável Atividade', _ou_na(rad.responsavel_atividade)),
         (
             'operador_ccm_abertura',
-            'Op CCM - Abertura',
-            _operador_ccm_texto(rad.operador_ccm_abertura_nome, rad.operador_ccm_abertura_hora),
+            'Operador CCO/CCM - Abertura',
+            _operador_ccm_texto(
+                rad.operador_ccm_abertura_nome, rad.operador_ccm_abertura_hora,
+                rad.operador_ccm_abertura_centro,
+            ),
         ),
         (
             'operador_ccm_entrega',
-            'Op CCM - Entrega',
-            _operador_ccm_texto(rad.operador_ccm_entrega_nome, rad.operador_ccm_entrega_hora),
+            'Operador CCO/CCM - Entrega',
+            _operador_ccm_texto(
+                rad.operador_ccm_entrega_nome, rad.operador_ccm_entrega_hora,
+                rad.operador_ccm_entrega_centro,
+            ),
         ),
         (
             'descricao_tecnica_atividade',
@@ -266,10 +284,12 @@ def _grupos_da_mensagem(rad):
     responsaveis = [
         ('colaboradores', 'Responsável', ', '.join(rad.colaboradores.values_list('nome', flat=True))),
         ('responsavel_atividade', 'Responsável Atividade', rad.responsavel_atividade),
-        ('operador_ccm_abertura', 'Op CCM - Abertura',
-         _ccm(rad.operador_ccm_abertura_nome, rad.operador_ccm_abertura_hora)),
-        ('operador_ccm_entrega', 'Op CCM - Entrega',
-         _ccm(rad.operador_ccm_entrega_nome, rad.operador_ccm_entrega_hora)),
+        ('operador_ccm_abertura', 'Operador CCO/CCM - Abertura',
+         _com_centro(_ccm(rad.operador_ccm_abertura_nome, rad.operador_ccm_abertura_hora),
+                     rad.operador_ccm_abertura_centro)),
+        ('operador_ccm_entrega', 'Operador CCO/CCM - Entrega',
+         _com_centro(_ccm(rad.operador_ccm_entrega_nome, rad.operador_ccm_entrega_hora),
+                     rad.operador_ccm_entrega_centro)),
     ]
 
     return [

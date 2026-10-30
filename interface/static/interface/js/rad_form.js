@@ -304,6 +304,8 @@ document.addEventListener('DOMContentLoaded', async function () {
       operador_ccm_abertura_hora: '00:00',
       operador_ccm_entrega_nome: '',
       operador_ccm_entrega_hora: '00:00',
+      operador_ccm_abertura_centro: '',
+      operador_ccm_entrega_centro: '',
       descricao_tecnica_atividade: '',
       materiais_utilizados: '',
       observacoes_gerais: '',
@@ -1151,7 +1153,17 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
   }
 
-  const MAXIMO_BLOCOS_AMV = 16;
+  // 30/10/2026: o limite de blocos AMV depende do servico marcado --
+  // "Manutenção em AMV" = 16, "Manutenção Corretiva em AMV" = 3 (campo
+  // limite_blocos_amv do catalogo; vazio = 16). Com os dois marcados vale
+  // o MAIOR. Mesma regra do servidor (rad/validadores.py::limite_blocos_amv).
+  const LIMITE_PADRAO_BLOCOS_AMV = 16;
+  function limiteBlocosAmv() {
+    const limites = servicos
+      .filter((s) => s.requer_amv && rascunho.servicos.includes(s.id))
+      .map((s) => s.limite_blocos_amv || LIMITE_PADRAO_BLOCOS_AMV);
+    return limites.length ? Math.max(...limites) : LIMITE_PADRAO_BLOCOS_AMV;
+  }
   const containerBlocosAmv = document.getElementById('container-blocos-amv');
   const botaoAdicionarMch = document.getElementById('botao-adicionar-mch');
   const contadorBlocosAmv = document.getElementById('contador-blocos-amv');
@@ -1453,12 +1465,20 @@ document.addEventListener('DOMContentLoaded', async function () {
     rascunho.amv_blocos.forEach(function (bloco, indice) {
       containerBlocosAmv.appendChild(renderizarBlocoAmvIndividual(bloco, indice));
     });
-    contadorBlocosAmv.textContent = `${rascunho.amv_blocos.length} de ${MAXIMO_BLOCOS_AMV} blocos usados`;
-    botaoAdicionarMch.style.display = rascunho.amv_blocos.length >= MAXIMO_BLOCOS_AMV ? 'none' : '';
+    const limite = limiteBlocosAmv();
+    const excedeu = rascunho.amv_blocos.length > limite;
+    // Acima do limite (ex.: trocou "Manutenção em AMV" por "Manutenção
+    // Corretiva em AMV" com 5 blocos preenchidos): nada e apagado sozinho
+    // -- avisa para o tecnico remover os blocos que sobram.
+    contadorBlocosAmv.textContent = excedeu
+      ? `${rascunho.amv_blocos.length} de ${limite} blocos — remova ${rascunho.amv_blocos.length - limite} para sincronizar`
+      : `${rascunho.amv_blocos.length} de ${limite} blocos usados`;
+    contadorBlocosAmv.style.color = excedeu ? 'var(--cor-perigo)' : '';
+    botaoAdicionarMch.style.display = rascunho.amv_blocos.length >= limite ? 'none' : '';
   }
 
   botaoAdicionarMch.addEventListener('click', function () {
-    if (rascunho.amv_blocos.length >= MAXIMO_BLOCOS_AMV) return;
+    if (rascunho.amv_blocos.length >= limiteBlocosAmv()) return;
     rascunho.amv_blocos.push(criarBlocoAmvVazio());
     renderizarBlocosAmv();
     salvarRascunhoAgora();
@@ -2274,6 +2294,46 @@ document.addEventListener('DOMContentLoaded', async function () {
     salvarRascunhoAgora();
   });
 
+  // 30/10/2026: CCO ou CCM -- dois "flegues" que funcionam como escolha
+  // unica (marcar um desmarca o outro) mas podem ficar os dois vazios
+  // (opcional). A Entrega copia a escolha da Abertura ate o tecnico mexer
+  // nela -- mesmo comportamento do nome.
+  // Na edicao de um RAD ja salvo, uma Entrega ja preenchida nao e
+  // sobrescrita ao mexer na Abertura.
+  let ccmEntregaCentroEditadoManualmente = !!rascunho._operadorCcmEntregaCentroEditado
+    || !!(MODO_EDICAO && rascunho.operador_ccm_entrega_centro);
+  function ligarCentroOperador(qual, aoMudar) {
+    const chave = `operador_ccm_${qual}_centro`;
+    const caixas = {
+      CCO: document.getElementById(`campo-operador-ccm-${qual}-cco`),
+      CCM: document.getElementById(`campo-operador-ccm-${qual}-ccm`),
+    };
+    function mostrar(valor) {
+      caixas.CCO.checked = valor === 'CCO';
+      caixas.CCM.checked = valor === 'CCM';
+    }
+    mostrar(rascunho[chave] || '');
+    Object.keys(caixas).forEach(function (valor) {
+      caixas[valor].addEventListener('change', function () {
+        rascunho[chave] = caixas[valor].checked ? valor : '';
+        mostrar(rascunho[chave]);
+        if (aoMudar) aoMudar(rascunho[chave]);
+        salvarRascunhoAgora();
+      });
+    });
+    return mostrar;
+  }
+  const mostrarCentroEntrega = ligarCentroOperador('entrega', function () {
+    ccmEntregaCentroEditadoManualmente = true;
+    rascunho._operadorCcmEntregaCentroEditado = true;
+  });
+  ligarCentroOperador('abertura', function (valor) {
+    if (!ccmEntregaCentroEditadoManualmente) {
+      rascunho.operador_ccm_entrega_centro = valor;
+      mostrarCentroEntrega(valor);
+    }
+  });
+
   ligarCampoTexto('campo-descricao-tecnica', 'descricao_tecnica_atividade');
   ligarCampoTexto('campo-tipo-veiculo', 'tipo_veiculo');
   ligarCampoTexto('campo-operador', 'operador');
@@ -2473,6 +2533,8 @@ document.addEventListener('DOMContentLoaded', async function () {
       operador_ccm_abertura_hora: rascunho.operador_ccm_abertura_hora,
       operador_ccm_entrega_nome: rascunho.operador_ccm_entrega_nome,
       operador_ccm_entrega_hora: rascunho.operador_ccm_entrega_hora,
+      operador_ccm_abertura_centro: rascunho.operador_ccm_abertura_centro || null,
+      operador_ccm_entrega_centro: rascunho.operador_ccm_entrega_centro || null,
       descricao_tecnica_atividade: rascunho.descricao_tecnica_atividade,
       materiais_utilizados: rascunho.materiais_utilizados,
       observacoes_gerais: rascunho.observacoes_gerais,

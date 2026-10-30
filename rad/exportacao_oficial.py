@@ -276,9 +276,11 @@ def _operador_ccm_abertura_texto(rad):
     """
     nome = rad.operador_ccm_abertura_nome
     hora = rad.operador_ccm_abertura_hora
+    centro = rad.operador_ccm_abertura_centro  # 30/10/2026: CCO ou CCM, opcional
     if not nome:
-        return 'N/A'
-    return f'{nome} ({hora.strftime("%H:%M")})' if hora else nome
+        return centro or 'N/A'
+    texto = f'{nome} ({hora.strftime("%H:%M")})' if hora else nome
+    return f'{texto} – {centro}' if centro else texto
 
 
 def gerar_docx_oficial_bytes(rad):

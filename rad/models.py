@@ -211,6 +211,18 @@ class Rad(models.Model):
     operador_ccm_abertura_hora = models.TimeField(null=True, blank=True)
     operador_ccm_entrega_nome = models.CharField(max_length=50, null=True, blank=True)
     operador_ccm_entrega_hora = models.TimeField(null=True, blank=True)
+    # 30/10/2026: a pessoa informada na Abertura/Entrega pode ser do CCO
+    # ou do CCM -- o tecnico escolhe marcando uma das duas opcoes. Opcional
+    # (vazio = nao informado; RADs antigos ficam assim).
+    CENTRO_CCO = 'CCO'
+    CENTRO_CCM = 'CCM'
+    CENTRO_OPERADOR_CHOICES = [(CENTRO_CCO, 'CCO'), (CENTRO_CCM, 'CCM')]
+    operador_ccm_abertura_centro = models.CharField(
+        max_length=3, choices=CENTRO_OPERADOR_CHOICES, null=True, blank=True
+    )
+    operador_ccm_entrega_centro = models.CharField(
+        max_length=3, choices=CENTRO_OPERADOR_CHOICES, null=True, blank=True
+    )
     descricao_tecnica_atividade = models.TextField(
         null=True, blank=True, help_text='Sem limite de caracteres. Aceita qualquer caractere.'
     )

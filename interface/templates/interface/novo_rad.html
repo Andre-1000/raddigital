@@ -178,7 +178,10 @@
 
     <!-- Falha: Horario Programado de Inicio/Termino ficam ocultos e
          desabilitados (rad_form.js, atualizarHorariosProgramadosPorTipo). -->
-    <style>.campo[hidden], #bloco-duracao-programada[hidden] { display: none !important; }</style>
+    <style>.campo[hidden], #bloco-duracao-programada[hidden] { display: none !important; }
+      .grupo-centro-operador { display:flex; gap:1.2rem; flex-wrap:wrap; margin:0.3rem 0 0.5rem; }
+      .grupo-centro-operador label { display:flex; align-items:center; gap:0.4rem; font-weight:normal; }
+      .grupo-centro-operador input { min-width:20px; min-height:20px; }</style>
     <div class="cartao" id="secao-horarios" style="margin-top:1rem;">
       <h2 style="font-size:1rem;">Horários</h2>
 
@@ -439,12 +442,18 @@
         <input type="text" id="campo-operador">
       </div>
 
-      <!-- Operador CCM (30/07/2026): Abertura e Entrega, cada um com
+      <!-- 30/10/2026: "Operador CCO/CCM" -- antes do nome, o tecnico marca se
+           a pessoa e do CCO ou do CCM (no maximo uma opcao; opcional).
+           Operador CCM (30/07/2026): Abertura e Entrega, cada um com
            Nome (texto, 50 caracteres) e Hora (padrao 00:00). O nome da
            Entrega é preenchido automaticamente a partir da Abertura,
            mas pode ser editado (ver rad_form.js). -->
       <div class="campo" data-config-campo="operador_ccm_abertura">
-        <label>Op CCM - Abertura <span class="texto-suave" id="marcador-operador_ccm_abertura">(opcional)</span></label>
+        <label>Operador CCO/CCM - Abertura <span class="texto-suave" id="marcador-operador_ccm_abertura">(opcional)</span></label>
+        <div class="grupo-centro-operador" role="group" aria-label="Centro do operador (abertura)">
+          <label><input type="checkbox" class="checkbox-centro-operador" id="campo-operador-ccm-abertura-cco" value="CCO"> Opção 1 - CCO</label>
+          <label><input type="checkbox" class="checkbox-centro-operador" id="campo-operador-ccm-abertura-ccm" value="CCM"> Opção 2 - CCM</label>
+        </div>
         <div class="duas-colunas">
           <div>
             <label for="campo-operador-ccm-abertura-nome" class="texto-suave" style="font-size:0.8rem;">Nome</label>
@@ -458,7 +467,11 @@
       </div>
 
       <div class="campo" data-config-campo="operador_ccm_entrega">
-        <label>Op CCM - Entrega <span class="texto-suave" id="marcador-operador_ccm_entrega">(opcional)</span></label>
+        <label>Operador CCO/CCM - Entrega <span class="texto-suave" id="marcador-operador_ccm_entrega">(opcional)</span></label>
+        <div class="grupo-centro-operador" role="group" aria-label="Centro do operador (entrega)">
+          <label><input type="checkbox" class="checkbox-centro-operador" id="campo-operador-ccm-entrega-cco" value="CCO"> Opção 1 - CCO</label>
+          <label><input type="checkbox" class="checkbox-centro-operador" id="campo-operador-ccm-entrega-ccm" value="CCM"> Opção 2 - CCM</label>
+        </div>
         <div class="duas-colunas">
           <div>
             <label for="campo-operador-ccm-entrega-nome" class="texto-suave" style="font-size:0.8rem;">Nome</label>
@@ -469,7 +482,7 @@
             <input type="time" id="campo-operador-ccm-entrega-hora" value="00:00">
           </div>
         </div>
-        <p class="campo__ajuda">O nome é preenchido automaticamente a partir da Abertura, mas pode ser editado.</p>
+        <p class="campo__ajuda">O nome e a opção CCO/CCM são preenchidos automaticamente a partir da Abertura, mas podem ser editados.</p>
       </div>
 
       <div class="campo" data-config-campo="descricao_tecnica_atividade">
