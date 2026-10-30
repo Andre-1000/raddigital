@@ -404,10 +404,13 @@ const ExportarCliente = (function () {
   // 29/10/2026: N° SA obrigatoria so em Preventiva/Preditiva (exigeSa),
   // mesma regra do servidor (rad/validadores.py::_validar_numero_sa).
   // Sem o 3o parametro, mantem o comportamento antigo (exige fora de Falha).
-  function camposObrigatoriosFaltando(rascunho, ehFalha, exigeSa = !ehFalha) {
+  // 30/10/2026: linhaOpcional = so o Pátio marcado em Via (mesma regra do
+  // servidor, rad/validadores.py::_somente_patio).
+  function camposObrigatoriosFaltando(rascunho, ehFalha, exigeSa = !ehFalha, linhaOpcional = false) {
     const faltando = CAMPOS_OBRIGATORIOS_ROTULOS.filter(function ([chave]) {
       if (ehFalha && CHAVES_SO_FORA_DE_FALHA.includes(chave)) return false;
       if (chave === 'numero_sa' && !exigeSa) return false;
+      if (chave === 'linhas' && linhaOpcional) return false;
       const valor = rascunho[chave];
       if (Array.isArray(valor)) return valor.length === 0;
       return !valor;
@@ -420,7 +423,7 @@ const ExportarCliente = (function () {
     return faltando;
   }
 
-  function camposObrigatoriosPreenchidos(rascunho, ehFalha, exigeSa = !ehFalha) {
+  function camposObrigatoriosPreenchidos(rascunho, ehFalha, exigeSa = !ehFalha, linhaOpcional = false) {
     return !!(
       rascunho.numero_os &&
       (!exigeSa || rascunho.numero_sa) &&
@@ -430,7 +433,7 @@ const ExportarCliente = (function () {
       rascunho.id_local_final &&
       rascunho.km_poste_inicial &&
       rascunho.km_poste_final &&
-      rascunho.linhas && rascunho.linhas.length > 0 &&
+      (linhaOpcional || (rascunho.linhas && rascunho.linhas.length > 0)) &&
       rascunho.vias && rascunho.vias.length > 0 &&
       rascunho.id_tipo_manutencao &&
       (ehFalha || (rascunho.hora_prog_inicio && rascunho.hora_prog_termino)) &&

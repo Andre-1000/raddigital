@@ -202,11 +202,19 @@ sem combinar com o André:
   `rad_form.js::limiteBlocosAmv`. Acima do limite a tela avisa e não apaga nada.
 - **Operador CCO/CCM** (antes "Op CCM"): Abertura e Entrega ganham a escolha CCO ou CCM
   (`Rad.operador_ccm_abertura_centro`/`_entrega_centro`, migration `rad/0029`, opcional).
-  Dois "flegues" exclusivos ("Opção 1 - CCO" / "Opção 2 - CCM"); a Entrega copia a Abertura
+  Dois "flegues" exclusivos ("CCO" / "CCM"); a Entrega copia a Abertura
   até ser mexida. Textos: "Fulano (08:00) – CCO" (mensagem, PDF/Word simples, Word oficial
   na Abertura). A migration renomeia os rótulos em Configurações. Planilha/Excel não têm
   colunas de operador (nem antes) — nada a mudar no cabeçalho.
 - Testes: `rad/test_amv_corretiva_e_cco_ccm.py`, `interface/js_tests/teste_amv_corretiva_cco_ccm.js`.
+
+## Pátio deixa a Linha opcional (30/10/2026)
+- Quando a ÚNICA Via marcada é "Pátio", a Linha fica opcional: marcador vira "(opcional)" e
+  aparece "Quando Pátio é selecionado, a Linha torna-se opcional" abaixo da Linha. Pátio +
+  outra via → Linha obrigatória. `rad/validadores.py::_somente_patio` (também em
+  `_CONDICAO_VISIBILIDADE_CAMPO_CONFIG`, para o "obrigatório" de Configurações não travar),
+  `rad_form.js::atualizarLinhaPorVia`, `ExportarCliente.camposObrigatorios*(…, linhaOpcional)`.
+- Testes: `rad/test_patio_linha_opcional.py`, `interface/js_tests/teste_patio_linha.js`.
 
 ## Convenções de código
 

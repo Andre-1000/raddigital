@@ -194,9 +194,26 @@ def _validar_locais(payload, erros):
         erros.append(_erro('VLD-006', 'id_local_final', 'Selecione um Local Final.'))
 
 
+NOME_VIA_PATIO = 'Pátio'
+
+
+def _somente_patio(payload):
+    """
+    30/10/2026: True quando a UNICA Via marcada e "Pátio". Nesse caso a
+    Linha fica opcional (servico dentro do patio nao esta numa linha).
+    Pátio junto com outra via (ex.: Via 1 + Pátio) -> Linha obrigatoria.
+    """
+    from catalogos.models import CatVia
+
+    vias = payload.get('vias') or []
+    if len(vias) != 1:
+        return False
+    return CatVia.objects.filter(id=vias[0], nome=NOME_VIA_PATIO).exists()
+
+
 def _validar_linhas_e_vias(payload, erros):
-    """VLD-007/VLD-008."""
-    if not payload.get('linhas'):
+    """VLD-007/VLD-008. 30/10/2026: Linha opcional quando so o Pátio esta marcado."""
+    if not payload.get('linhas') and not _somente_patio(payload):
         erros.append(_erro('VLD-007', 'linhas', 'Selecione ao menos uma Linha.'))
     if not payload.get('vias'):
         erros.append(_erro('VLD-008', 'vias', 'Selecione ao menos uma Via.'))
@@ -776,6 +793,9 @@ _CONDICAO_VISIBILIDADE_CAMPO_CONFIG = {
     'hora_prog_termino': lambda payload: not payload.get('_tipo_manutencao_e_falha'),
     'numero_falha': lambda payload: bool(payload.get('_tipo_manutencao_e_falha')),
     'outros_servico_desc': _servico_outros_selecionado,
+    # 30/10/2026: so o Pátio marcado em Via -> Linha opcional, mesmo que o
+    # Administrador marque Linha como obrigatoria em Configuracoes.
+    'linhas': lambda payload: not _somente_patio(payload),
     'id_motivo_atraso_inicio': lambda payload: bool(payload.get('atraso_inicio')),
     'id_motivo_atraso_termino': lambda payload: bool(payload.get('atraso_termino')),
     'desc_motivo_atraso_inicio': lambda payload: (

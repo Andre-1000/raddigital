@@ -351,8 +351,17 @@ document.addEventListener('DOMContentLoaded', async function () {
     }
   }
 
+  // 30/10/2026: so o Pátio marcado em Via -> Linha opcional.
+  function somentePatioSeguro() {
+    try {
+      return somentePatioSelecionado();
+    } catch (erro) {
+      return false;
+    }
+  }
+
   function atualizarEstadoBotaoExportar() {
-    const habilitado = ExportarCliente.camposObrigatoriosPreenchidos(rascunho, ehFalhaSeguro(), exigeSaSeguro());
+    const habilitado = ExportarCliente.camposObrigatoriosPreenchidos(rascunho, ehFalhaSeguro(), exigeSaSeguro(), somentePatioSeguro());
     const botaoExportar = document.getElementById('botao-exportar');
     const botaoCopiar = document.getElementById('botao-copiar-mensagem');
     [botaoExportar, botaoCopiar].forEach(function (botao) {
@@ -480,12 +489,35 @@ document.addEventListener('DOMContentLoaded', async function () {
     salvarRascunhoAgora
   );
 
+  // 30/10/2026: quando a UNICA Via marcada e "Pátio", a Linha fica
+  // opcional (marcador vira "(opcional)" + aviso abaixo da Linha). Pátio
+  // junto com outra via: Linha obrigatoria. Mesma regra do servidor
+  // (rad/validadores.py::_somente_patio).
+  const NOME_VIA_PATIO = 'Pátio';
+  function somentePatioSelecionado() {
+    if (rascunho.vias.length !== 1) return false;
+    const via = vias.find((v) => String(v.id) === String(rascunho.vias[0]));
+    return !!via && via.nome === NOME_VIA_PATIO;
+  }
+  const marcadorLinhas = document.getElementById('marcador-linhas');
+  const ajudaLinhas = document.getElementById('ajuda-linhas');
+  function atualizarLinhaPorVia() {
+    const opcional = somentePatioSelecionado();
+    marcadorLinhas.textContent = opcional ? '(opcional)' : '*';
+    marcadorLinhas.className = opcional ? 'texto-suave' : 'obrigatorio';
+    ajudaLinhas.textContent = opcional ? 'Quando Pátio é selecionado, a Linha torna-se opcional' : '';
+  }
+
   renderizarChips(
     document.getElementById('chips-vias'),
     vias.map((v) => ({ valor: v.id, rotulo: v.nome })),
     rascunho.vias,
-    salvarRascunhoAgora
+    function () {
+      atualizarLinhaPorVia();
+      salvarRascunhoAgora();
+    }
   );
+  atualizarLinhaPorVia();
 
   renderizarChips(
     document.getElementById('chips-equipes'),
@@ -2379,14 +2411,14 @@ document.addEventListener('DOMContentLoaded', async function () {
   const avisoExportarRascunho = document.getElementById('aviso-exportar-rascunho');
 
   function avisarCamposFaltando() {
-    const faltando = ExportarCliente.camposObrigatoriosFaltando(rascunho, ehFalhaSeguro(), exigeSaSeguro());
+    const faltando = ExportarCliente.camposObrigatoriosFaltando(rascunho, ehFalhaSeguro(), exigeSaSeguro(), somentePatioSeguro());
     avisoExportarRascunho.innerHTML =
       '<div class="aviso aviso--erro">Preencha os campos obrigatórios antes de continuar: ' +
       faltando.join(', ') + '.</div>';
   }
 
   document.getElementById('botao-exportar').addEventListener('click', function () {
-    if (!ExportarCliente.camposObrigatoriosPreenchidos(rascunho, ehFalhaSeguro(), exigeSaSeguro())) {
+    if (!ExportarCliente.camposObrigatoriosPreenchidos(rascunho, ehFalhaSeguro(), exigeSaSeguro(), somentePatioSeguro())) {
       avisarCamposFaltando();
       return;
     }
@@ -2420,7 +2452,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   }
 
   document.getElementById('botao-copiar-mensagem').addEventListener('click', async function () {
-    if (!ExportarCliente.camposObrigatoriosPreenchidos(rascunho, ehFalhaSeguro(), exigeSaSeguro())) {
+    if (!ExportarCliente.camposObrigatoriosPreenchidos(rascunho, ehFalhaSeguro(), exigeSaSeguro(), somentePatioSeguro())) {
       avisarCamposFaltando();
       return;
     }
